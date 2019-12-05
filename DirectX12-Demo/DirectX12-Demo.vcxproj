@@ -19,10 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DXFactory.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="WinImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DXFactory.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="WinImpl.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
