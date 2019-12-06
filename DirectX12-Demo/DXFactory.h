@@ -1,13 +1,13 @@
 #pragma once
+#define WIN32_LEAN_AND_MEAN // for Windows.h minimum included
 #include <Windows.h>
-#include <stdint.h>
+#include <wrl.h> // Windows runtime library
+using namespace Microsoft::WRL;
 
 // DX12 spec
 #include <d3d12.h>
 #include <dxgi1_6.h> // DXGI1.6 adds HDR feature
-
-#include <wrl.h> // Windows runtime library
-using namespace Microsoft::WRL;
+#include <d3dx12.h>
 
 class DXFactory {
 public:

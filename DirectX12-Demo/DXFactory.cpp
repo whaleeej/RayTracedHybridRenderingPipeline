@@ -1,5 +1,4 @@
 #include <cassert>
-#include <d3dx12.h>
 
 #include "DXFactory.h"
 #include "Helpers.h"
@@ -204,7 +203,6 @@ HANDLE DXFactory::CreateEventHandle()
 
 	return fenceEvent;
 }
-
 
 // excluded from factory
 bool DXFactory::CheckTearingSupport()
