@@ -57,6 +57,14 @@ void WinImpl::createWindow(HINSTANCE hInst){
 	assert(hWnd && "Failed to create window");
 
 	g_hWnd = hWnd;
+
+	// Initialize the global window rect variable.
+	::GetWindowRect(g_hWnd, &g_WindowRect);
+}
+
+void WinImpl::showWindow()
+{
+	::ShowWindow(g_hWnd, SW_SHOW);
 }
 
 void WinImpl::setFullscreen(bool fullscreen)
@@ -70,7 +78,7 @@ void WinImpl::setFullscreen(bool fullscreen)
 			// Store the current window dimensions so they can be restored 
 			// when switching out of fullscreen state.
 			::GetWindowRect(g_hWnd, &g_WindowRect);
-			// Set the window style to a borderless window so the client area fills
+			// SeFVC/t the window style to a borderless window so the client area fills
 			// the entire screen.
 			UINT windowStyle = WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
 

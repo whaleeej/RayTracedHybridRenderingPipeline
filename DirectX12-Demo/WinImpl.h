@@ -7,6 +7,7 @@ class WinImpl {
 public:
 	void registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM));
 	void createWindow(HINSTANCE hInst);
+	void showWindow();
 	void setFullscreen(bool fullscreen);
 	void resize(uint32_t width, uint32_t height);
 

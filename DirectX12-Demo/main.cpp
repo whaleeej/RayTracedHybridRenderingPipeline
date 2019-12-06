@@ -55,9 +55,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (message)
 		{
 		case WM_PAINT:
+		{
 			dxClient.update();
 			dxClient.render();
-			break;
+		}
+		break;
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN:
 		{
@@ -81,9 +83,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		break;
-		// The default window procedure will play a system notification sound 
-		// when pressing the Alt+Enter keyboard combination if this message is 
-		// not handled.
 		case WM_SYSCHAR:
 			break;
 		case WM_SIZE:
@@ -119,19 +118,16 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 	// to achieve 100% scaling while still allowing non-client window content to 
 	// be rendered in a DPI sensitive fashion.
 	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
 	ParseCommandLineArguments();
 	EnableDebugLayer();
 
 	winImpl.registerWindowClass(hInstance, &WndProc);
 	winImpl.createWindow(hInstance);
-	// Initialize the global window rect variable.
-	::GetWindowRect(winImpl.g_hWnd, &winImpl.g_WindowRect);
-
 
 	//render loop with msg Callback
 	dxClient.initialize(winImpl);
-	::ShowWindow(winImpl.g_hWnd, SW_SHOW);
+
+	winImpl.showWindow();
 
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
