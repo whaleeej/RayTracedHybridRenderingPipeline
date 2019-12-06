@@ -19,11 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DXClient.cpp" />
     <ClCompile Include="DXFactory.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="WinImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DXClient.h" />
     <ClInclude Include="DXFactory.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="WinImpl.h" />
