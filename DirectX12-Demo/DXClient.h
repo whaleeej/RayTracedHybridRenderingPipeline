@@ -20,18 +20,27 @@ class WinImpl;
 
 class DXClient {
 public:
+	DXClient(bool useWarp=false, bool vSync=false, bool tearing=false);
+	~DXClient();
+	void initialize(WinImpl& winImpl);
+
 	uint64_t signal(uint64_t& fenceValue);
 	void waitForFenceValue(uint64_t fenceValue, HANDLE fenceEvent,
 		std::chrono::milliseconds duration = std::chrono::milliseconds::max());
 	void flush(uint64_t& fenceValue, HANDLE fenceEvent);
-	
+
+	void flush_out();
 	void update();
 	void render();
 	void resize(WinImpl& winImpl, uint32_t width, uint32_t height);
 
 public:
 	const static uint8_t g_NumFrames = 3; // back buffers
-	bool g_UseWarp = false; // Windows Advance Rasterization Platform
+
+	// Support configuration
+	bool g_UseWarp; // Windows Advance Rasterization Platform
+	bool g_VSync;
+	bool g_TearingSupported ;
 
 	// DirectX 12 Objects
 	ComPtr<ID3D12Device2> g_Device;
@@ -46,20 +55,16 @@ public:
 
 	// Sync Objects
 	ComPtr<ID3D12Fence> g_Fence; // fence per command queue
-	uint64_t g_FenceValue = 0;
-	uint64_t g_FrameFenceValues[g_NumFrames] = {};
+	uint64_t g_FenceValue ;
+	uint64_t g_FrameFenceValues[g_NumFrames] ;
 	HANDLE g_FenceEvent; // handle to osEvent
 
-	// Support configuration
-	bool g_VSync = true;
-	bool g_TearingSupported = false;
-
 	// Frametime
-	bool g_IsCounterInitialized = false;
+	bool g_IsCounterInitialized;
 	uint64_t frameCounter;
 	double elapsedSeconds;
 	std::chrono::high_resolution_clock clock;
 	std::chrono::time_point<std::chrono::steady_clock> t0 ;
 
-	bool g_IsInitialized = false;
+	bool g_IsInitialized;
 };

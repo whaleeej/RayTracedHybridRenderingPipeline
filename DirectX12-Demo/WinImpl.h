@@ -18,6 +18,7 @@ public:
 	uint32_t g_ClientHeight = 720;
 	bool g_Fullscreen = false;
 
+	// Used for registering & creating the window
 	const wchar_t* windowClassName = L"DX12WindowClass";
 	const wchar_t* windowTitle = L"DirectX12 Demo";
 };

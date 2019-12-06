@@ -204,7 +204,7 @@ HANDLE DXFactory::CreateEventHandle()
 	return fenceEvent;
 }
 
-// excluded from factory
+// Global Configuration
 bool DXFactory::CheckTearingSupport()
 {
 	BOOL allowTearing = FALSE;

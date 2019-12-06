@@ -6,6 +6,61 @@
 #include "WinImpl.h"
 #include "Helpers.h"
 
+DXClient::DXClient(bool useWarp, bool vSync, bool tearing):
+	g_UseWarp(useWarp), g_VSync(vSync), g_TearingSupported(tearing)
+{
+	g_FenceValue = 0;
+	
+	g_IsCounterInitialized = false;
+	frameCounter = 0;
+	elapsedSeconds = 0.0;
+	t0 = clock.now();
+
+	g_IsInitialized = false;
+}
+
+DXClient::~DXClient()
+{
+	::CloseHandle(g_FenceEvent);
+}
+
+void DXClient::initialize(WinImpl& winImpl)
+{
+	// tearing supported
+	g_TearingSupported = DXFactory::CheckTearingSupport();
+
+	// device
+	ComPtr<IDXGIAdapter4> dxgiAdapter4 = DXFactory::GetAdapter(g_UseWarp);
+	g_Device = DXFactory::CreateDevice(dxgiAdapter4);
+
+	// command queue and swap chain
+	g_CommandQueue = DXFactory::CreateCommandQueue(g_Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	g_SwapChain = DXFactory::CreateSwapChain(winImpl.g_hWnd, g_CommandQueue,
+		winImpl.g_ClientWidth, winImpl.g_ClientHeight, DXClient::g_NumFrames);
+
+	// RTV heap
+	g_RTVDescriptorHeap = DXFactory::CreateDescriptorHeap(g_Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, DXClient::g_NumFrames);
+	g_RTVDescriptorSize = g_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	// backBuffer and commandAllocator
+	DXFactory::UpdateRenderTargetViews(g_Device, g_SwapChain, g_RTVDescriptorHeap, g_BackBuffers, DXClient::g_NumFrames);
+	for (int i = 0; i < DXClient::g_NumFrames; ++i)
+	{
+		g_CommandAllocators[i] = DXFactory::CreateCommandAllocator(g_Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	}
+
+	// command List
+	g_CurrentBackBufferIndex = g_SwapChain->GetCurrentBackBufferIndex();
+	g_CommandList = DXFactory::CreateCommandList(g_Device,
+		g_CommandAllocators[g_CurrentBackBufferIndex], D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	// fence and fenceEvent
+	g_Fence = DXFactory::CreateFence(g_Device);
+	g_FenceEvent = DXFactory::CreateEventHandle();
+
+	g_IsInitialized = true;
+}
+
 uint64_t DXClient::signal(uint64_t& fenceValue)
 {
 	uint64_t fenceValueForSignal = ++fenceValue;
@@ -14,8 +69,7 @@ uint64_t DXClient::signal(uint64_t& fenceValue)
 	return fenceValueForSignal;
 }
 
-void DXClient::waitForFenceValue( uint64_t fenceValue, HANDLE fenceEvent,
-	std::chrono::milliseconds duration = std::chrono::milliseconds::max())
+void DXClient::waitForFenceValue( uint64_t fenceValue, HANDLE fenceEvent, std::chrono::milliseconds duration)
 {
 	if (g_Fence->GetCompletedValue() < fenceValue)
 	{
@@ -28,6 +82,11 @@ void DXClient::flush(uint64_t& fenceValue, HANDLE fenceEvent)
 {
 	uint64_t fenceValueForSignal = signal(fenceValue);
 	waitForFenceValue(fenceValueForSignal, fenceEvent);
+}
+
+void DXClient::flush_out()
+{
+	this->flush(g_FenceValue, g_FenceEvent);
 }
 
 void DXClient::update()
