@@ -2,10 +2,11 @@
 #include <Windows.h>
 #include <shellapi.h> // For CommandLineToArgvW after Windows.h
 
-#include "Helpers.h"
+
 #include "WinImpl.h"
 #include "DXFactory.h"
 #include "DXClient.h"
+#include "Helpers.h" // including after others
 
 WinImpl winImpl;
 DXClient dxClient;
