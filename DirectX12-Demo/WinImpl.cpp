@@ -3,7 +3,7 @@
 
 #include "WinImpl.h"
 
-void WinImpl::RegisterWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM))
+void WinImpl::registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM))
 {
 	// Register a window class for creating our render window with.
 	WNDCLASSEXW windowClass = {};
@@ -59,7 +59,7 @@ void WinImpl::createWindow(HINSTANCE hInst){
 	g_hWnd = hWnd;
 }
 
-void WinImpl::SetFullscreen(bool fullscreen)
+void WinImpl::setFullscreen(bool fullscreen)
 {
 	if (g_Fullscreen != fullscreen)
 	{

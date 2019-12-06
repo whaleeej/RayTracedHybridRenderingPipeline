@@ -1,15 +1,13 @@
 #pragma once
-
 #define WIN32_LEAN_AND_MEAN // for Windows.h minimum included
 #include <Windows.h>
 #include <stdint.h>
 
 class WinImpl {
-
 public:
-	void RegisterWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM));
+	void registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM));
 	void createWindow(HINSTANCE hInst);
-	void SetFullscreen(bool fullscreen);
+	void setFullscreen(bool fullscreen);
 	void resize(uint32_t width, uint32_t height);
 
 public:
