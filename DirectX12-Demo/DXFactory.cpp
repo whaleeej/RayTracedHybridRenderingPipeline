@@ -134,7 +134,7 @@ ComPtr<IDXGISwapChain4> DXFactory::CreateSwapChain(HWND hWnd,
 	swapChainDesc.Flags = CheckTearingSupport() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
 	ComPtr<IDXGISwapChain1> swapChain1;
-	ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd(
+	ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd( // tex creation hidden in 
 		commandQueue.Get(),
 		hWnd,
 		&swapChainDesc,
