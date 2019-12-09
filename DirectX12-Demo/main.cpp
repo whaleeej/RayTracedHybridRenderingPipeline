@@ -123,10 +123,8 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 
 	winImpl.registerWindowClass(hInstance, &WndProc);
 	winImpl.createWindow(hInstance);
-
 	//render loop with msg Callback
 	dxClient.initialize(winImpl);
-
 	winImpl.showWindow();
 
 	MSG msg = {};

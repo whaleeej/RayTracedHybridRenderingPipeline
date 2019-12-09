@@ -42,7 +42,7 @@ void DXClient::initialize(WinImpl& winImpl)
 	g_RTVDescriptorHeap = DXFactory::CreateDescriptorHeap(g_Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, DXClient::g_NumFrames);
 	g_RTVDescriptorSize = g_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	// backBuffer and commandAllocator
+	// backBuffer+RTV in heap and commandAllocator
 	DXFactory::UpdateRenderTargetViews(g_Device, g_SwapChain, g_RTVDescriptorHeap, g_BackBuffers, DXClient::g_NumFrames);
 	for (int i = 0; i < DXClient::g_NumFrames; ++i)
 	{
