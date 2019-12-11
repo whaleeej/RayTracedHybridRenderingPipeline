@@ -3,9 +3,9 @@
 #include "DXFactory.h"
 #include "Helpers.h"
 
-ComPtr<IDXGIAdapter4> DXFactory::GetAdapter(bool useWarp)
+MS_ComPtr(IDXGIAdapter4) DXFactory::GetAdapter(bool useWarp)
 {
-	ComPtr<IDXGIFactory4> dxgiFactory;
+	MS_ComPtr(IDXGIFactory4) dxgiFactory;
 	UINT createFactoryFlags = 0;
 #if defined(_DEBUG)
 	createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
@@ -13,8 +13,8 @@ ComPtr<IDXGIAdapter4> DXFactory::GetAdapter(bool useWarp)
 
 	ThrowIfFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
-	ComPtr<IDXGIAdapter1> dxgiAdapter1;
-	ComPtr<IDXGIAdapter4> dxgiAdapter4;
+	MS_ComPtr(IDXGIAdapter1) dxgiAdapter1;
+	MS_ComPtr(IDXGIAdapter4) dxgiAdapter4;
 
 	if (useWarp)
 	{
@@ -47,13 +47,13 @@ ComPtr<IDXGIAdapter4> DXFactory::GetAdapter(bool useWarp)
 	return dxgiAdapter4;
 }
 
-ComPtr<ID3D12Device2> DXFactory::CreateDevice(ComPtr<IDXGIAdapter4> adapter)
+MS_ComPtr(ID3D12Device2) DXFactory::CreateDevice(MS_ComPtr(IDXGIAdapter4) adapter)
 {
-	ComPtr<ID3D12Device2> d3d12Device2;
+	MS_ComPtr(ID3D12Device2) d3d12Device2;
 	ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3d12Device2)));
 	// Enable debug messages in debug mode.
 #if defined(_DEBUG)
-	ComPtr<ID3D12InfoQueue> pInfoQueue;
+	MS_ComPtr(ID3D12InfoQueue) pInfoQueue;
 	if (SUCCEEDED(d3d12Device2.As(&pInfoQueue)))
 	{
 		pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
@@ -90,10 +90,10 @@ ComPtr<ID3D12Device2> DXFactory::CreateDevice(ComPtr<IDXGIAdapter4> adapter)
 	return d3d12Device2;
 }
 
-ComPtr<ID3D12CommandQueue> DXFactory::CreateCommandQueue(ComPtr<ID3D12Device2> device, 
+MS_ComPtr(ID3D12CommandQueue) DXFactory::CreateCommandQueue(MS_ComPtr(ID3D12Device2) device, 
 	D3D12_COMMAND_LIST_TYPE type)
 {
-	ComPtr<ID3D12CommandQueue> d3d12CommandQueue;
+	MS_ComPtr(ID3D12CommandQueue) d3d12CommandQueue;
 
 	D3D12_COMMAND_QUEUE_DESC desc = {};
 	desc.Type = type;
@@ -106,12 +106,12 @@ ComPtr<ID3D12CommandQueue> DXFactory::CreateCommandQueue(ComPtr<ID3D12Device2> d
 	return d3d12CommandQueue;
 }
 
-ComPtr<IDXGISwapChain4> DXFactory::CreateSwapChain(HWND hWnd,
-	ComPtr<ID3D12CommandQueue> commandQueue,
+MS_ComPtr(IDXGISwapChain4) DXFactory::CreateSwapChain(HWND hWnd,
+	MS_ComPtr(ID3D12CommandQueue) commandQueue,
 	uint32_t width, uint32_t height, uint32_t bufferCount)
 {
-	ComPtr<IDXGISwapChain4> dxgiSwapChain4;
-	ComPtr<IDXGIFactory4> dxgiFactory4;
+	MS_ComPtr(IDXGISwapChain4) dxgiSwapChain4;
+	MS_ComPtr(IDXGIFactory4) dxgiFactory4;
 	UINT createFactoryFlags = 0;
 #if defined(_DEBUG)
 	createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
@@ -133,7 +133,7 @@ ComPtr<IDXGISwapChain4> DXFactory::CreateSwapChain(HWND hWnd,
 	// It is recommended to always allow tearing if tearing support is available.
 	swapChainDesc.Flags = CheckTearingSupport() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
-	ComPtr<IDXGISwapChain1> swapChain1;
+	MS_ComPtr(IDXGISwapChain1) swapChain1;
 	ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd( // tex creation hidden in 
 		commandQueue.Get(),
 		hWnd,
@@ -151,10 +151,10 @@ ComPtr<IDXGISwapChain4> DXFactory::CreateSwapChain(HWND hWnd,
 	return dxgiSwapChain4;
 }
 
-ComPtr<ID3D12DescriptorHeap> DXFactory::CreateDescriptorHeap(ComPtr<ID3D12Device2> device,
+MS_ComPtr(ID3D12DescriptorHeap) DXFactory::CreateDescriptorHeap(MS_ComPtr(ID3D12Device2) device,
 	D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors)
 {
-	ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+	MS_ComPtr(ID3D12DescriptorHeap) descriptorHeap;
 
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
@@ -165,19 +165,19 @@ ComPtr<ID3D12DescriptorHeap> DXFactory::CreateDescriptorHeap(ComPtr<ID3D12Device
 	return descriptorHeap;
 }
 
-ComPtr<ID3D12CommandAllocator> DXFactory::CreateCommandAllocator(ComPtr<ID3D12Device2> device,
+MS_ComPtr(ID3D12CommandAllocator) DXFactory::CreateCommandAllocator(MS_ComPtr(ID3D12Device2) device,
 	D3D12_COMMAND_LIST_TYPE type)
 {
-	ComPtr<ID3D12CommandAllocator> commandAllocator;
+	MS_ComPtr(ID3D12CommandAllocator) commandAllocator;
 	ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator)));
 
 	return commandAllocator;
 }
 
-ComPtr<ID3D12GraphicsCommandList> DXFactory::CreateCommandList(ComPtr<ID3D12Device2> device,
-	ComPtr<ID3D12CommandAllocator> commandAllocator, D3D12_COMMAND_LIST_TYPE type)
+MS_ComPtr(ID3D12GraphicsCommandList) DXFactory::CreateCommandList(MS_ComPtr(ID3D12Device2) device,
+	MS_ComPtr(ID3D12CommandAllocator) commandAllocator, D3D12_COMMAND_LIST_TYPE type)
 {
-	ComPtr<ID3D12GraphicsCommandList> commandList;
+	MS_ComPtr(ID3D12GraphicsCommandList) commandList;
 	ThrowIfFailed(device->CreateCommandList(0, type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
 
 	ThrowIfFailed(commandList->Close());
@@ -185,9 +185,9 @@ ComPtr<ID3D12GraphicsCommandList> DXFactory::CreateCommandList(ComPtr<ID3D12Devi
 	return commandList;
 }
 
-ComPtr<ID3D12Fence> DXFactory::CreateFence(ComPtr<ID3D12Device2> device)
+MS_ComPtr(ID3D12Fence) DXFactory::CreateFence(MS_ComPtr(ID3D12Device2) device)
 {
-	ComPtr<ID3D12Fence> fence;
+	MS_ComPtr(ID3D12Fence) fence;
 
 	ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 
@@ -213,10 +213,10 @@ bool DXFactory::CheckTearingSupport()
 	// DXGI 1.4 interface and query for the 1.5 interface. This is to enable the 
 	// graphics debugging tools which will not support the 1.5 factory interface 
 	// until a future update.
-	ComPtr<IDXGIFactory4> factory4;
+	MS_ComPtr(IDXGIFactory4) factory4;
 	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory4))))
 	{
-		ComPtr<IDXGIFactory5> factory5;
+		MS_ComPtr(IDXGIFactory5) factory5;
 		if (SUCCEEDED(factory4.As(&factory5)))
 		{
 			if (FAILED(factory5->CheckFeatureSupport(
@@ -231,9 +231,9 @@ bool DXFactory::CheckTearingSupport()
 	return allowTearing == TRUE;
 }
 
-void DXFactory::UpdateRenderTargetViews(ComPtr<ID3D12Device2> device,
-	ComPtr<IDXGISwapChain4> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap,
-	ComPtr<ID3D12Resource> backBuffers[], const uint8_t numFrames)
+void DXFactory::UpdateRenderTargetViews(MS_ComPtr(ID3D12Device2) device,
+	MS_ComPtr(IDXGISwapChain4) swapChain, MS_ComPtr(ID3D12DescriptorHeap) descriptorHeap,
+	MS_ComPtr(ID3D12Resource) backBuffers[], const uint8_t numFrames)
 {
 	auto rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
@@ -241,7 +241,7 @@ void DXFactory::UpdateRenderTargetViews(ComPtr<ID3D12Device2> device,
 
 	for (int i = 0; i < numFrames; ++i)
 	{
-		ComPtr<ID3D12Resource> backBuffer;
+		MS_ComPtr(ID3D12Resource) backBuffer;
 		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
 		device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);

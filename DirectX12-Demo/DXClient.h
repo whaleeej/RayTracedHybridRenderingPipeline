@@ -2,7 +2,9 @@
 #include <stdint.h>
 #include <chrono>
 #include <wrl.h> // Windows runtime library
-using namespace Microsoft::WRL;
+#ifndef MS_ComPtr
+#define MS_ComPtr(TYPE) Microsoft::WRL::ComPtr<TYPE>
+#endif
 
 // DX12 spec
 #include <d3d12.h>
@@ -43,18 +45,19 @@ public:
 	bool g_TearingSupported ;
 
 	// DirectX 12 Objects
-	ComPtr<ID3D12Device2> g_Device;
-	ComPtr<ID3D12CommandQueue> g_CommandQueue;
-	ComPtr<IDXGISwapChain4> g_SwapChain; // used to present
-	ComPtr<ID3D12Resource> g_BackBuffers[g_NumFrames]; // pointer to back buffer resources
-	ComPtr<ID3D12GraphicsCommandList> g_CommandList; // one per thread
-	ComPtr<ID3D12CommandAllocator> g_CommandAllocators[g_NumFrames]; // backing memory for commands, sync with GPU execution->one per backbuffer
-	ComPtr<ID3D12DescriptorHeap> g_RTVDescriptorHeap; // RTV(view=desc) location,type/dim of the RT(tex), 
+	MS_ComPtr(ID3D12Device2) g_Device1;
+	MS_ComPtr(ID3D12Device2) g_Device;
+	MS_ComPtr(ID3D12CommandQueue) g_CommandQueue;
+	MS_ComPtr(IDXGISwapChain4) g_SwapChain; // used to present
+	MS_ComPtr(ID3D12Resource) g_BackBuffers[g_NumFrames]; // pointer to back buffer resources
+	MS_ComPtr(ID3D12GraphicsCommandList) g_CommandList; // one per thread
+	MS_ComPtr(ID3D12CommandAllocator) g_CommandAllocators[g_NumFrames]; // backing memory for commands, sync with GPU execution->one per backbuffer
+	MS_ComPtr(ID3D12DescriptorHeap) g_RTVDescriptorHeap; // RTV(view=desc) location,type/dim of the RT(tex), 
 	UINT g_RTVDescriptorSize;
 	UINT g_CurrentBackBufferIndex;
 
 	// Sync Objects
-	ComPtr<ID3D12Fence> g_Fence; // fence per command queue
+	MS_ComPtr(ID3D12Fence) g_Fence; // fence per command queue
 	uint64_t g_FenceValue ;
 	uint64_t g_FrameFenceValues[g_NumFrames] ;
 	HANDLE g_FenceEvent; // handle to osEvent

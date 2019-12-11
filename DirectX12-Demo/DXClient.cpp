@@ -1,4 +1,4 @@
-//#include <d3dcompiler.h> 
+//#include <d3dcompiler.h>
 //#include <DirectXMath.h>
 
 #include "DXClient.h"
@@ -30,7 +30,7 @@ void DXClient::initialize(WinImpl& winImpl)
 	g_TearingSupported = DXFactory::CheckTearingSupport();
 
 	// device
-	ComPtr<IDXGIAdapter4> dxgiAdapter4 = DXFactory::GetAdapter(g_UseWarp);
+	MS_ComPtr(IDXGIAdapter4) dxgiAdapter4 = DXFactory::GetAdapter(g_UseWarp);
 	g_Device = DXFactory::CreateDevice(dxgiAdapter4);
 
 	// command queue and swap chain
