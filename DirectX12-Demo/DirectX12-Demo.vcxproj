@@ -20,12 +20,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DXClient.cpp" />
+    <ClCompile Include="DXCommandRequester.cpp" />
     <ClCompile Include="DXFactory.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="WinImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DXClient.h" />
+    <ClInclude Include="DXCommandRequester.h" />
     <ClInclude Include="DXFactory.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="WinImpl.h" />

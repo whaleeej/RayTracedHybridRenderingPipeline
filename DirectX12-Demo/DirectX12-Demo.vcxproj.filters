@@ -27,6 +27,9 @@
     <ClCompile Include="DXClient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DXCommandRequester.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Helpers.h">
@@ -39,6 +42,9 @@
       <Filter>Resource Files</Filter>
     </ClInclude>
     <ClInclude Include="DXClient.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DXCommandRequester.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
   </ItemGroup>
