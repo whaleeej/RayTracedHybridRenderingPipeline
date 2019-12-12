@@ -23,14 +23,14 @@
     <ClCompile Include="DXCommandRequester.cpp" />
     <ClCompile Include="DXFactory.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="WinImpl.cpp" />
+    <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DXClient.h" />
     <ClInclude Include="DXCommandRequester.h" />
     <ClInclude Include="DXFactory.h" />
     <ClInclude Include="Helpers.h" />
-    <ClInclude Include="WinImpl.h" />
+    <ClInclude Include="Window.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
