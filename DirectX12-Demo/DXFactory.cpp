@@ -180,15 +180,12 @@ MS_ComPtr(ID3D12GraphicsCommandList) DXFactory::CreateCommandList(MS_ComPtr(ID3D
 	MS_ComPtr(ID3D12GraphicsCommandList) commandList;
 	ThrowIfFailed(device->CreateCommandList(0, type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
 
-	ThrowIfFailed(commandList->Close());
-
 	return commandList;
 }
 
 MS_ComPtr(ID3D12Fence) DXFactory::CreateFence(MS_ComPtr(ID3D12Device2) device)
 {
 	MS_ComPtr(ID3D12Fence) fence;
-
 	ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 
 	return fence;
