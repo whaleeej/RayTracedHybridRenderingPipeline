@@ -3,12 +3,12 @@
 #include <shellapi.h> // For CommandLineToArgvW after Windows.h
 
 
-#include "WinImpl.h"
+#include "Window.h"
 #include "DXFactory.h"
 #include "DXClient.h"
 #include "Helpers.h" // including after others
 
-WinImpl winImpl;
+Window window;
 DXClient dxClient;
 
 void ParseCommandLineArguments()
@@ -20,11 +20,11 @@ void ParseCommandLineArguments()
 	{
 		if (::wcscmp(argv[i], L"-w") == 0 || ::wcscmp(argv[i], L"--width") == 0)
 		{
-			winImpl.g_ClientWidth = ::wcstol(argv[++i], nullptr, 10);
+			window.g_ClientWidth = ::wcstol(argv[++i], nullptr, 10);
 		}
 		if (::wcscmp(argv[i], L"-h") == 0 || ::wcscmp(argv[i], L"--height") == 0)
 		{
-			winImpl.g_ClientHeight = ::wcstol(argv[++i], nullptr, 10);
+			window.g_ClientHeight = ::wcstol(argv[++i], nullptr, 10);
 		}
 		if (::wcscmp(argv[i], L"-warp") == 0 || ::wcscmp(argv[i], L"--warp") == 0)
 		{
@@ -77,7 +77,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (alt)
 				{
 			case VK_F11:
-				winImpl.setFullscreen(!winImpl.g_Fullscreen);
+				window.setFullscreen(!window.g_Fullscreen);
 				}
 				break;
 			}
@@ -88,12 +88,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 		{
 			RECT clientRect = {};
-			::GetClientRect(winImpl.g_hWnd, &clientRect);
+			::GetClientRect(window.g_hWnd, &clientRect);
 
 			int width = clientRect.right - clientRect.left;
 			int height = clientRect.bottom - clientRect.top;
 
-			dxClient.resize(winImpl , width, height);
+			dxClient.resize(window , width, height);
 		}
 		break;
 		case WM_DESTROY:
@@ -121,11 +121,11 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 	ParseCommandLineArguments();
 	EnableDebugLayer();
 
-	winImpl.registerWindowClass(hInstance, &WndProc);
-	winImpl.createWindow(hInstance);
+	window.registerWindowClass(hInstance, &WndProc);
+	window.createWindow(hInstance);
 	//render loop with msg Callback
-	dxClient.initialize(winImpl);
-	winImpl.showWindow();
+	dxClient.initialize(window);
+	window.showWindow();
 
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
@@ -136,9 +136,6 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 			::DispatchMessage(&msg);
 		}
 	}
-
-	// Make sure the command queue has finished all commands before closing.
-	dxClient.flush_out();
 
 	return 0;
 }
