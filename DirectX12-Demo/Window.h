@@ -3,7 +3,7 @@
 #include <Windows.h>
 #include <stdint.h>
 
-class WinImpl {
+class Window {
 public:
 	void registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM));
 	void createWindow(HINSTANCE hInst);

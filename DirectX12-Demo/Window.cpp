@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <cassert>
 
-#include "WinImpl.h"
+#include "Window.h"
 
-void WinImpl::registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM))
+void Window::registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM))
 {
 	// Register a window class for creating our render window with.
 	WNDCLASSEXW windowClass = {};
@@ -25,7 +25,7 @@ void WinImpl::registerWindowClass(HINSTANCE hInst, LRESULT CALLBACK WndProc(HWND
 	assert(atom > 0);
 }
 
-void WinImpl::createWindow(HINSTANCE hInst){
+void Window::createWindow(HINSTANCE hInst){
 	int screenWidth = ::GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = ::GetSystemMetrics(SM_CYSCREEN);
 
@@ -62,12 +62,12 @@ void WinImpl::createWindow(HINSTANCE hInst){
 	::GetWindowRect(g_hWnd, &g_WindowRect);
 }
 
-void WinImpl::showWindow()
+void Window::showWindow()
 {
 	::ShowWindow(g_hWnd, SW_SHOW);
 }
 
-void WinImpl::setFullscreen(bool fullscreen)
+void Window::setFullscreen(bool fullscreen)
 {
 	if (g_Fullscreen != fullscreen)
 	{
@@ -117,7 +117,7 @@ void WinImpl::setFullscreen(bool fullscreen)
 	}
 }
 
-void WinImpl::resize(uint32_t width, uint32_t height) {
+void Window::resize(uint32_t width, uint32_t height) {
 	this->g_ClientWidth = std::max<unsigned int>(1u, width);
 	this->g_ClientHeight = std::max<unsigned int>(1u, height);
 }
