@@ -19,18 +19,36 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DXClient.cpp" />
-    <ClCompile Include="DXCommandRequester.cpp" />
-    <ClCompile Include="DXFactory.cpp" />
+    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="DX12LibPCH.cpp" />
+    <ClCompile Include="Game.cpp" />
+    <ClCompile Include="Game02.cpp" />
+    <ClCompile Include="HighResolutionClock.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DXClient.h" />
-    <ClInclude Include="DXCommandRequester.h" />
-    <ClInclude Include="DXFactory.h" />
+    <ClInclude Include="Application.h" />
+    <ClInclude Include="CommandQueue.h" />
+    <ClInclude Include="DX12LibPCH.h" />
+    <ClInclude Include="Events.h" />
+    <ClInclude Include="Game.h" />
+    <ClInclude Include="Game02.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="HighResolutionClock.h" />
+    <ClInclude Include="KeyCodes.h" />
     <ClInclude Include="Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\shaders\PixelShader.hlsl">
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="..\shaders\VertexShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
+    </FxCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -101,11 +119,15 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions>_ENABLE_EXTENDED_ALIGNED_STORAGE;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>%(AdditionalDependencies);d3d12.lib;dxgi.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;Shlwapi.lib</AdditionalDependencies>
     </Link>
+    <FxCompile>
+      <ShaderModel>5.1</ShaderModel>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
