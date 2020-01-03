@@ -39,6 +39,9 @@
     <ClCompile Include="Game02.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="UploadBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12LibPCH.h">
@@ -69,6 +72,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game02.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UploadBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
