@@ -23,7 +23,7 @@
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="DX12LibPCH.cpp" />
     <ClCompile Include="Game.cpp" />
-    <ClCompile Include="Game02.cpp" />
+    <ClCompile Include="Tutorial2.cpp" />
     <ClCompile Include="HighResolutionClock.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="UploadBuffer.cpp" />
@@ -36,7 +36,7 @@
     <ClInclude Include="DX12LibPCH.h" />
     <ClInclude Include="Events.h" />
     <ClInclude Include="Game.h" />
-    <ClInclude Include="Game02.h" />
+    <ClInclude Include="Tutorial2.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="HighResolutionClock.h" />
     <ClInclude Include="KeyCodes.h" />

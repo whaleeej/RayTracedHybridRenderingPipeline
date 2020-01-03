@@ -3,7 +3,7 @@
 #include <Shlwapi.h>
 
 #include "Application.h"
-#include "Game02.h"
+#include "Tutorial2.h"
 
 #include <dxgidebug.h>
 
