@@ -1,4 +1,4 @@
-#include <Tutorial4.h>
+#include <HybridPipeline.h>
 
 #include <Application.h>
 #include <CommandQueue.h>
@@ -133,7 +133,7 @@ XMMATRIX XM_CALLCONV LookAtMatrix(FXMVECTOR Position, FXMVECTOR Direction, FXMVE
     return M;
 }
 
-Tutorial4::Tutorial4(const std::wstring& name, int width, int height, bool vSync)
+HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
     , m_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX))
     , m_Viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
@@ -163,12 +163,12 @@ Tutorial4::Tutorial4(const std::wstring& name, int width, int height, bool vSync
     m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
 }
 
-Tutorial4::~Tutorial4()
+HybridPipeline::~HybridPipeline()
 {
     _aligned_free(m_pAlignedCameraData);
 }
 
-bool Tutorial4::LoadContent()
+bool HybridPipeline::LoadContent()
 {
     auto device = Application::Get().GetDevice();
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
@@ -254,8 +254,8 @@ bool Tutorial4::LoadContent()
         // Load the Skybox shaders.
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/Skybox_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/Skybox_PS.cso", &ps));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Skybox_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Skybox_PS.cso", &ps));
 
         // Setup the input layout for the skybox vertex shader.
         D3D12_INPUT_ELEMENT_DESC inputLayout[1] = {
@@ -313,8 +313,8 @@ bool Tutorial4::LoadContent()
         // Load the HDR shaders.
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/HDR_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/HDR_PS.cso", &ps));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDR_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDR_PS.cso", &ps));
 
         // Allow input layout and deny unnecessary access to certain pipeline stages.
         D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -385,8 +385,8 @@ bool Tutorial4::LoadContent()
         // Create the SDR PSO
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/HDRtoSDR_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/Tutorial4/HDRtoSDR_PS.cso", &ps));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDRtoSDR_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDRtoSDR_PS.cso", &ps));
 
         CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
         rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -420,7 +420,7 @@ bool Tutorial4::LoadContent()
     return true;
 }
 
-void Tutorial4::OnResize(ResizeEventArgs& e)
+void HybridPipeline::OnResize(ResizeEventArgs& e)
 {
     super::OnResize(e);
 
@@ -439,11 +439,11 @@ void Tutorial4::OnResize(ResizeEventArgs& e)
     }
 }
 
-void Tutorial4::UnloadContent()
+void HybridPipeline::UnloadContent()
 {
 }
 
-void Tutorial4::OnUpdate(UpdateEventArgs& e)
+void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 {
     static uint64_t frameCount = 0;
     static double totalTime = 0.0;
@@ -702,7 +702,7 @@ void XM_CALLCONV ComputeMatrices(FXMMATRIX model, CXMMATRIX view, CXMMATRIX view
     mat.ModelViewProjectionMatrix = model * viewProjection;
 }
 
-void Tutorial4::OnRender(RenderEventArgs& e)
+void HybridPipeline::OnRender(RenderEventArgs& e)
 {
     super::OnRender(e);
 
@@ -935,7 +935,7 @@ void Tutorial4::OnRender(RenderEventArgs& e)
 
 static bool g_AllowFullscreenToggle = true;
 
-void Tutorial4::OnKeyPressed(KeyEventArgs& e)
+void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
 {
     super::OnKeyPressed(e);
 
@@ -999,7 +999,7 @@ void Tutorial4::OnKeyPressed(KeyEventArgs& e)
     }
 }
 
-void Tutorial4::OnKeyReleased(KeyEventArgs& e)
+void HybridPipeline::OnKeyReleased(KeyEventArgs& e)
 {
     super::OnKeyReleased(e);
 
@@ -1043,7 +1043,7 @@ void Tutorial4::OnKeyReleased(KeyEventArgs& e)
     }
 }
 
-void Tutorial4::OnMouseMoved(MouseMotionEventArgs& e)
+void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
 {
     super::OnMouseMoved(e);
 
@@ -1062,7 +1062,7 @@ void Tutorial4::OnMouseMoved(MouseMotionEventArgs& e)
 }
 
 
-void Tutorial4::OnMouseWheel(MouseWheelEventArgs& e)
+void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 {
     if (!ImGui::GetIO().WantCaptureMouse)
     {

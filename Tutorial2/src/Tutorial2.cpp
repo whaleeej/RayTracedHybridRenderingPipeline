@@ -355,6 +355,8 @@ void Tutorial2::OnRender(RenderEventArgs& e)
 {
     super::OnRender(e);
 
+	if (!m_ContentLoaded) return;
+
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 

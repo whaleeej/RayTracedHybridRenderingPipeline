@@ -137,11 +137,11 @@ bool Tutorial3::LoadContent()
 
     // Load the vertex shader.
     ComPtr<ID3DBlob> vertexShaderBlob;
-    ThrowIfFailed( D3DReadFileToBlob( L"data/shaders/Tutorial3/VertexShader.cso", &vertexShaderBlob ) );
+    ThrowIfFailed( D3DReadFileToBlob( L"build_vs2019/data/shaders/Tutorial3/VertexShader.cso", &vertexShaderBlob ) );
 
     // Load the pixel shader.
     ComPtr<ID3DBlob> pixelShaderBlob;
-    ThrowIfFailed( D3DReadFileToBlob( L"data/shaders/Tutorial3/PixelShader.cso", &pixelShaderBlob ) );
+    ThrowIfFailed( D3DReadFileToBlob( L"build_vs2019/data/shaders/Tutorial3/PixelShader.cso", &pixelShaderBlob ) );
 
     // Create a root signature.
     D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
@@ -705,11 +705,11 @@ void Tutorial3::OnMouseMoved( MouseMotionEventArgs& e )
     {
         if ( e.LeftButton )
         {
-            m_Pitch -= e.RelY * mouseSpeed;
+            m_Pitch += e.RelY * mouseSpeed;
 
             m_Pitch = clamp( m_Pitch, -90.0f, 90.0f );
 
-            m_Yaw -= e.RelX * mouseSpeed;
+            m_Yaw += e.RelX * mouseSpeed;
         }
     }
 }

@@ -15,7 +15,7 @@ PUSHD %CMAKE_BINARY_DIR%
 IF ERRORLEVEL 1 (
     PAUSE
 ) ELSE (
-    START LearningDirectX12.sln
+    START DirectX12-Demo.sln
 )
 
 POPD
