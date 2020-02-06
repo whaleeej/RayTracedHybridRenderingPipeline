@@ -295,6 +295,8 @@ void CommandList::LoadTextureFromFile( Texture& texture, const std::wstring& fil
         
         CopyTextureSubresource( texture, 0, static_cast<uint32_t>( subresources.size() ), subresources.data() );
 
+		int mipLevel = textureResource->GetDesc().MipLevels;
+
         if ( subresources.size() < textureResource->GetDesc().MipLevels )
         {
             GenerateMips( texture );

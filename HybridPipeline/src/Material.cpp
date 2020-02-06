@@ -48,8 +48,8 @@ const Material Material::Magenta =
 const Material Material::Yellow =
 {
     { 0.0f, 0.0f, 0.0f, 1.0f },
-    { 0.0f, 0.1f, 0.1f, 1.0f },
-    { 0.0f, 1.0f, 1.0f, 1.0f },
+    { 0.1f, 0.1f, 0.0f, 1.0f },
+    { 1.0f, 1.0f, 0.0f, 1.0f },
     { 1.0f, 1.0f, 1.0f, 1.0f },
     128.0f
 };

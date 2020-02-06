@@ -16,14 +16,14 @@ set( SRC_FILES
 )
 
 set( VERTEX_SHADER_FILES 
-    shaders/HDR_VS.hlsl
-    shaders/HDRtoSDR_VS.hlsl
+    shaders/Deferred_VS.hlsl
+    shaders/PostProcessing_VS.hlsl
     shaders/Skybox_VS.hlsl
 )
 
 set( PIXEL_SHADER_FILES
-    shaders/HDR_PS.hlsl
-    shaders/HDRtoSDR_PS.hlsl
+    shaders/Deferred_PS.hlsl
+    shaders/PostProcessing_PS.hlsl
     shaders/Skybox_PS.hlsl
 )
 

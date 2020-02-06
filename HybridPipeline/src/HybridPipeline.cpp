@@ -30,8 +30,7 @@ using namespace DirectX;
 struct Mat
 {
     XMMATRIX ModelMatrix;
-    XMMATRIX ModelViewMatrix;
-    XMMATRIX InverseTransposeModelViewMatrix;
+    XMMATRIX InverseTransposeModelMatrix;
     XMMATRIX ModelViewProjectionMatrix;
 };
 
@@ -41,57 +40,6 @@ struct LightProperties
     uint32_t NumSpotLights;
 };
 
-enum TonemapMethod : uint32_t
-{
-    TM_Linear,
-    TM_Reinhard,
-    TM_ReinhardSq,
-    TM_ACESFilmic,
-};
-
-struct TonemapParameters
-{
-    TonemapParameters()
-        : TonemapMethod(TM_Reinhard)
-        , Exposure(0.0f)
-        , MaxLuminance(1.0f)
-        , K(1.0f)
-        , A(0.22f)
-        , B(0.3f)
-        , C(0.1f)
-        , D(0.2f)
-        , E(0.01f)
-        , F(0.3f)
-        , LinearWhite(11.2f)
-        , Gamma(2.2f)
-    {}
-
-    // The method to use to perform tonemapping.
-    TonemapMethod TonemapMethod;
-    // Exposure should be expressed as a relative exposure value (-2, -1, 0, +1, +2 )
-    float Exposure;
-
-    // The maximum luminance to use for linear tonemapping.
-    float MaxLuminance;
-
-    // Reinhard constant. Generally this is 1.0.
-    float K;
-
-    // ACES Filmic parameters
-    // See: https://www.slideshare.net/ozlael/hable-john-uncharted2-hdr-lighting/142
-    float A; // Shoulder strength
-    float B; // Linear strength
-    float C; // Linear angle
-    float D; // Toe strength
-    float E; // Toe Numerator
-    float F; // Toe denominator
-    // Note E/F = Toe angle.
-    float LinearWhite;
-    float Gamma;
-};
-
-TonemapParameters g_TonemapParameters;
-
 // An enum for root signature parameters.
 // I'm not using scoped enums to avoid the explicit cast that would be required
 // to use these as root indices in the root signature.
@@ -99,10 +47,7 @@ enum RootParameters
 {
     MatricesCB,         // ConstantBuffer<Mat> MatCB : register(b0);
     MaterialCB,         // ConstantBuffer<Material> MaterialCB : register( b0, space1 );
-    LightPropertiesCB,  // ConstantBuffer<LightProperties> LightPropertiesCB : register( b1 );
-    PointLights,        // StructuredBuffer<PointLight> PointLights : register( t0 );
-    SpotLights,         // StructuredBuffer<SpotLight> SpotLights : register( t1 );
-    Textures,           // Texture2D DiffuseTexture : register( t2 );
+    Textures,           // Texture2D DiffuseTexture : register( t0 );
     NumRootParameters
 };
 
@@ -158,7 +103,6 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
 
     m_pAlignedCameraData = (CameraData*)_aligned_malloc(sizeof(CameraData), 16);
-
     m_pAlignedCameraData->m_InitialCamPos = m_Camera.get_Translation();
     m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
 }
@@ -184,11 +128,20 @@ bool HybridPipeline::LoadContent()
     m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
 
     // Load some textures
-    commandList->LoadTextureFromFile(m_DefaultTexture, L"Assets/Textures/DefaultWhite.bmp");
-    commandList->LoadTextureFromFile(m_DirectXTexture, L"Assets/Textures/Directx9.png");
-    commandList->LoadTextureFromFile(m_EarthTexture, L"Assets/Textures/earth.dds");
-    commandList->LoadTextureFromFile(m_MonaLisaTexture, L"Assets/Textures/Mona_Lisa.jpg");
-    commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr");
+    commandList->LoadTextureFromFile(m_DefaultTexture, L"Assets/Textures/DefaultWhite.bmp", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_EarthTexture, L"Assets/Textures/earth.dds", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_MonaLisaTexture, L"Assets/Textures/Mona_Lisa.jpg", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+
+	// load PBR textures
+	commandList->LoadTextureFromFile(m_default_albedo_texture, L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(m_default_metallic_texture, L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
+	commandList->LoadTextureFromFile(m_default_normal_texture, L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
+	commandList->LoadTextureFromFile(m_default_roughness_texture, L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
+	commandList->LoadTextureFromFile(m_rustedIron_albedo_texture, L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(m_rustedIron_metallic_texture, L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
+	commandList->LoadTextureFromFile(m_rustedIron_normal_texture, L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
+	commandList->LoadTextureFromFile(m_rustedIron_roughness_texture, L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
 
     // Create a cubemap for the HDR panorama.
     auto cubemapDesc = m_GraceCathedralTexture.GetD3D12ResourceDesc();
@@ -204,10 +157,11 @@ bool HybridPipeline::LoadContent()
     DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
 
-    // Check the best multisample quality level that can be used for the given texture format.
-    DXGI_SAMPLE_DESC sampleDesc = Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT);
+    // Disable the multiple sampling for performance and simplicity
+	DXGI_SAMPLE_DESC sampleDesc = {1, 0}/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
 
-    // Create an off-screen render target with a single color buffer and a depth buffer.
+    // Create an off-screen multi render target(MRT) and a depth buffer.
+	// AttachmentPoint::Color0
     auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
         m_Width, m_Height,
         1, 1,
@@ -215,16 +169,29 @@ bool HybridPipeline::LoadContent()
         D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
     D3D12_CLEAR_VALUE colorClearValue;
     colorClearValue.Format = colorDesc.Format;
-    colorClearValue.Color[0] = 0.4f;
-    colorClearValue.Color[1] = 0.6f;
-    colorClearValue.Color[2] = 0.9f;
+    colorClearValue.Color[0] = 0.0f;
+    colorClearValue.Color[1] = 0.0f;
+    colorClearValue.Color[2] = 0.0f;
     colorClearValue.Color[3] = 1.0f;
 
-    Texture HDRTexture = Texture(colorDesc, &colorClearValue,
+    Texture gPosition = Texture(colorDesc, &colorClearValue,
         TextureUsage::RenderTarget,
-        L"HDR Texture");
+        L"gPosition Texture");
+	Texture gAlbedo = Texture(colorDesc, &colorClearValue,
+		TextureUsage::RenderTarget,
+		L"gAlbedo Texture");
+	Texture gMetallic = Texture(colorDesc, &colorClearValue,
+		TextureUsage::RenderTarget,
+		L"gMetallic Texture");
+	Texture gNormal = Texture(colorDesc, &colorClearValue,
+		TextureUsage::RenderTarget,
+		L"gNormal Texture");
+	Texture gRoughness = Texture(colorDesc, &colorClearValue,
+		TextureUsage::RenderTarget,
+		L"gRoughness Texture");
+	
 
-    // Create a depth buffer for the HDR render target.
+    // Create a depth buffer for the Deferred render target.
     auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
         m_Width, m_Height,
         1, 1,
@@ -239,8 +206,12 @@ bool HybridPipeline::LoadContent()
         L"Depth Render Target");
 
     // Attach the HDR texture to the HDR render target.
-    m_HDRRenderTarget.AttachTexture(AttachmentPoint::Color0, HDRTexture);
-    m_HDRRenderTarget.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color0, gPosition);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color1, gAlbedo);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color2, gMetallic);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color3, gNormal);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color4, gRoughness);
+	m_DeferredRenderTarget.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
 
     D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
     featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -249,18 +220,13 @@ bool HybridPipeline::LoadContent()
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
     }
 
-    // Create a root signature and PSO for the skybox shaders.
+    // Create a root signature for the Deferred Shadings pipeline.
     {
-        // Load the Skybox shaders.
+        // Load the Deferred shaders.
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Skybox_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Skybox_PS.cso", &ps));
-
-        // Setup the input layout for the skybox vertex shader.
-        D3D12_INPUT_ELEMENT_DESC inputLayout[1] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Deferred_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Deferred_PS.cso", &ps));
 
         // Allow input layout and deny unnecessary access to certain pipeline stages.
         D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -269,80 +235,23 @@ bool HybridPipeline::LoadContent()
             D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
             D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
-        CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-        CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-        rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-        rootParameters[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        CD3DX12_STATIC_SAMPLER_DESC linearClampSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-
-        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-        rootSignatureDescription.Init_1_1(2, rootParameters, 1, &linearClampSampler, rootSignatureFlags);
-
-        m_SkyboxSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-        // Setup the Skybox pipeline state.
-        struct SkyboxPipelineState
-        {
-            CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-            CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-            CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-            CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-            CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-            CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-            CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-        } skyboxPipelineStateStream;
-
-        skyboxPipelineStateStream.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
-        skyboxPipelineStateStream.InputLayout = { inputLayout, 1 };
-        skyboxPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        skyboxPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-        skyboxPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-        skyboxPipelineStateStream.RTVFormats = m_HDRRenderTarget.GetRenderTargetFormats();
-        skyboxPipelineStateStream.SampleDesc = sampleDesc;
-
-        D3D12_PIPELINE_STATE_STREAM_DESC skyboxPipelineStateStreamDesc = {
-            sizeof(SkyboxPipelineState), &skyboxPipelineStateStream
-        };
-        ThrowIfFailed(device->CreatePipelineState(&skyboxPipelineStateStreamDesc, IID_PPV_ARGS(&m_SkyboxPipelineState)));
-    }
-
-    // Create a root signature for the HDR pipeline.
-    {
-        // Load the HDR shaders.
-        ComPtr<ID3DBlob> vs;
-        ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDR_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDR_PS.cso", &ps));
-
-        // Allow input layout and deny unnecessary access to certain pipeline stages.
-        D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-        CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
+        CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
 
         CD3DX12_ROOT_PARAMETER1 rootParameters[RootParameters::NumRootParameters];
         rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
         rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[RootParameters::LightPropertiesCB].InitAsConstants(sizeof(LightProperties) / 4, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[RootParameters::PointLights].InitAsShaderResourceView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[RootParameters::SpotLights].InitAsShaderResourceView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[RootParameters::Textures].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
-        CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
-        CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
+        //CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
+		CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-        rootSignatureDescription.Init_1_1(RootParameters::NumRootParameters, rootParameters, 1, &linearRepeatSampler, rootSignatureFlags);
+        rootSignatureDescription.Init_1_1(RootParameters::NumRootParameters, rootParameters, 1, &anisotropicSampler, rootSignatureFlags);
 
-        m_HDRRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+        m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
-        // Setup the HDR pipeline state.
-        struct HDRPipelineStateStream
+        // Setup the Deferred pipeline state.
+        struct DeferredPipelineStateStream
         {
             CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
             CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
@@ -352,41 +261,40 @@ bool HybridPipeline::LoadContent()
             CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
             CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
             CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-        } hdrPipelineStateStream;
+        } deferredPipelineStateStream;
 
-        hdrPipelineStateStream.pRootSignature = m_HDRRootSignature.GetRootSignature().Get();
-        hdrPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
-        hdrPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        hdrPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-        hdrPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-        hdrPipelineStateStream.DSVFormat = m_HDRRenderTarget.GetDepthStencilFormat();
-        hdrPipelineStateStream.RTVFormats = m_HDRRenderTarget.GetRenderTargetFormats();
-        hdrPipelineStateStream.SampleDesc = sampleDesc;
+		deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
+		deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
+		deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+		deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+		deferredPipelineStateStream.DSVFormat = m_DeferredRenderTarget.GetDepthStencilFormat();
+		deferredPipelineStateStream.RTVFormats = m_DeferredRenderTarget.GetRenderTargetFormats();
+		deferredPipelineStateStream.SampleDesc = sampleDesc;
 
-        D3D12_PIPELINE_STATE_STREAM_DESC hdrPipelineStateStreamDesc = {
-            sizeof(HDRPipelineStateStream), &hdrPipelineStateStream
+        D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
+            sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
         };
-        ThrowIfFailed(device->CreatePipelineState(&hdrPipelineStateStreamDesc, IID_PPV_ARGS(&m_HDRPipelineState)));
+        ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
     }
 
     // Create the SDR Root Signature
     {
         CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-        CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-        rootParameters[0].InitAsConstants(sizeof(TonemapParameters) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+        CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+        rootParameters[0].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-        rootSignatureDescription.Init_1_1(2, rootParameters);
+        rootSignatureDescription.Init_1_1(1, rootParameters);
 
         m_SDRRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
         // Create the SDR PSO
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDRtoSDR_VS.cso", &vs));
-        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/HDRtoSDR_PS.cso", &ps));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_PS.cso", &ps));
 
         CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
         rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -435,7 +343,7 @@ void HybridPipeline::OnResize(ResizeEventArgs& e)
         m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
             static_cast<float>(m_Width), static_cast<float>(m_Height));
 
-        m_HDRRenderTarget.Resize(m_Width, m_Height);
+		m_DeferredRenderTarget.Resize(m_Width, m_Height);
     }
 }
 
@@ -544,161 +452,10 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
     }
 }
 
-// Helper to display a little (?) mark which shows a tooltip when hovered.
-static void ShowHelpMarker(const char* desc)
-{
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered())
-    {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        ImGui::TextUnformatted(desc);
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-}
-
-// Number of values to plot in the tonemapping curves.
-static const int VALUES_COUNT = 256;
-// Maximum HDR value to normalize the plot samples.
-static const float HDR_MAX = 12.0f;
-
-float LinearTonemapping(float HDR, float max)
-{
-    if (max > 0.0f)
-    {
-        return clamp(HDR / max);
-    }
-    return HDR;
-}
-
-float LinearTonemappingPlot(void*, int index)
-{
-    return LinearTonemapping(index / (float)VALUES_COUNT * HDR_MAX, g_TonemapParameters.MaxLuminance);
-}
-
-// Reinhard tone mapping.
-// See: http://www.cs.utah.edu/~reinhard/cdrom/tonemap.pdf
-float ReinhardTonemapping(float HDR, float k)
-{
-    return HDR / (HDR + k);
-}
-
-float ReinhardTonemappingPlot(void*, int index)
-{
-    return ReinhardTonemapping(index / (float)VALUES_COUNT * HDR_MAX, g_TonemapParameters.K);
-}
-
-float ReinhardSqrTonemappingPlot(void*, int index)
-{
-    float reinhard = ReinhardTonemapping(index / (float)VALUES_COUNT * HDR_MAX, g_TonemapParameters.K);
-    return reinhard * reinhard;
-}
-
-// ACES Filmic
-// See: https://www.slideshare.net/ozlael/hable-john-uncharted2-hdr-lighting/142
-float ACESFilmicTonemapping(float x, float A, float B, float C, float D, float E, float F)
-{
-    return (((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - (E / F));
-}
-
-float ACESFilmicTonemappingPlot(void*, int index)
-{
-    float HDR = index / (float)VALUES_COUNT * HDR_MAX;
-    return ACESFilmicTonemapping(HDR, g_TonemapParameters.A, g_TonemapParameters.B, g_TonemapParameters.C, g_TonemapParameters.D, g_TonemapParameters.E, g_TonemapParameters.F) /
-        ACESFilmicTonemapping(g_TonemapParameters.LinearWhite, g_TonemapParameters.A, g_TonemapParameters.B, g_TonemapParameters.C, g_TonemapParameters.D, g_TonemapParameters.E, g_TonemapParameters.F);
-}
-
-void OnGUI()
-{
-    static bool showDemoWindow = false;
-    static bool showOptions = true;
-
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("View"))
-        {
-            ImGui::MenuItem("Demo Window", nullptr, &showDemoWindow);
-            ImGui::MenuItem("Tonemapping Options", nullptr, &showOptions);
-
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-
-    if (showDemoWindow)
-    {
-        ImGui::ShowDemoWindow(&showDemoWindow);
-    }
-
-    if (showOptions)
-    {
-        ImGui::Begin("Tonemapping", &showOptions);
-        {
-            ImGui::TextWrapped("Use the Exposure slider to adjust the overall exposure of the HDR scene.");
-            ImGui::SliderFloat("Exposure", &g_TonemapParameters.Exposure, -10.0f, 10.0f);
-            ImGui::SameLine(); ShowHelpMarker("Adjust the overall exposure of the HDR scene.");
-            ImGui::SliderFloat("Gamma", &g_TonemapParameters.Gamma, 0.01f, 5.0f);
-            ImGui::SameLine(); ShowHelpMarker("Adjust the Gamma of the output image.");
-
-            const char* toneMappingMethods[] = {
-                "Linear",
-                "Reinhard",
-                "Reinhard Squared",
-                "ACES Filmic"
-            };
-
-            ImGui::Combo("Tonemapping Methods", (int*)(&g_TonemapParameters.TonemapMethod), toneMappingMethods, 4);
-
-            switch (g_TonemapParameters.TonemapMethod)
-            {
-            case TonemapMethod::TM_Linear:
-                ImGui::PlotLines("Linear Tonemapping", &LinearTonemappingPlot, nullptr, VALUES_COUNT, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 250));
-                ImGui::SliderFloat("Max Brightness", &g_TonemapParameters.MaxLuminance, 1.0f, 10.0f);
-                ImGui::SameLine(); ShowHelpMarker("Linearly scale the HDR image by the maximum brightness.");
-                break;
-            case TonemapMethod::TM_Reinhard:
-                ImGui::PlotLines("Reinhard Tonemapping", &ReinhardTonemappingPlot, nullptr, VALUES_COUNT, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 250));
-                ImGui::SliderFloat("Reinhard Constant", &g_TonemapParameters.K, 0.01f, 10.0f);
-                ImGui::SameLine(); ShowHelpMarker("The Reinhard constant is used in the denominator.");
-                break;
-            case TonemapMethod::TM_ReinhardSq:
-                ImGui::PlotLines("Reinhard Squared Tonemapping", &ReinhardSqrTonemappingPlot, nullptr, VALUES_COUNT, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 250));
-                ImGui::SliderFloat("Reinhard Constant", &g_TonemapParameters.K, 0.01f, 10.0f);
-                ImGui::SameLine(); ShowHelpMarker("The Reinhard constant is used in the denominator.");
-                break;
-            case TonemapMethod::TM_ACESFilmic:
-                ImGui::PlotLines("ACES Filmic Tonemapping", &ACESFilmicTonemappingPlot, nullptr, VALUES_COUNT, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 250));
-                ImGui::SliderFloat("Shoulder Strength", &g_TonemapParameters.A, 0.01f, 5.0f);
-                ImGui::SliderFloat("Linear Strength", &g_TonemapParameters.B, 0.0f, 100.0f);
-                ImGui::SliderFloat("Linear Angle", &g_TonemapParameters.C, 0.0f, 1.0f);
-                ImGui::SliderFloat("Toe Strength", &g_TonemapParameters.D, 0.01f, 1.0f);
-                ImGui::SliderFloat("Toe Numerator", &g_TonemapParameters.E, 0.0f, 10.0f);
-                ImGui::SliderFloat("Toe Denominator", &g_TonemapParameters.F, 1.0f, 10.0f);
-                ImGui::SliderFloat("Linear White", &g_TonemapParameters.LinearWhite, 1.0f, 120.0f);
-                break;
-            default:
-                break;
-            }
-        }
-
-        if (ImGui::Button("Reset to Defaults"))
-        {
-            TonemapMethod method = g_TonemapParameters.TonemapMethod;
-            g_TonemapParameters = TonemapParameters();
-            g_TonemapParameters.TonemapMethod = method;
-        }
-
-        ImGui::End();
-
-    }
-}
-
 void XM_CALLCONV ComputeMatrices(FXMMATRIX model, CXMMATRIX view, CXMMATRIX viewProjection, Mat& mat)
 {
     mat.ModelMatrix = model;
-    mat.ModelViewMatrix = model * view;
-    mat.InverseTransposeModelViewMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, mat.ModelViewMatrix));
+    mat.InverseTransposeModelMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, mat.ModelMatrix));
     mat.ModelViewProjectionMatrix = model * viewProjection;
 }
 
@@ -713,222 +470,238 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     {
         FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
-        commandList->ClearTexture(m_HDRRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
-        commandList->ClearDepthStencilTexture(m_HDRRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
+        commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
+		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
+		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
+		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
+		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
+        commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
     }
 
     commandList->SetViewport(m_Viewport);
     commandList->SetScissorRect(m_ScissorRect);
+    commandList->SetRenderTarget(m_DeferredRenderTarget);
 
-    commandList->SetRenderTarget(m_HDRRenderTarget);
+	// Deferred Pipeline
+	{
+		commandList->SetPipelineState(m_DeferredPipelineState);
+		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-    // Render the skybox.
-    {
-        // The view matrix should only consider the camera's rotation, but not the translation.
-        auto viewMatrix = XMMatrixTranspose(XMMatrixRotationQuaternion(m_Camera.get_Rotation()));
-        auto projMatrix = m_Camera.get_ProjectionMatrix();
-        auto viewProjMatrix = viewMatrix * projMatrix;
+		// Draw the earth sphere
+		XMMATRIX translationMatrix = XMMatrixTranslation(-4.0f, 2.0f, -4.0f);
+		XMMATRIX rotationMatrix = XMMatrixIdentity();
+		XMMATRIX scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
+		XMMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+		XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
 
-        commandList->SetPipelineState(m_SkyboxPipelineState);
-        commandList->SetGraphicsRootSignature(m_SkyboxSignature);
+		Mat matrices;
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-        commandList->SetGraphics32BitConstants(0, viewProjMatrix);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = m_GraceCathedralCubemap.GetD3D12ResourceDesc().Format;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
+		m_SphereMesh->Draw(*commandList);
 
-        // TODO: Need a better way to bind a cubemap.
-        commandList->SetShaderResourceView(1, 0, m_GraceCathedralCubemap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
+		// Draw a cube
+		translationMatrix = XMMatrixTranslation(4.0f, 2.0f, 4.0f);
+		rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
+		scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-        m_SkyboxMesh->Draw(*commandList);
-    }
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    commandList->SetPipelineState(m_HDRPipelineState);
-    commandList->SetGraphicsRootSignature(m_HDRRootSignature);
+		m_CubeMesh->Draw(*commandList);
 
-    // Upload lights
-    LightProperties lightProps;
-    lightProps.NumPointLights = static_cast<uint32_t>(m_PointLights.size());
-    lightProps.NumSpotLights = static_cast<uint32_t>(m_SpotLights.size());
+		//// Draw a torus
+		translationMatrix = XMMatrixTranslation(4.0f, 0.6f, -4.0f);
+		rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
+		scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    commandList->SetGraphics32BitConstants(RootParameters::LightPropertiesCB, lightProps);
-    commandList->SetGraphicsDynamicStructuredBuffer(RootParameters::PointLights, m_PointLights);
-    commandList->SetGraphicsDynamicStructuredBuffer(RootParameters::SpotLights, m_SpotLights);
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    // Draw the earth sphere
-    XMMATRIX translationMatrix = XMMatrixTranslation(-4.0f, 2.0f, -4.0f);
-    XMMATRIX rotationMatrix = XMMatrixIdentity();
-    XMMATRIX scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
-    XMMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-    XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-    XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    Mat matrices;
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		m_TorusMesh->Draw(*commandList);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-    commandList->SetShaderResourceView(RootParameters::Textures, 0, m_EarthTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		// Floor plane.
+		float scalePlane = 20.0f;
+		float translateOffset = scalePlane / 2.0f;
 
-    m_SphereMesh->Draw(*commandList);
+		translationMatrix = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+		rotationMatrix = XMMatrixIdentity();
+		scaleMatrix = XMMatrixScaling(scalePlane, 1.0f, scalePlane);
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    // Draw a cube
-    translationMatrix = XMMatrixTranslation(4.0f, 4.0f, 4.0f);
-    rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
-    scaleMatrix = XMMatrixScaling(4.0f, 8.0f, 4.0f);
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Red);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-    commandList->SetShaderResourceView(RootParameters::Textures, 0, m_MonaLisaTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		m_PlaneMesh->Draw(*commandList);
 
-    m_CubeMesh->Draw(*commandList);
+		// Back wall
+		translationMatrix = XMMatrixTranslation(0, translateOffset, translateOffset);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    // Draw a torus
-    translationMatrix = XMMatrixTranslation(4.0f, 0.6f, -4.0f);
-    rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
-    scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Green);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Ruby);
-    commandList->SetShaderResourceView(RootParameters::Textures, 0, m_DefaultTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		m_PlaneMesh->Draw(*commandList);
 
-    m_TorusMesh->Draw(*commandList);
+		// Ceiling plane
+		translationMatrix = XMMatrixTranslation(0, translateOffset * 2.0f, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(180));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    // Floor plane.
-    float scalePlane = 20.0f;
-    float translateOffset = scalePlane / 2.0f;
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    translationMatrix = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-    rotationMatrix = XMMatrixIdentity();
-    scaleMatrix = XMMatrixScaling(scalePlane, 1.0f, scalePlane);
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Blue);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		m_PlaneMesh->Draw(*commandList);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-    commandList->SetShaderResourceView(RootParameters::Textures, 0, m_DirectXTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		// Front wall
+		translationMatrix = XMMatrixTranslation(0, translateOffset, -translateOffset);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    m_PlaneMesh->Draw(*commandList);
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    // Back wall
-    translationMatrix = XMMatrixTranslation(0, translateOffset, translateOffset);
-    rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90));
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Yellow);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		m_PlaneMesh->Draw(*commandList);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		// Left wall
+		translationMatrix = XMMatrixTranslation(-translateOffset, translateOffset, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    m_PlaneMesh->Draw(*commandList);
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    // Ceiling plane
-    translationMatrix = XMMatrixTranslation(0, translateOffset * 2.0f, 0);
-    rotationMatrix = XMMatrixRotationX(XMConvertToRadians(180));
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Cyan);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+		m_PlaneMesh->Draw(*commandList);
 
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		// Right wall
+		translationMatrix = XMMatrixTranslation(translateOffset, translateOffset, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-    m_PlaneMesh->Draw(*commandList);
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    // Front wall
-    translationMatrix = XMMatrixTranslation(0, translateOffset, -translateOffset);
-    rotationMatrix = XMMatrixRotationX(XMConvertToRadians(90));
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Magenta);
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-
-    m_PlaneMesh->Draw(*commandList);
-
-    // Left wall
-    translationMatrix = XMMatrixTranslation(-translateOffset, translateOffset, 0);
-    rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90));
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Red);
-    commandList->SetShaderResourceView(RootParameters::Textures, 0, m_DefaultTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-    m_PlaneMesh->Draw(*commandList);
-
-    // Right wall
-    translationMatrix = XMMatrixTranslation(translateOffset, translateOffset, 0);
-    rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90));
-    worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-    ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-    commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Blue);
-    m_PlaneMesh->Draw(*commandList);
+		m_PlaneMesh->Draw(*commandList);
+	}
+    
 
     // Draw shapes to visualize the position of the lights in the scene.
-    Material lightMaterial;
-    // No specular
-    lightMaterial.Specular = { 0, 0, 0, 1 };
-    for (const auto& l : m_PointLights)
-    {
-        lightMaterial.Emissive = l.Color;
-        XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
-        worldMatrix = XMMatrixTranslationFromVector(lightPos);
-        ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+	//{
+	//	Material lightMaterial;
+	//	// No specular
+	//	lightMaterial.Specular = { 0, 0, 0, 1 };
 
-        commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-        commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+	//	// MVP matrices
+	//	XMMATRIX worldMatrix;
+	//	XMMATRIX rotationMatrix;
+	//	XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+	//	XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
+	//	Mat matrices;
 
-        m_SphereMesh->Draw(*commandList);
-    }
+	//	for (const auto& l : m_PointLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		worldMatrix = XMMatrixTranslationFromVector(lightPos);
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    for (const auto& l : m_SpotLights)
-    {
-        lightMaterial.Emissive = l.Color;
-        XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
-        XMVECTOR lightDir = XMLoadFloat4(&l.DirectionWS);
-        XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
 
-        // Rotate the cone so it is facing the Z axis.
-        rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90.0f));
-        worldMatrix = rotationMatrix * LookAtMatrix(lightPos, lightDir, up);
+	//		m_SphereMesh->Draw(*commandList);
+	//	}
 
-        ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+	//	for (const auto& l : m_SpotLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		XMVECTOR lightDir = XMLoadFloat4(&l.DirectionWS);
+	//		XMVECTOR up = XMVectorSet(0, 1, 0, 0);
 
-        commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-        commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+	//		// Rotate the cone so it is facing the Z axis.
+	//		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90.0f));
+	//		worldMatrix = rotationMatrix * LookAtMatrix(lightPos, lightDir, up);
 
-        m_ConeMesh->Draw(*commandList);
-    }
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
-    // Perform HDR -> SDR tonemapping directly to the Window's render target.
-    commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-    commandList->SetPipelineState(m_SDRPipelineState);
-    commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->SetGraphicsRootSignature(m_SDRRootSignature);
-    commandList->SetGraphics32BitConstants(0, g_TonemapParameters);
-    commandList->SetShaderResourceView(1, 0, m_HDRRenderTarget.GetTexture(Color0), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
 
-    commandList->Draw(3);
+	//		m_ConeMesh->Draw(*commandList);
+	//	}
+
+	//}
+
+	// Perform off-screen texture to RT post processing
+	{
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_SDRPipelineState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_SDRRootSignature);
+		commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		commandList->Draw(3);
+	}
 
     commandQueue->ExecuteCommandList(commandList);
-
-    // Render GUI.
-    OnGUI();
-
     // Present
     m_pWindow->Present();
 }
@@ -938,109 +711,104 @@ static bool g_AllowFullscreenToggle = true;
 void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
 {
     super::OnKeyPressed(e);
-
-    if (!ImGui::GetIO().WantCaptureKeyboard)
+    switch (e.Key)
     {
-        switch (e.Key)
+    case KeyCode::Escape:
+        Application::Get().Quit(0);
+        break;
+    case KeyCode::Enter:
+        if (e.Alt)
         {
-        case KeyCode::Escape:
-            Application::Get().Quit(0);
-            break;
-        case KeyCode::Enter:
-            if (e.Alt)
-            {
-        case KeyCode::F11:
-            if (g_AllowFullscreenToggle)
-            {
-                m_pWindow->ToggleFullscreen();
-                g_AllowFullscreenToggle = false;
-            }
-            break;
-            }
-        case KeyCode::V:
-            m_pWindow->ToggleVSync();
-            break;
-        case KeyCode::R:
-            // Reset camera transform
-            m_Camera.set_Translation(m_pAlignedCameraData->m_InitialCamPos);
-            m_Camera.set_Rotation(m_pAlignedCameraData->m_InitialCamRot);
-            m_Pitch = 0.0f;
-            m_Yaw = 0.0f;
-            break;
-        case KeyCode::Up:
-        case KeyCode::W:
-            m_Forward = 1.0f;
-            break;
-        case KeyCode::Left:
-        case KeyCode::A:
-            m_Left = 1.0f;
-            break;
-        case KeyCode::Down:
-        case KeyCode::S:
-            m_Backward = 1.0f;
-            break;
-        case KeyCode::Right:
-        case KeyCode::D:
-            m_Right = 1.0f;
-            break;
-        case KeyCode::Q:
-            m_Down = 1.0f;
-            break;
-        case KeyCode::E:
-            m_Up = 1.0f;
-            break;
-        case KeyCode::Space:
-            m_AnimateLights = !m_AnimateLights;
-            break;
-        case KeyCode::ShiftKey:
-            m_Shift = true;
-            break;
+    case KeyCode::F11:
+        if (g_AllowFullscreenToggle)
+        {
+            m_pWindow->ToggleFullscreen();
+            g_AllowFullscreenToggle = false;
         }
+        break;
+        }
+    case KeyCode::V:
+        m_pWindow->ToggleVSync();
+        break;
+    case KeyCode::R:
+        // Reset camera transform
+        m_Camera.set_Translation(m_pAlignedCameraData->m_InitialCamPos);
+        m_Camera.set_Rotation(m_pAlignedCameraData->m_InitialCamRot);
+        m_Pitch = 0.0f;
+        m_Yaw = 0.0f;
+        break;
+    case KeyCode::Up:
+    case KeyCode::W:
+        m_Forward = 2.0f;
+        break;
+    case KeyCode::Left:
+    case KeyCode::A:
+        m_Left = 2.0f;
+        break;
+    case KeyCode::Down:
+    case KeyCode::S:
+        m_Backward = 2.0f;
+        break;
+    case KeyCode::Right:
+    case KeyCode::D:
+        m_Right = 2.0f;
+        break;
+    case KeyCode::Q:
+        m_Down =2.0f;
+        break;
+    case KeyCode::E:
+        m_Up = 2.0f;
+        break;
+    case KeyCode::Space:
+        m_AnimateLights = !m_AnimateLights;
+        break;
+    case KeyCode::ShiftKey:
+        m_Shift = true;
+        break;
     }
+    
 }
 
 void HybridPipeline::OnKeyReleased(KeyEventArgs& e)
 {
     super::OnKeyReleased(e);
 
-    if (!ImGui::GetIO().WantCaptureKeyboard)
+    switch (e.Key)
     {
-        switch (e.Key)
+    case KeyCode::Enter:
+        if (e.Alt)
         {
-        case KeyCode::Enter:
-            if (e.Alt)
-            {
-        case KeyCode::F11:
-            g_AllowFullscreenToggle = true;
-            }
-            break;
-        case KeyCode::Up:
-        case KeyCode::W:
-            m_Forward = 0.0f;
-            break;
-        case KeyCode::Left:
-        case KeyCode::A:
-            m_Left = 0.0f;
-            break;
-        case KeyCode::Down:
-        case KeyCode::S:
-            m_Backward = 0.0f;
-            break;
-        case KeyCode::Right:
-        case KeyCode::D:
-            m_Right = 0.0f;
-            break;
-        case KeyCode::Q:
-            m_Down = 0.0f;
-            break;
-        case KeyCode::E:
-            m_Up = 0.0f;
-            break;
-        case KeyCode::ShiftKey:
-            m_Shift = false;
-            break;
+    case KeyCode::F11:
+        g_AllowFullscreenToggle = true;
         }
+        break;
+    case KeyCode::Up:
+    case KeyCode::W:
+        m_Forward = 0.0f;
+        break;
+    case KeyCode::Left:
+    case KeyCode::A:
+        m_Left = 0.0f;
+        break;
+    case KeyCode::Down:
+    case KeyCode::S:
+        m_Backward = 0.0f;
+        break;
+    case KeyCode::Right:
+    case KeyCode::D:
+        m_Right = 0.0f;
+        break;
+    case KeyCode::Q:
+        m_Down = 0.0f;
+        break;
+    case KeyCode::E:
+        m_Up = 0.0f;
+        break;
+    case KeyCode::ShiftKey:
+        m_Shift = false;
+        break;
     }
+    
 }
 
 void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
@@ -1048,33 +816,28 @@ void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
     super::OnMouseMoved(e);
 
     const float mouseSpeed = 0.1f;
-    if (!ImGui::GetIO().WantCaptureMouse)
+    if (e.LeftButton)
     {
-        if (e.LeftButton)
-        {
-            m_Pitch -= e.RelY * mouseSpeed;
+        m_Pitch -= e.RelY * mouseSpeed;
 
-            m_Pitch = clamp(m_Pitch, -90.0f, 90.0f);
+        m_Pitch = clamp(m_Pitch, -90.0f, 90.0f);
 
-            m_Yaw -= e.RelX * mouseSpeed;
-        }
+        m_Yaw -= e.RelX * mouseSpeed;
     }
+    
 }
 
 
 void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 {
-    if (!ImGui::GetIO().WantCaptureMouse)
-    {
-        auto fov = m_Camera.get_FoV();
+    auto fov = m_Camera.get_FoV();
 
-        fov -= e.WheelDelta;
-        fov = clamp(fov, 12.0f, 90.0f);
+    fov -= e.WheelDelta;
+    fov = clamp(fov, 12.0f, 90.0f);
 
-        m_Camera.set_FoV(fov);
+    m_Camera.set_FoV(fov);
 
-        char buffer[256];
-        sprintf_s(buffer, "FoV: %f\n", fov);
-        OutputDebugStringA(buffer);
-    }
+    char buffer[256];
+    sprintf_s(buffer, "FoV: %f\n", fov);
+    OutputDebugStringA(buffer);
 }

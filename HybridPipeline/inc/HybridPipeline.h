@@ -75,25 +75,37 @@ private:
 
     std::unique_ptr<Mesh> m_SkyboxMesh;
 
+	// old texture
     Texture m_DefaultTexture;
-    Texture m_DirectXTexture;
     Texture m_EarthTexture;
     Texture m_MonaLisaTexture;
     Texture m_GraceCathedralTexture;
     Texture m_GraceCathedralCubemap;
 
-    // HDR Render target
-    RenderTarget m_HDRRenderTarget;
+	// pbr texture
+	//// pipeline default
+	Texture m_default_albedo_texture;
+	Texture m_default_metallic_texture;
+	Texture m_default_normal_texture;
+	Texture m_default_roughness_texture;
+	//// rust iron
+	Texture m_rustedIron_albedo_texture;
+	Texture m_rustedIron_metallic_texture;
+	Texture m_rustedIron_normal_texture;
+	Texture m_rustedIron_roughness_texture;
+
+    // Deferred Render target
+    RenderTarget m_DeferredRenderTarget;
 
     // Root signatures
     RootSignature m_SkyboxSignature;
-    RootSignature m_HDRRootSignature;
+    RootSignature m_DeferredRootSignature;
     RootSignature m_SDRRootSignature;
 
     // Pipeline state object.
     // Skybox PSO
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_HDRPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
     // HDR -> SDR tone mapping PSO.
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SDRPipelineState;
 
