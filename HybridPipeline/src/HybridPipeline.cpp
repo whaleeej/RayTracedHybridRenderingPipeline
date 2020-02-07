@@ -40,6 +40,14 @@ struct LightProperties
     uint32_t NumSpotLights;
 };
 
+struct PBRMaterial
+{
+	float metallic;
+	float roughness;
+	uint32_t  Padding[2];
+	PBRMaterial(float m, float r) :metallic(m), roughness(r), Padding{ 0 } {};
+};
+
 // An enum for root signature parameters.
 // I'm not using scoped enums to avoid the explicit cast that would be required
 // to use these as root indices in the root signature.
@@ -47,7 +55,8 @@ enum RootParameters
 {
     MatricesCB,         // ConstantBuffer<Mat> MatCB : register(b0);
     MaterialCB,         // ConstantBuffer<Material> MaterialCB : register( b0, space1 );
-    Textures,           // Texture2D DiffuseTexture : register( t0 );
+	PBRMaterialCB,  // ConstantBuffer<PBRMaterial> PBRMaterialCB: register(b1, space1);
+    Textures,            // Texture2D DiffuseTextures : register( t0-tN );
     NumRootParameters
 };
 
@@ -134,14 +143,26 @@ bool HybridPipeline::LoadContent()
     commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
 
 	// load PBR textures
+	//// default
 	commandList->LoadTextureFromFile(m_default_albedo_texture, L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
 	commandList->LoadTextureFromFile(m_default_metallic_texture, L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
 	commandList->LoadTextureFromFile(m_default_normal_texture, L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
 	commandList->LoadTextureFromFile(m_default_roughness_texture, L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
+	//// rusted iron
 	commandList->LoadTextureFromFile(m_rustedIron_albedo_texture, L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
 	commandList->LoadTextureFromFile(m_rustedIron_metallic_texture, L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
 	commandList->LoadTextureFromFile(m_rustedIron_normal_texture, L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
 	commandList->LoadTextureFromFile(m_rustedIron_roughness_texture, L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
+	//// grid metal
+	commandList->LoadTextureFromFile(m_gridMetal_albedo_texture, L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(m_gridMetal_metallic_texture, L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
+	commandList->LoadTextureFromFile(m_gridMetal_normal_texture, L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
+	commandList->LoadTextureFromFile(m_gridMetal_roughness_texture, L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
+	//// metal
+	commandList->LoadTextureFromFile(m_metal_albedo_texture, L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(m_metal_metallic_texture, L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
+	commandList->LoadTextureFromFile(m_metal_normal_texture, L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
+	commandList->LoadTextureFromFile(m_metal_roughness_texture, L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
     // Create a cubemap for the HDR panorama.
     auto cubemapDesc = m_GraceCathedralTexture.GetD3D12ResourceDesc();
@@ -240,6 +261,7 @@ bool HybridPipeline::LoadContent()
         CD3DX12_ROOT_PARAMETER1 rootParameters[RootParameters::NumRootParameters];
         rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
         rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[RootParameters::PBRMaterialCB].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParameters[RootParameters::Textures].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
         //CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
@@ -487,7 +509,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPipelineState(m_DeferredPipelineState);
 		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-		// Draw the earth sphere
+		// Draw the sphere sphere
 		XMMATRIX translationMatrix = XMMatrixTranslation(-4.0f, 2.0f, -4.0f);
 		XMMATRIX rotationMatrix = XMMatrixIdentity();
 		XMMATRIX scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
@@ -500,10 +522,11 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f,1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_metal_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_metal_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_metal_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_metal_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		m_SphereMesh->Draw(*commandList);
 
@@ -517,10 +540,11 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_gridMetal_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_gridMetal_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_gridMetal_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_gridMetal_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		m_CubeMesh->Draw(*commandList);
 
@@ -534,6 +558,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -554,6 +579,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Red);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -570,6 +596,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Green);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -586,6 +613,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Blue);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -602,6 +630,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Yellow);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -618,6 +647,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Cyan);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -634,6 +664,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Magenta);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
 		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);

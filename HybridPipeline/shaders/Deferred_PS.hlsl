@@ -24,9 +24,15 @@ struct Material
 	float3 Padding; //----------------------------------- (16 byte boundary)
 }; // Total:                              16 * 5 = 80 bytes
 
-
+struct PBRMaterial
+{
+	float Metallic;
+	float Roughness;
+	float2 Padding;
+};// Totoal: 4*2 +8 = 16 bytes
 
 ConstantBuffer<Material> MaterialCB : register( b0, space1 );
+ConstantBuffer<PBRMaterial> PBRMaterialCB : register(b1, space1);
 Texture2D AlbedoTexture            : register( t0 );
 Texture2D MetallicTexture           : register( t1 );
 Texture2D NormalTexture            : register( t2 );
@@ -59,11 +65,14 @@ PixelShaderOutput main(PixelShaderInput IN)
     float4 diffuse = MaterialCB.Diffuse ;
     float4 specular = MaterialCB.Specular;
 	
+	float metallic = PBRMaterialCB.Metallic;
+	float roughness = PBRMaterialCB.Roughness;
+	
 	pso.GPosition = IN.PositionWS;
 	pso.GAlbedo = AlbedoTexture.Sample(AnisotropicSampler, IN.TexCoord) * diffuse;
-	pso.GMetallic = MetallicTexture.Sample(AnisotropicSampler, IN.TexCoord);
+	pso.GMetallic = MetallicTexture.Sample(AnisotropicSampler, IN.TexCoord) * metallic;
 	pso.GNormal = float4(getFromNormalMapping(NormalTexture.Sample(AnisotropicSampler, IN.TexCoord), IN), 1.0f);
-	pso.GRoughness = RoughnessTexture.Sample(AnisotropicSampler, IN.TexCoord);
+	pso.GRoughness = RoughnessTexture.Sample(AnisotropicSampler, IN.TexCoord) * roughness;
 	
 	return pso;
 }

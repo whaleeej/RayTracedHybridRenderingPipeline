@@ -93,6 +93,16 @@ private:
 	Texture m_rustedIron_metallic_texture;
 	Texture m_rustedIron_normal_texture;
 	Texture m_rustedIron_roughness_texture;
+	//// grid metal
+	Texture m_gridMetal_albedo_texture;
+	Texture m_gridMetal_metallic_texture;
+	Texture m_gridMetal_normal_texture;
+	Texture m_gridMetal_roughness_texture;
+	//// metal
+	Texture m_metal_albedo_texture;
+	Texture m_metal_metallic_texture;
+	Texture m_metal_normal_texture;
+	Texture m_metal_roughness_texture;
 
     // Deferred Render target
     RenderTarget m_DeferredRenderTarget;
