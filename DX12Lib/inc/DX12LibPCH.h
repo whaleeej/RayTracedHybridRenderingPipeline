@@ -82,3 +82,9 @@ namespace fs = std::experimental::filesystem;
 
 // Helper functions
 #include <Helpers.h>
+#include <comdef.h>
+
+#define MAKE_SMART_COM_PTR(_a) _COM_SMARTPTR_TYPEDEF(_a, __uuidof(_a))
+MAKE_SMART_COM_PTR(ID3D12Resource);
+
+

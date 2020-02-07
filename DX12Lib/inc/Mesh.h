@@ -71,6 +71,8 @@ struct VertexPositionNormalTexture
 using VertexCollection = std::vector<VertexPositionNormalTexture>;
 using IndexCollection = std::vector<uint16_t>;
 
+class RTRenderer;
+
 class Mesh
 {
 public:
@@ -86,6 +88,7 @@ public:
 protected:
 
 private:
+	friend class RTRenderer;
     friend struct std::default_delete<Mesh>;
 
     Mesh();
