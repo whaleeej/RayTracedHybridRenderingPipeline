@@ -187,6 +187,12 @@ Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::
     ComPtr<ID3D12Device5> d3d12Device5;
     ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device5)));
 //    NAME_D3D12_OBJECT(d3d12Device5);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
+	HRESULT hr = d3d12Device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5));
+	if (FAILED(hr) || features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+	{
+		ThrowIfFailed(hr);
+	}
 
     // Enable debug messages in debug mode.
 #if defined(_DEBUG)
