@@ -29,12 +29,18 @@ set( PIXEL_SHADER_FILES
     shaders/Skybox_PS.hlsl
 )
 
+
+set( RT_SHADER_FILES
+    shaders/RayTracing.hlsl
+)
+
 set( SHADER_FILES
     ${VERTEX_SHADER_FILES}
     ${PIXEL_SHADER_FILES}
 )
 
-source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
+source_group( "Resources\\Shaders" FILES ${SHADER_FILES})
+source_group( "Resources\\RT" FILES ${RT_SHADER_FILES})
 
 set_source_files_properties( ${SHADER_FILES} 
     PROPERTIES
@@ -42,6 +48,11 @@ set_source_files_properties( ${SHADER_FILES}
         VS_SHADER_MODEL 5.1
         VS_SHADER_DISABLE_OPTIMIZATIONS $<$<CONFIG:Debug>:ON>
         VS_SHADER_ENABLE_DEBUG $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:ON>
+)
+
+set_source_files_properties( ${RT_SHADER_FILES} 
+    PROPERTIES
+        HEADER_FILE_ONLY TRUE
 )
 
 set_source_files_properties( ${VERTEX_SHADER_FILES}
@@ -57,7 +68,7 @@ set_source_files_properties( ${PIXEL_SHADER_FILES}
 add_executable( HybridPipeline WIN32
     ${HEADER_FILES} 
     ${SRC_FILES}
-    ${SHADER_FILES}
+    ${SHADER_FILES} ${RT_SHADER_FILES}
 )
 
 target_include_directories( HybridPipeline

@@ -72,8 +72,8 @@ void Application::Initialize()
     ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
     debugInterface->EnableDebugLayer();
     // Enable these if you want full validation (will slow down rendering a lot).
-    //debugInterface->SetEnableGPUBasedValidation(TRUE);
-    //debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
+    debugInterface->SetEnableGPUBasedValidation(TRUE);
+    debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
 #endif
 
     auto dxgiAdapter = GetAdapter(false);

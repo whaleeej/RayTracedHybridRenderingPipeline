@@ -13,6 +13,8 @@
 
 #include <DirectXMath.h>
 
+#include "RTRenderer.h"
+
 class HybridPipeline : public Game
 {
 public:
@@ -73,14 +75,9 @@ private:
     std::unique_ptr<Mesh> m_TorusMesh;
     std::unique_ptr<Mesh> m_PlaneMesh;
 
-    std::unique_ptr<Mesh> m_SkyboxMesh;
-
-	// old texture
-    Texture m_DefaultTexture;
-    Texture m_EarthTexture;
-    Texture m_MonaLisaTexture;
-    Texture m_GraceCathedralTexture;
-    Texture m_GraceCathedralCubemap;
+	// Define some lights.
+	std::vector<PointLight> m_PointLights;
+	std::vector<SpotLight> m_SpotLights;
 
 	// pbr texture
 	//// pipeline default
@@ -108,16 +105,17 @@ private:
     RenderTarget m_DeferredRenderTarget;
 
     // Root signatures
-    RootSignature m_SkyboxSignature;
     RootSignature m_DeferredRootSignature;
-    RootSignature m_SDRRootSignature;
+    RootSignature m_PostProcessingRootSignature;
 
     // Pipeline state object.
     // Skybox PSO
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
     // HDR -> SDR tone mapping PSO.
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SDRPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
+
+	// RT 
+	RTRenderer rtRenderer;
 
     D3D12_VIEWPORT m_Viewport;
     D3D12_RECT m_ScissorRect;
@@ -148,8 +146,4 @@ private:
 
     int m_Width;
     int m_Height;
-
-    // Define some lights.
-    std::vector<PointLight> m_PointLights;
-    std::vector<SpotLight> m_SpotLights;
 };

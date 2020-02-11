@@ -27,13 +27,13 @@
  *  @date October 22, 2018
  *  @author Jeremiah van Oosten
  *
- *  @brief CommandList class encapsulates a ID3D12GraphicsCommandList2 interface.
+ *  @brief CommandList class encapsulates a ID3D12GraphicsCommandList4 interface.
  *  The CommandList class provides additional functionality that makes working with
  *  DirectX 12 applications easier.
  */
 
 #include "TextureUsage.h"
-
+#include "DX12LibPCH.h"
 #include <d3d12.h>
 #include <wrl.h>
 
@@ -73,9 +73,9 @@ public:
     }
 
     /**
-     * Get direct access to the ID3D12GraphicsCommandList2 interface.
+     * Get direct access to the ID3D12GraphicsCommandList4 interface.
      */
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> GetGraphicsCommandList() const
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetGraphicsCommandList() const
     {
         return m_d3d12CommandList;
     }
@@ -118,7 +118,7 @@ public:
 	/**
 	 * Copy resources.
 	 */
-	void CopyResource(Resource& dstRes, const Resource& srcRes);
+	void CopyResource(const Resource& dstRes, const Resource& srcRes);
 
     /**
      * Resolve a multisampled resource into a non-multisampled resource.
@@ -388,6 +388,17 @@ public:
         return m_ComputeCommandList;
     }
 
+public:
+	//temp
+	static ID3D12ResourcePtr createBuffer(uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps);
+	void  BuildRaytracingAccelerationStructure(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC* pDesc);
+	void  UAVBarrier(ID3D12ResourcePtr pResource);
+	void resourceBarrier(ID3D12ResourcePtr pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
+	void SetComputeRootSignature(ID3D12RootSignaturePtr sig);
+	void SetPipelineState1(ID3D12StateObjectPtr pStateObject);
+	void DispatchRays(D3D12_DISPATCH_RAYS_DESC* pDispatchRayDes);
+	void CopyResourceRaw(const Resource& dstRes, ID3D12ResourcePtr srcRes);
+
 protected:
 
 private:
@@ -410,8 +421,9 @@ private:
     using TrackedObjects = std::vector < Microsoft::WRL::ComPtr<ID3D12Object> >;
 
     D3D12_COMMAND_LIST_TYPE m_d3d12CommandListType;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> m_d3d12CommandList;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_d3d12CommandList;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_d3d12CommandAllocator;
+
 
     // For copy queues, it may be necessary to generate mips while loading textures.
     // Mips can't be generated on copy queues but must be generated on compute or

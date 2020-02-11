@@ -71,7 +71,6 @@ set( IMGUI_HEADERS
     inc/imconfig.h
     inc/imgui_impl_win32.h
 )
-
 source_group( "Header Files\\ImGUI" FILES ${IMGUI_HEADERS} )
 
 set( IMGUI_SOURCE
@@ -83,6 +82,23 @@ set( IMGUI_SOURCE
 )
 
 source_group( "Source Files\\ImGUI" FILES ${IMGUI_SOURCE} )
+
+set( EXTERNAL_HEADERS
+    Externals/DXCAPI/dxcapi.use.h
+)
+source_group( "Header Files\\Externals" FILES ${EXTERNAL_HEADERS} )
+
+set(  DynamicLib
+    Externals/dxcompiler/dxcompiler.dll
+    Externals/dxcompiler/dxil.dll
+)
+
+set( SHADER_FILES
+    Resources/Shaders/GenerateMips_CS.hlsl
+    Resources/Shaders/PanoToCubemap_CS.hlsl
+    Resources/Shaders/ImGUI_VS.hlsl
+    Resources/Shaders/ImGUI_PS.hlsl
+)
 
 set( SHADER_FILES
     Resources/Shaders/GenerateMips_CS.hlsl
@@ -105,11 +121,13 @@ add_library( DX12Lib STATIC
     ${HEADER_FILES}
     ${SOURCE_FILES}
     ${RESOURCE_FILES}
-    ${IMGUI_HEADERS} ${IMGUI_SOURCE}
+    ${IMGUI_HEADERS} ${IMGUI_SOURCE} 
+    ${EXTERNAL_HEADERS}
 )
 
 target_include_directories( DX12Lib
     PUBLIC inc
+    PUBLIC Externals
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
 )
 

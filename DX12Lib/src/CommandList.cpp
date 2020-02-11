@@ -94,7 +94,7 @@ void CommandList::FlushResourceBarriers()
     m_ResourceStateTracker->FlushResourceBarriers( *this );
 }
 
-void CommandList::CopyResource( Resource& dstRes, const Resource& srcRes )
+void CommandList::CopyResource(const Resource& dstRes, const Resource& srcRes )
 {
     TransitionBarrier( dstRes, D3D12_RESOURCE_STATE_COPY_DEST );
     TransitionBarrier( srcRes, D3D12_RESOURCE_STATE_COPY_SOURCE );
@@ -1136,4 +1136,79 @@ void CommandList::BindDescriptorHeaps()
     }
 
     m_d3d12CommandList->SetDescriptorHeaps( numDescriptorHeaps, descriptorHeaps );
+}
+
+
+
+//temp
+
+ID3D12ResourcePtr CommandList::createBuffer(uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps)
+{
+	auto pDevice = Application::Get().GetDevice();
+	D3D12_RESOURCE_DESC bufDesc = {};
+	bufDesc.Alignment = 0;
+	bufDesc.DepthOrArraySize = 1;
+	bufDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	bufDesc.Flags = flags;
+	bufDesc.Format = DXGI_FORMAT_UNKNOWN;
+	bufDesc.Height = 1;
+	bufDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	bufDesc.MipLevels = 1;
+	bufDesc.SampleDesc.Count = 1;
+	bufDesc.SampleDesc.Quality = 0;
+	bufDesc.Width = size;
+
+	ID3D12ResourcePtr pBuffer;
+	ThrowIfFailed(pDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufDesc, initState, nullptr, IID_PPV_ARGS(&pBuffer)));
+	return pBuffer;
+}
+
+void CommandList::UAVBarrier(ID3D12ResourcePtr pResource)
+{
+	D3D12_RESOURCE_BARRIER uavBarrier = {};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = pResource;
+	m_d3d12CommandList->ResourceBarrier(1, &uavBarrier);
+}
+
+void CommandList::BuildRaytracingAccelerationStructure(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC* pDesc)
+{
+	m_d3d12CommandList->BuildRaytracingAccelerationStructure(pDesc, 0, nullptr);
+}
+
+void CommandList::resourceBarrier(ID3D12ResourcePtr pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter)
+{
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Transition.pResource = pResource;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = stateBefore;
+	barrier.Transition.StateAfter = stateAfter;
+	m_d3d12CommandList->ResourceBarrier(1, &barrier);
+}
+
+void CommandList::SetComputeRootSignature(ID3D12RootSignaturePtr sig)
+{
+	m_d3d12CommandList->SetComputeRootSignature(sig);
+}
+
+void CommandList::SetPipelineState1(ID3D12StateObjectPtr pStateObject)
+{
+	m_d3d12CommandList->SetPipelineState1(pStateObject);
+}
+
+void CommandList::DispatchRays(D3D12_DISPATCH_RAYS_DESC* pDispatchRayDes)
+{
+	m_d3d12CommandList->DispatchRays(pDispatchRayDes);
+}
+
+void CommandList::CopyResourceRaw(const Resource& dstRes, ID3D12ResourcePtr srcRes)
+{
+	TransitionBarrier(dstRes, D3D12_RESOURCE_STATE_COPY_DEST);
+
+	FlushResourceBarriers();
+
+	m_d3d12CommandList->CopyResource(dstRes.GetD3D12Resource().Get(), srcRes);
+
+	TrackResource(dstRes);
 }
