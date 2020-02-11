@@ -133,8 +133,15 @@ bool HybridPipeline::LoadContent()
     m_ConeMesh = Mesh::CreateCone(*commandList);
     m_TorusMesh = Mesh::CreateTorus(*commandList);
     m_PlaneMesh = Mesh::CreatePlane(*commandList);
+    // Create an inverted (reverse winding order) cube so the insides are not clipped.
+    m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
 
     // Load some textures
+    commandList->LoadTextureFromFile(m_DefaultTexture, L"Assets/Textures/DefaultWhite.bmp", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_EarthTexture, L"Assets/Textures/earth.dds", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_MonaLisaTexture, L"Assets/Textures/Mona_Lisa.jpg", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+
 	// load PBR textures
 	//// default
 	commandList->LoadTextureFromFile(m_default_albedo_texture, L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
@@ -156,6 +163,16 @@ bool HybridPipeline::LoadContent()
 	commandList->LoadTextureFromFile(m_metal_metallic_texture, L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
 	commandList->LoadTextureFromFile(m_metal_normal_texture, L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
 	commandList->LoadTextureFromFile(m_metal_roughness_texture, L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
+
+    // Create a cubemap for the HDR panorama.
+    auto cubemapDesc = m_GraceCathedralTexture.GetD3D12ResourceDesc();
+    cubemapDesc.Width = cubemapDesc.Height = 1024;
+    cubemapDesc.DepthOrArraySize = 6;
+    cubemapDesc.MipLevels = 0;
+
+    m_GraceCathedralCubemap = Texture(cubemapDesc, nullptr, TextureUsage::Albedo, L"Grace Cathedral Cubemap");
+    // Convert the 2D panorama to a 3D cubemap.
+    commandList->PanoToCubemap(m_GraceCathedralCubemap, m_GraceCathedralTexture);
 
     // Create an HDR intermediate render target.
     DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -283,7 +300,7 @@ bool HybridPipeline::LoadContent()
         ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
     }
 
-    // Create the PostProcessing Root Signature
+    // Create the SDR Root Signature
     {
         CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
@@ -293,9 +310,9 @@ bool HybridPipeline::LoadContent()
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
         rootSignatureDescription.Init_1_1(1, rootParameters);
 
-        m_PostProcessingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+        m_SDRRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
-        // Create the PostProcessing PSO
+        // Create the SDR PSO
         ComPtr<ID3DBlob> vs;
         ComPtr<ID3DBlob> ps;
         ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_VS.cso", &vs));
@@ -304,7 +321,7 @@ bool HybridPipeline::LoadContent()
         CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
         rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 
-        struct PostProcessingPipelineStateStream
+        struct SDRPipelineStateStream
         {
             CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
             CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
@@ -312,19 +329,19 @@ bool HybridPipeline::LoadContent()
             CD3DX12_PIPELINE_STATE_STREAM_PS PS;
             CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
             CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-        } postProcessingPipelineStateStream;
+        } sdrPipelineStateStream;
 
-		postProcessingPipelineStateStream.pRootSignature = m_PostProcessingRootSignature.GetRootSignature().Get();
-		postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-		postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-		postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
-		postProcessingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+        sdrPipelineStateStream.pRootSignature = m_SDRRootSignature.GetRootSignature().Get();
+        sdrPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        sdrPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+        sdrPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+        sdrPipelineStateStream.Rasterizer = rasterizerDesc;
+        sdrPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
 
-        D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
-            sizeof(PostProcessingPipelineStateStream), & postProcessingPipelineStateStream
+        D3D12_PIPELINE_STATE_STREAM_DESC sdrPipelineStateStreamDesc = {
+            sizeof(SDRPipelineStateStream), &sdrPipelineStateStream
         };
-        ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostProcessingPipelineState)));
+        ThrowIfFailed(device->CreatePipelineState(&sdrPipelineStateStreamDesc, IID_PPV_ARGS(&m_SDRPipelineState)));
     }
 
     auto fenceValue = commandQueue->ExecuteCommandList(commandList);
@@ -655,14 +672,61 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		m_PlaneMesh->Draw(*commandList);
 	}
+    
 
+    // Draw shapes to visualize the position of the lights in the scene.
+	//{
+	//	Material lightMaterial;
+	//	// No specular
+	//	lightMaterial.Specular = { 0, 0, 0, 1 };
 
-	// Perform off-screen texture to post processing
+	//	// MVP matrices
+	//	XMMATRIX worldMatrix;
+	//	XMMATRIX rotationMatrix;
+	//	XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+	//	XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
+	//	Mat matrices;
+
+	//	for (const auto& l : m_PointLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		worldMatrix = XMMatrixTranslationFromVector(lightPos);
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+
+	//		m_SphereMesh->Draw(*commandList);
+	//	}
+
+	//	for (const auto& l : m_SpotLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		XMVECTOR lightDir = XMLoadFloat4(&l.DirectionWS);
+	//		XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+
+	//		// Rotate the cone so it is facing the Z axis.
+	//		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90.0f));
+	//		worldMatrix = rotationMatrix * LookAtMatrix(lightPos, lightDir, up);
+
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+
+	//		m_ConeMesh->Draw(*commandList);
+	//	}
+
+	//}
+
+	// Perform off-screen texture to RT post processing
 	{
 		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-		commandList->SetPipelineState(m_PostProcessingPipelineState);
+		commandList->SetPipelineState(m_SDRPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
+		commandList->SetGraphicsRootSignature(m_SDRRootSignature);
 		commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		commandList->Draw(3);

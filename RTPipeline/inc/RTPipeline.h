@@ -73,9 +73,14 @@ private:
     std::unique_ptr<Mesh> m_TorusMesh;
     std::unique_ptr<Mesh> m_PlaneMesh;
 
-	// Define some lights.
-	std::vector<PointLight> m_PointLights;
-	std::vector<SpotLight> m_SpotLights;
+    std::unique_ptr<Mesh> m_SkyboxMesh;
+
+	// old texture
+    Texture m_DefaultTexture;
+    Texture m_EarthTexture;
+    Texture m_MonaLisaTexture;
+    Texture m_GraceCathedralTexture;
+    Texture m_GraceCathedralCubemap;
 
 	// pbr texture
 	//// pipeline default
@@ -103,12 +108,16 @@ private:
     RenderTarget m_DeferredRenderTarget;
 
     // Root signatures
+    RootSignature m_SkyboxSignature;
     RootSignature m_DeferredRootSignature;
-    RootSignature m_PostProcessingRootSignature;
+    RootSignature m_SDRRootSignature;
 
     // Pipeline state object.
+    // Skybox PSO
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
+    // HDR -> SDR tone mapping PSO.
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SDRPipelineState;
 
     D3D12_VIEWPORT m_Viewport;
     D3D12_RECT m_ScissorRect;
@@ -139,4 +148,8 @@ private:
 
     int m_Width;
     int m_Height;
+
+    // Define some lights.
+    std::vector<PointLight> m_PointLights;
+    std::vector<SpotLight> m_SpotLights;
 };

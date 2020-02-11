@@ -1,21 +1,22 @@
 cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this file was created.
 
-set( HEADER_FILES 
-    inc/DX12LibPCH.h
+set( HEADER_FILES
     inc/Application.h
     inc/Buffer.h
     inc/ByteAddressBuffer.h
     inc/CommandList.h
     inc/CommandQueue.h
     inc/ConstantBuffer.h
+    inc/d3dx12.h
+    inc/Defines.h
     inc/DescriptorAllocation.h
     inc/DescriptorAllocator.h
     inc/DescriptorAllocatorPage.h
+    inc/DX12LibPCH.h
     inc/DynamicDescriptorHeap.h
     inc/Events.h
     inc/Game.h
     inc/GenerateMipsPSO.h
-    inc/GUI.h
     inc/Helpers.h
     inc/HighResolutionClock.h
     inc/IndexBuffer.h
@@ -33,7 +34,6 @@ set( HEADER_FILES
     inc/UploadBuffer.h
     inc/VertexBuffer.h
     inc/Window.h
-    inc/d3dx12.h
 )
 
 set( SOURCE_FILES
@@ -50,7 +50,6 @@ set( SOURCE_FILES
     src/DynamicDescriptorHeap.cpp
     src/Game.cpp
     src/GenerateMipsPSO.cpp
-    src/GUI.cpp
     src/HighResolutionClock.cpp
     src/IndexBuffer.cpp
     src/Mesh.cpp
@@ -66,29 +65,9 @@ set( SOURCE_FILES
     src/Window.cpp
 )
 
-set( IMGUI_HEADERS
-    inc/imgui.h
-    inc/imconfig.h
-    inc/imgui_impl_win32.h
-)
-
-source_group( "Header Files\\ImGUI" FILES ${IMGUI_HEADERS} )
-
-set( IMGUI_SOURCE
-    src/imgui.cpp
-    src/imgui_demo.cpp
-    src/imgui_draw.cpp
-    src/imgui_widgets.cpp
-    src/imgui_impl_win32.cpp
-)
-
-source_group( "Source Files\\ImGUI" FILES ${IMGUI_SOURCE} )
-
 set( SHADER_FILES
     Resources/Shaders/GenerateMips_CS.hlsl
     Resources/Shaders/PanoToCubemap_CS.hlsl
-    Resources/Shaders/ImGUI_VS.hlsl
-    Resources/Shaders/ImGUI_PS.hlsl
 )
 
 set( RESOURCE_FILES 
@@ -105,7 +84,6 @@ add_library( DX12Lib STATIC
     ${HEADER_FILES}
     ${SOURCE_FILES}
     ${RESOURCE_FILES}
-    ${IMGUI_HEADERS} ${IMGUI_SOURCE}
 )
 
 target_include_directories( DX12Lib
@@ -150,16 +128,4 @@ set_source_files_properties( Resources/Shaders/PanoToCubemap_CS.hlsl
     PROPERTIES
         VS_SHADER_TYPE Compute
         VS_SHADER_VARIABLE_NAME g_PanoToCubemap_CS
-)
-
-set_source_files_properties( Resources/Shaders/ImGUI_VS.hlsl
-    PROPERTIES
-        VS_SHADER_TYPE Vertex
-        VS_SHADER_VARIABLE_NAME g_ImGUI_VS
-)
-
-set_source_files_properties( Resources/Shaders/ImGUI_PS.hlsl
-    PROPERTIES
-        VS_SHADER_TYPE Pixel
-        VS_SHADER_VARIABLE_NAME g_ImGUI_PS
 )

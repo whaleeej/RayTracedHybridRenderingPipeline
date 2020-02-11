@@ -38,7 +38,6 @@
 #include <dxgi1_5.h>
 
 #include <Events.h>
-#include <GUI.h>
 #include <HighResolutionClock.h>
 #include <RenderTarget.h>
 #include <Texture.h>
@@ -197,7 +196,5 @@ private:
 
     int m_PreviousMouseX;
     int m_PreviousMouseY;
-
-    GUI m_GUI;
 
 };

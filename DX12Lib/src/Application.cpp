@@ -20,7 +20,6 @@ static WindowNameMap gs_WindowByName;
 uint64_t Application::ms_FrameCount = 0;
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
-extern LRESULT ImGui_ImplWin32_WndProcHandler( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
 
 // A wrapper struct to allow shared pointers for the window class.
 // This is needed because the constructor and destructor for the Window
@@ -482,10 +481,6 @@ MouseButtonEventArgs::MouseButton DecodeMouseButton(UINT messageID)
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    if ( ImGui_ImplWin32_WndProcHandler( hwnd, message, wParam, lParam ) )
-    {
-        return true;
-    }
 
     WindowPtr pWindow;
     {
@@ -528,9 +523,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
             {
                 GetMessage(&charMsg, hwnd, 0, 0);
                 c = static_cast<unsigned int>( charMsg.wParam );
-
-                if ( charMsg.wParam > 0 && charMsg.wParam < 0x10000 )
-                    ImGui::GetIO().AddInputCharacter( (unsigned short)charMsg.wParam );
             }
             bool shift = ( GetAsyncKeyState(VK_SHIFT) & 0x8000 ) != 0;
             bool control = ( GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
