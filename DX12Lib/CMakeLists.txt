@@ -1,69 +1,11 @@
 cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this file was created.
 
-set( HEADER_FILES
-    inc/Application.h
-    inc/Buffer.h
-    inc/ByteAddressBuffer.h
-    inc/CommandList.h
-    inc/CommandQueue.h
-    inc/ConstantBuffer.h
-    inc/d3dx12.h
-    inc/Defines.h
-    inc/DescriptorAllocation.h
-    inc/DescriptorAllocator.h
-    inc/DescriptorAllocatorPage.h
-    inc/DX12LibPCH.h
-    inc/DynamicDescriptorHeap.h
-    inc/Events.h
-    inc/Game.h
-    inc/GenerateMipsPSO.h
-    inc/Helpers.h
-    inc/HighResolutionClock.h
-    inc/IndexBuffer.h
-    inc/KeyCodes.h
-    inc/Mesh.h
-    inc/PanoToCubemapPSO.h
-    inc/RenderTarget.h
-    inc/Resource.h
-    inc/ResourceStateTracker.h
-    inc/RootSignature.h
-    inc/StructuredBuffer.h
-    inc/Texture.h
-    inc/TextureUsage.h
-    inc/ThreadSafeQueue.h
-    inc/UploadBuffer.h
-    inc/VertexBuffer.h
-    inc/Window.h
-)
-
-set( SOURCE_FILES
-    src/DX12LibPCH.cpp
-    src/Application.cpp
-    src/Buffer.cpp
-    src/ByteAddressBuffer.cpp
-    src/CommandQueue.cpp
-    src/CommandList.cpp
-    src/ConstantBuffer.cpp
-    src/DescriptorAllocation.cpp
-    src/DescriptorAllocator.cpp
-    src/DescriptorAllocatorPage.cpp
-    src/DynamicDescriptorHeap.cpp
-    src/Game.cpp
-    src/GenerateMipsPSO.cpp
-    src/HighResolutionClock.cpp
-    src/IndexBuffer.cpp
-    src/Mesh.cpp
-    src/PanoToCubemapPSO.cpp
-    src/RenderTarget.cpp
-    src/Resource.cpp
-    src/ResourceStateTracker.cpp
-    src/RootSignature.cpp
-    src/StructuredBuffer.cpp
-    src/Texture.cpp
-    src/UploadBuffer.cpp
-    src/VertexBuffer.cpp
-    src/Window.cpp
-)
+file(GLOB SOURCE_Buildin false inc/Buildin/*.h src/Buildin/*.cpp)
+file(GLOB SOURCE_DXObject false inc/DXObject/*.h src/DXObject/*.cpp)
+file(GLOB SOURCE_Framework false inc/Framework/*.h src/Framework/*.cpp)
+file(GLOB SOURCE_Geometry false inc/Geometry/*.h src/Geometry/*.cpp)
+file(GLOB SOURCE_Resource false inc/Resource/*.h src/Resource/*.cpp)
+file(GLOB SOURCE_Utility false inc/Utility/*.h src/Utility/*.cpp)
 
 set( SHADER_FILES
     Resources/Shaders/GenerateMips_CS.hlsl
@@ -76,9 +18,18 @@ set( RESOURCE_FILES
 	${SHADER_FILES}
 )
 
+source_group( "Buildin" FILES ${SOURCE_Buildin} )
+source_group( "DXObject" FILES ${SOURCE_DXObject} )
+source_group( "Framework" FILES ${SOURCE_Framework} )
+source_group( "Geometry" FILES ${SOURCE_Geometry} )
+source_group( "Resource" FILES ${SOURCE_Resource} )
+source_group( "Utility" FILES ${SOURCE_Utility} )
+source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
 source_group( "Resources" FILES DX12Lib.rc resource.h )
 source_group( "Resources\\Icon" FILES Resources/Icon/app_icon.ico )
-source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
+
+file(GLOB_RECURSE HEADER_FILES false inc/*.h)
+file(GLOB_RECURSE SOURCE_FILES false src/*.cpp)
 
 add_library( DX12Lib STATIC
     ${HEADER_FILES}
@@ -87,7 +38,12 @@ add_library( DX12Lib STATIC
 )
 
 target_include_directories( DX12Lib
-    PUBLIC inc
+    PUBLIC inc/Buildin
+    public inc/DXObject
+    public inc/Framework
+    public inc/Geometry
+    public inc/Resource
+    public inc/Utility
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
 )
 
@@ -99,16 +55,16 @@ target_link_libraries( DX12Lib
     PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/DX12Lib.dir/${CMAKE_CFG_INTDIR}/DX12Lib.res # This is the only way I could figure out how to link the compiled resource file.
 )
 
-# Enable precompiled header files.
-set_source_files_properties( ${SOURCE_FILES} 
-    PROPERTIES 
-        COMPILE_FLAGS /Yu"DX12LibPCH.h"
-)
+# # Enable precompiled header files.
+# set_source_files_properties( ${SOURCE_FILES} 
+#     PROPERTIES 
+#         COMPILE_FLAGS /Yu"DX12LibPCH.h"
+# )
 
-set_source_files_properties( src/DX12LibPCH.cpp
-    PROPERTIES
-        COMPILE_FLAGS /Yc"DX12LibPCH.h"
-)
+# set_source_files_properties( src/DX12LibPCH.cpp
+#     PROPERTIES
+#         COMPILE_FLAGS /Yc"DX12LibPCH.h"
+# )
 
 set_source_files_properties( ${SHADER_FILES}
     PROPERTIES
