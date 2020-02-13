@@ -149,6 +149,7 @@ D3D12_UNORDERED_ACCESS_VIEW_DESC GetUAVDesc(const D3D12_RESOURCE_DESC& resDesc, 
 
 void Texture::CreateViews()
 {
+	// Texture这里专门为Back Buffer服务生成RTV和DSV的
     if (m_d3d12Resource)
     {
         auto& app = Application::Get();
