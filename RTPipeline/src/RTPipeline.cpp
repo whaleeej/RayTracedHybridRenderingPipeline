@@ -518,12 +518,11 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
 		}
 
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_DeferredRenderTarget);
-
 		// Deferred Pipeline
 		{
+			commandList->SetViewport(m_Viewport);
+			commandList->SetScissorRect(m_ScissorRect);
+			commandList->SetRenderTarget(m_DeferredRenderTarget);
 			commandList->SetPipelineState(m_DeferredPipelineState);
 			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
@@ -691,15 +690,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			m_PlaneMesh->Draw(*commandList);
 		}
 
-		// Perform off-screen texture to RT post processing
-		{
-			commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-			commandList->SetPipelineState(m_SDRPipelineState);
-			commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			commandList->SetGraphicsRootSignature(m_SDRRootSignature);
-			commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->Draw(3);
-		}
 	}*/
 
 	{ // Let's raytrace
@@ -735,9 +725,22 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->DispatchRays(&raytraceDesc);
 	}
 
+	// Perform off-screen texture to RT post processing
+	{
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_SDRPipelineState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_SDRRootSignature);
+		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->Draw(3);
+	}
+
+
     commandQueue->ExecuteCommandList(commandList);
     // Present
-    m_pWindow->Present(*mpOutputTexture);
+    m_pWindow->Present();
 }
 
 static bool g_AllowFullscreenToggle = true;

@@ -1,7 +1,7 @@
 cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this file was created.
 
 file(GLOB SOURCE_Buildin false inc/Buildin/*.h src/Buildin/*.cpp)
-file(GLOB SOURCE_DXObject false inc/DXObject/*.h src/DXObject/*.cpp)
+file(GLOB SOURCE_DXRuntime false inc/DXRuntime/*.h src/DXRuntime/*.cpp)
 file(GLOB SOURCE_Framework false inc/Framework/*.h src/Framework/*.cpp)
 file(GLOB SOURCE_Geometry false inc/Geometry/*.h src/Geometry/*.cpp)
 file(GLOB SOURCE_Resource false inc/Resource/*.h src/Resource/*.cpp)
@@ -21,7 +21,7 @@ set( RESOURCE_FILES
 
 source_group( "Buildin" FILES ${SOURCE_Buildin} )
 source_group( "Dep" FILES ${SOURCE_Dep} )
-source_group( "DXObject" FILES ${SOURCE_DXObject} )
+source_group( "DXRuntime" FILES ${SOURCE_DXRuntime} )
 source_group( "Framework" FILES ${SOURCE_Framework} )
 source_group( "Geometry" FILES ${SOURCE_Geometry} )
 source_group( "Resource" FILES ${SOURCE_Resource} )
@@ -41,8 +41,8 @@ add_library( DX12Lib STATIC
 
 target_include_directories( DX12Lib
     PUBLIC  inc/Buildin
-	PUBLIC inc/Dep
-    PUBLIC inc/DXObject
+    PUBLIC inc/Dep
+    PUBLIC inc/DXRuntime
     PUBLIC inc/Framework
     PUBLIC inc/Geometry
     PUBLIC inc/Resource

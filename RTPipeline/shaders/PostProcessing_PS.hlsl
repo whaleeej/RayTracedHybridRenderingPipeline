@@ -16,8 +16,8 @@ float4 main( float4 Position : SV_Position ) : SV_Target0
 	float3 color = HDRTexture.Load(int3(texCoord.x, texCoord.y, 0)).rgb;
 	
 	//return float4(color.x / 20.0f, color.y / 20.0f, color.z / 20.0f, 1); // position testing
-	//return float4(color.r, color.r, color.r, 1); // metallic and roughness testing
-	return float4((normalize(color) + 1.0f) / 2.0f, 1); // normal testing from -1 1 -> 0 1
+	return float4(color.r, color.r, color.r, 1); // metallic and roughness testing
+	//return float4((normalize(color) + 1.0f) / 2.0f, 1); // normal testing from -1 1 -> 0 1
 	//return float4(normalize(color), 1); // normal testing // ac 0 1 space
 	//return float4(LinearToSRGB(color), 1); // albedo testing
 }
