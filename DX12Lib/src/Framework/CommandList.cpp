@@ -863,6 +863,7 @@ void CommandList::SetGraphicsDynamicStructuredBuffer( uint32_t slot, size_t numE
 
     m_d3d12CommandList->SetGraphicsRootShaderResourceView( slot, heapAllocation.GPU );
 }
+
 void CommandList::SetViewport(const D3D12_VIEWPORT& viewport)
 {
     SetViewports( {viewport} );

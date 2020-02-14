@@ -374,7 +374,7 @@ Microsoft::WRL::ComPtr<ID3D12Device2> Application::GetDevice() const
     return m_d3d12Device;
 }
 
-std::shared_ptr<CommandQueue> Application::GetCommandQueue(D3D12_COMMAND_LIST_TYPE type) const
+std::shared_ptr<CommandQueue> Application::GetCommandQueue(D3D12_COMMAND_LIST_TYPE type) const	
 {
     std::shared_ptr<CommandQueue> commandQueue;
     switch (type)
@@ -415,19 +415,19 @@ void Application::ReleaseStaleDescriptors( uint64_t finishedFrame )
     }
 }
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Application::CreateDescriptorHeap(UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
-{
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-    desc.Type = type;
-    desc.NumDescriptors = numDescriptors;
-    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    desc.NodeMask = 0;
-
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-    ThrowIfFailed(m_d3d12Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
-
-    return descriptorHeap;
-}
+//Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Application::CreateDescriptorHeap(UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
+//{
+//    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+//    desc.Type = type;
+//    desc.NumDescriptors = numDescriptors;
+//    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+//    desc.NodeMask = 0;
+//
+//    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+//    ThrowIfFailed(m_d3d12Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
+//
+//    return descriptorHeap;
+//}
 
 UINT Application::GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const
 {
