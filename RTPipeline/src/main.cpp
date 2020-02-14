@@ -4,7 +4,7 @@
 #include <Shlwapi.h>
 
 #include <Application.h>
-#include <HybridPipeline.h>
+#include <RTPipeline.h>
 
 #include <dxgidebug.h>
 
@@ -41,7 +41,7 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 
     Application::Create(hInstance);
     {
-        std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"HybridPipeline", 1280, 720);
+        std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"RTPipeline", 1280, 720);
         retCode = Application::Get().Run(demo);
     }
     Application::Destroy();

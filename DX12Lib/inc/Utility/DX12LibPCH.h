@@ -56,9 +56,12 @@ using namespace Microsoft::WRL;
 // DirectX 12 specific headers.
 #include "d3dx12.h"
 #include <dxgi1_6.h>
+#include <dxgiformat.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXTex.h>
+#include <DXCAPI/dxcapi.use.h>
+#include <comdef.h>
 
 using namespace DirectX;
 
@@ -77,6 +80,9 @@ using namespace DirectX;
 #include <unordered_map>
 #include <thread>
 #include <vector>
+#include <array>
+#include <fstream>
+#include <sstream>
 
 namespace fs = std::experimental::filesystem;
 

@@ -32,6 +32,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <DX12LibPCH.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h> // For HRESULT
@@ -312,3 +313,21 @@ namespace Math
 #define WSTR1(x) L##x
 #define WSTR(x) WSTR1(x)
 #define NAME_D3D12_OBJECT(x) x->SetName( WSTR(__FILE__ "(" STR(__LINE__) "): " L#x) )
+
+#define arraysize(a) (sizeof(a)/sizeof(a[0]))
+
+// Display a message-box
+void msgBox(const std::string& msg);
+// Convert a string to a wide-string
+std::wstring string_2_wstring(const std::string& s);
+// Convert a wide-string to a string
+std::string wstring_2_string(const std::wstring& ws);
+// Convert a blob to at string
+template<class BlotType>
+std::string convertBlobToString(BlotType* pBlob)
+{
+	std::vector<char> infoLog(pBlob->GetBufferSize() + 1);
+	memcpy(infoLog.data(), pBlob->GetBufferPointer(), pBlob->GetBufferSize());
+	infoLog[pBlob->GetBufferSize()] = 0;
+	return std::string(infoLog.data());
+}

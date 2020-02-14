@@ -895,6 +895,13 @@ void CommandList::SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> p
     TrackObject(pipelineState);
 }
 
+void CommandList::SetPipelineState1(Microsoft::WRL::ComPtr < ID3D12StateObject > pipelineState)
+{
+	m_d3d12CommandList->SetPipelineState1(pipelineState.Get());
+
+	TrackObject(pipelineState);
+}
+
 void CommandList::SetGraphicsRootSignature( const RootSignature& rootSignature )
 {
     auto d3d12RootSignature = rootSignature.GetRootSignature().Get();
@@ -929,6 +936,12 @@ void CommandList::SetComputeRootSignature( const RootSignature& rootSignature )
 
         TrackObject(m_RootSignature);
     }
+}
+
+void CommandList::SetComputeRootSignature(Microsoft::WRL::ComPtr<ID3D12RootSignature> pRootSignature)
+{
+	m_d3d12CommandList->SetComputeRootSignature(pRootSignature.Get());
+	TrackObject(pRootSignature);
 }
 
 void CommandList::SetShaderResourceView( uint32_t rootParameterIndex,
@@ -1054,6 +1067,11 @@ void CommandList::Dispatch( uint32_t numGroupsX, uint32_t numGroupsY, uint32_t n
     }
 
     m_d3d12CommandList->Dispatch( numGroupsX, numGroupsY, numGroupsZ );
+}
+
+void CommandList::DispatchRays(D3D12_DISPATCH_RAYS_DESC* desc)
+{
+	m_d3d12CommandList->DispatchRays(desc);
 }
 
 bool CommandList::Close( CommandList& pendingCommandList )

@@ -10,7 +10,7 @@
 #include <RootSignature.h>
 #include <Texture.h>
 #include <VertexBuffer.h>
-
+#include <RTHelper.h>
 #include <DirectXMath.h>
 
 class HybridPipeline : public Game
@@ -108,13 +108,10 @@ private:
     RenderTarget m_DeferredRenderTarget;
 
     // Root signatures
-    RootSignature m_SkyboxSignature;
     RootSignature m_DeferredRootSignature;
     RootSignature m_SDRRootSignature;
 
     // Pipeline state object.
-    // Skybox PSO
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
     // HDR -> SDR tone mapping PSO.
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SDRPipelineState;
@@ -149,7 +146,33 @@ private:
     int m_Width;
     int m_Height;
 
-    // Define some lights.
-    std::vector<PointLight> m_PointLights;
-    std::vector<SpotLight> m_SpotLights;
+	// Define some lights.
+	std::vector<PointLight> m_PointLights;
+	std::vector<SpotLight> m_SpotLights;
+
+	////////////////////////////////////////////////////////////////////// RT Object 
+	void createAccelerationStructures();
+	Microsoft::WRL::ComPtr < ID3D12Resource > mpVertexBuffer;
+	Microsoft::WRL::ComPtr < ID3D12Resource > mpTopLevelAS;
+	Microsoft::WRL::ComPtr < ID3D12Resource > mpBottomLevelAS;
+	uint64_t mTlasSize = 0;
+
+	void createRtPipelineState();
+	RootSignatureDesc createRayGenRootDesc();
+	Microsoft::WRL::ComPtr < ID3D12StateObject > mpPipelineState;
+	Microsoft::WRL::ComPtr < ID3D12RootSignature > mpEmptyRootSig;
+
+	void createShaderResources();
+	std::shared_ptr< Texture > mpOutputTexture;
+	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
+	const uint32_t kSrvUavHeapSize = 2;
+
+	void createShaderTable();
+	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;
+	uint32_t mShaderTableEntrySize = 0;
+
+	const WCHAR* kRayGenShader = L"rayGen";
+	const WCHAR* kMissShader = L"miss";
+	const WCHAR* kClosestHitShader = L"chs";
+	const WCHAR* kHitGroup = L"HitGroup";
 };

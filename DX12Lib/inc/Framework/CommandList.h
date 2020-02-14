@@ -73,9 +73,9 @@ public:
     }
 
     /**
-     * Get direct access to the ID3D12GraphicsCommandList2 interface.
+     * Get direct access to the ID3D12GraphicsCommandList4 interface.
      */
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> GetGraphicsCommandList() const
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetGraphicsCommandList() const
     {
         return m_d3d12CommandList;
     }
@@ -298,12 +298,14 @@ public:
      * Set the pipeline state object on the command list.
      */
     void SetPipelineState( Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState );
+	void SetPipelineState1(Microsoft::WRL::ComPtr < ID3D12StateObject > pipelineState);
 
     /**
      * Set the current root signature on the command list.
      */
     void SetGraphicsRootSignature( const RootSignature& rootSignature );
     void SetComputeRootSignature( const RootSignature& rootSignature );
+	void SetComputeRootSignature(Microsoft::WRL::ComPtr<ID3D12RootSignature> pRootSignature);
 
     /**
      * Set the SRV on the graphics pipeline.
@@ -348,6 +350,11 @@ public:
 	 */
 	void Dispatch(uint32_t numGroupsX, uint32_t numGroupsY = 1, uint32_t numGroupsZ = 1);
 
+	/**
+	 * Dispatch a Ray Trace.
+	 */
+	void DispatchRays(D3D12_DISPATCH_RAYS_DESC* desc);
+
     /***************************************************************************
      * Methods defined below are only intended to be used by internal classes. *
      ***************************************************************************/
@@ -388,6 +395,10 @@ public:
         return m_ComputeCommandList;
     }
 
+	void BuildRaytracingAccelerationStructure(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC* pDesc) {
+		m_d3d12CommandList->BuildRaytracingAccelerationStructure(pDesc, 0, nullptr);
+	}
+
 protected:
 
 private:
@@ -410,7 +421,7 @@ private:
     using TrackedObjects = std::vector < Microsoft::WRL::ComPtr<ID3D12Object> >;
 
     D3D12_COMMAND_LIST_TYPE m_d3d12CommandListType;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> m_d3d12CommandList;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_d3d12CommandList;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_d3d12CommandAllocator;
 
     // For copy queues, it may be necessary to generate mips while loading textures.

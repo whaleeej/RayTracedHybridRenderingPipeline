@@ -103,6 +103,7 @@ void Resource::SetD3D12Resource(Microsoft::WRL::ComPtr<ID3D12Resource> d3d12Reso
 
 	//Remind: 这里不必添加Global State Tracker
 	//// 我们认为全局所有的D3DResoure必须通过构造函数生成Default Heap
+	//// 否则由用户自行添加
 
     SetName(m_ResourceName);
 }
