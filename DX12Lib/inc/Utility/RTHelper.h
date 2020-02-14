@@ -1,7 +1,6 @@
 #pragma once
 
 #include <DX12LibPCH.h>
-#include <Helpers.h>
 #include <wrl.h>
 
 using namespace Microsoft::WRL;

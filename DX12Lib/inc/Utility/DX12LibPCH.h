@@ -60,7 +60,7 @@ using namespace Microsoft::WRL;
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXTex.h>
-#include <DXCAPI/dxcapi.use.h>
+#include <dxcapi.use.h>
 #include <comdef.h>
 
 using namespace DirectX;

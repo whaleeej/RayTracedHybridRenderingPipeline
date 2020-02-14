@@ -5,7 +5,8 @@ file(GLOB SOURCE_DXObject false inc/DXObject/*.h src/DXObject/*.cpp)
 file(GLOB SOURCE_Framework false inc/Framework/*.h src/Framework/*.cpp)
 file(GLOB SOURCE_Geometry false inc/Geometry/*.h src/Geometry/*.cpp)
 file(GLOB SOURCE_Resource false inc/Resource/*.h src/Resource/*.cpp)
-file(GLOB SOURCE_Utility false inc/Utility/*.h src/Utility/*.cpp Externals/DXCAPI/*h)
+file(GLOB SOURCE_Utility false inc/Utility/*.h src/Utility/*.cpp )
+file(GLOB SOURCE_Dep false inc/Dep/*.h src/Dep/*.cpp )
 
 set( SHADER_FILES
     Resources/Shaders/GenerateMips_CS.hlsl
@@ -19,6 +20,7 @@ set( RESOURCE_FILES
 )
 
 source_group( "Buildin" FILES ${SOURCE_Buildin} )
+source_group( "Dep" FILES ${SOURCE_Dep} )
 source_group( "DXObject" FILES ${SOURCE_DXObject} )
 source_group( "Framework" FILES ${SOURCE_Framework} )
 source_group( "Geometry" FILES ${SOURCE_Geometry} )
@@ -28,7 +30,7 @@ source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
 source_group( "Resources" FILES DX12Lib.rc resource.h )
 source_group( "Resources\\Icon" FILES Resources/Icon/app_icon.ico )
 
-file(GLOB_RECURSE HEADER_FILES false inc/*.h Externals/*.h)
+file(GLOB_RECURSE HEADER_FILES false inc/*.h)
 file(GLOB_RECURSE SOURCE_FILES false src/*.cpp)
 
 add_library( DX12Lib STATIC
@@ -39,12 +41,12 @@ add_library( DX12Lib STATIC
 
 target_include_directories( DX12Lib
     PUBLIC  inc/Buildin
+	PUBLIC inc/Dep
     PUBLIC inc/DXObject
     PUBLIC inc/Framework
     PUBLIC inc/Geometry
     PUBLIC inc/Resource
     PUBLIC inc/Utility
-	PUBLIC Externals
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
 )
 

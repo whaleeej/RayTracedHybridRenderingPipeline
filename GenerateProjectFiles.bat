@@ -12,6 +12,10 @@ PUSHD %CMAKE_BINARY_DIR%
 
 %CMAKE% -G %CMAKE_GENERATOR% -Wno-dev "%~dp0"
 
+cd G:\Repos\DirectX12-Demo
+XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Release /e /I
+XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Debug /e /I
+
 IF ERRORLEVEL 1 (
     PAUSE
 ) ELSE (

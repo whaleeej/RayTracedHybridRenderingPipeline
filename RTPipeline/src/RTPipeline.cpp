@@ -257,8 +257,8 @@ bool HybridPipeline::LoadContent()
 			// Load the Deferred shaders.
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Deferred_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/Deferred_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_PS.cso", &ps));
 
 			// Allow input layout and deny unnecessary access to certain pipeline stages.
 			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -326,8 +326,8 @@ bool HybridPipeline::LoadContent()
 			// Create the SDR PSO
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
