@@ -27,12 +27,17 @@ set( PIXEL_SHADER_FILES
     shaders/Skybox_PS.hlsl
 )
 
+set( RT_SHADER_FILES
+    shaders/RayTracing.hlsl
+)
+
 set( SHADER_FILES
     ${VERTEX_SHADER_FILES}
     ${PIXEL_SHADER_FILES}
+    ${RT_SHADER_FILES}
 )
 
-source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
+source_group( "Resources\\Shaders" FILES ${SHADER_FILES}  )
 
 set_source_files_properties( ${SHADER_FILES} 
     PROPERTIES
@@ -50,6 +55,11 @@ set_source_files_properties( ${VERTEX_SHADER_FILES}
 set_source_files_properties( ${PIXEL_SHADER_FILES}
     PROPERTIES 
         VS_SHADER_TYPE Pixel
+)
+
+set_source_files_properties( ${RT_SHADER_FILES}
+    PROPERTIES 
+        HEADER_FILE_ONLY TRUE
 )
 
 add_executable( RTPipeline WIN32

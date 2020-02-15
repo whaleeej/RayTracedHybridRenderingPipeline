@@ -5,7 +5,7 @@
 #include <CommandList.h>
 #include <Helpers.h>
 #include <Light.h>
-#include <Material.h>
+
 #include <Window.h>
 
 #include <wrl.h>
@@ -30,26 +30,6 @@ using namespace DirectX;
 #undef max
 #endif
 
-struct Mat
-{
-    XMMATRIX ModelMatrix;
-    XMMATRIX InverseTransposeModelMatrix;
-    XMMATRIX ModelViewProjectionMatrix;
-};
-
-struct LightProperties
-{
-    uint32_t NumPointLights;
-    uint32_t NumSpotLights;
-};
-
-struct PBRMaterial
-{
-	float metallic;
-	float roughness;
-	uint32_t  Padding[2];
-	PBRMaterial(float m, float r) :metallic(m), roughness(r), Padding{ 0 } {};
-};
 
 // An enum for root signature parameters.
 // I'm not using scoped enums to avoid the explicit cast that would be required
@@ -63,14 +43,10 @@ enum RootParameters
     NumRootParameters
 };
 
-// Clamp a value between a min and max range.
-template<typename T>
-constexpr const T& clamp(const T& val, const T& min = T(0), const T& max = T(1))
-{
-    return val < min ? min : val > max ? max : val;
-}
-
 // Builds a look-at (world) matrix from a point, up and direction vectors.
+
+static bool g_AllowFullscreenToggle = true;
+
 XMMATRIX XM_CALLCONV LookAtMatrix(FXMVECTOR Position, FXMVECTOR Direction, FXMVECTOR Up)
 {
     assert(!XMVector3Equal(Direction, XMVectorZero()));
@@ -89,6 +65,8 @@ XMMATRIX XM_CALLCONV LookAtMatrix(FXMVECTOR Position, FXMVECTOR Direction, FXMVE
 
     return M;
 }
+
+
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
@@ -132,57 +110,111 @@ bool HybridPipeline::LoadContent()
 		auto commandList = commandQueue->GetCommandList();
 
 		// Create a Cube mesh
-		m_CubeMesh = Mesh::CreateCube(*commandList);
-		m_SphereMesh = Mesh::CreateSphere(*commandList);
-		m_ConeMesh = Mesh::CreateCone(*commandList);
-		m_TorusMesh = Mesh::CreateTorus(*commandList);
-		m_PlaneMesh = Mesh::CreatePlane(*commandList);
-		// Create an inverted (reverse winding order) cube so the insides are not clipped.
-		m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
-
-		// Load some textures
-		commandList->LoadTextureFromFile(m_DefaultTexture, L"Assets/Textures/DefaultWhite.bmp", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_EarthTexture, L"Assets/Textures/earth.dds", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_MonaLisaTexture, L"Assets/Textures/Mona_Lisa.jpg", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+		meshPool.emplace("cube", Mesh::CreateCube(*commandList));
+		meshPool.emplace("sphere", Mesh::CreateSphere(*commandList));
+		meshPool.emplace("cone", Mesh::CreateCone(*commandList));
+		meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
+		meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
 
 		// load PBR textures
 		//// default
-		commandList->LoadTextureFromFile(m_default_albedo_texture, L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_default_metallic_texture, L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
-		commandList->LoadTextureFromFile(m_default_normal_texture, L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
-		commandList->LoadTextureFromFile(m_default_roughness_texture, L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
+		texturePool.emplace("default_albedo", Texture());
+		commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
+		texturePool.emplace("default_metallic", Texture());
+		commandList->LoadTextureFromFile(texturePool["default_metallic"], L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
+		texturePool.emplace("default_normal", Texture());
+		commandList->LoadTextureFromFile(texturePool["default_normal"], L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
+		texturePool.emplace("default_roughness", Texture());
+		commandList->LoadTextureFromFile(texturePool["default_roughness"], L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
 		//// rusted iron
-		commandList->LoadTextureFromFile(m_rustedIron_albedo_texture, L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_rustedIron_metallic_texture, L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
-		commandList->LoadTextureFromFile(m_rustedIron_normal_texture, L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
-		commandList->LoadTextureFromFile(m_rustedIron_roughness_texture, L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
+		texturePool.emplace("rusted_iron_albedo", Texture());
+		commandList->LoadTextureFromFile(texturePool["rusted_iron_albedo"], L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
+		texturePool.emplace("rusted_iron_metallic", Texture());
+		commandList->LoadTextureFromFile(texturePool["rusted_iron_metallic"], L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
+		texturePool.emplace("rusted_iron_normal", Texture());
+		commandList->LoadTextureFromFile(texturePool["rusted_iron_normal"], L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
+		texturePool.emplace("rusted_iron_roughness", Texture());
+		commandList->LoadTextureFromFile(texturePool["rusted_iron_roughness"], L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
 		//// grid metal
-		commandList->LoadTextureFromFile(m_gridMetal_albedo_texture, L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_gridMetal_metallic_texture, L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
-		commandList->LoadTextureFromFile(m_gridMetal_normal_texture, L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
-		commandList->LoadTextureFromFile(m_gridMetal_roughness_texture, L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
+		texturePool.emplace("grid_metal_albedo", Texture());
+		commandList->LoadTextureFromFile(texturePool["grid_metal_albedo"], L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
+		texturePool.emplace("grid_metal_metallic", Texture());
+		commandList->LoadTextureFromFile(texturePool["grid_metal_metallic"], L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
+		texturePool.emplace("grid_metal_normal", Texture());
+		commandList->LoadTextureFromFile(texturePool["grid_metal_normal"], L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
+		texturePool.emplace("grid_metal_roughness", Texture());
+		commandList->LoadTextureFromFile(texturePool["grid_metal_roughness"], L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
 		//// metal
-		commandList->LoadTextureFromFile(m_metal_albedo_texture, L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
-		commandList->LoadTextureFromFile(m_metal_metallic_texture, L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
-		commandList->LoadTextureFromFile(m_metal_normal_texture, L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
-		commandList->LoadTextureFromFile(m_metal_roughness_texture, L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
-
-		// Create a cubemap for the HDR panorama.
-		auto cubemapDesc = m_GraceCathedralTexture.GetD3D12ResourceDesc();
-		cubemapDesc.Width = cubemapDesc.Height = 1024;
-		cubemapDesc.DepthOrArraySize = 6;
-		cubemapDesc.MipLevels = 0;
-
-		m_GraceCathedralCubemap = Texture(cubemapDesc, nullptr, TextureUsage::Albedo, L"Grace Cathedral Cubemap");
-		// Convert the 2D panorama to a 3D cubemap.
-		commandList->PanoToCubemap(m_GraceCathedralCubemap, m_GraceCathedralTexture);
+		texturePool.emplace("metal_albedo", Texture());
+		commandList->LoadTextureFromFile(texturePool["metal_albedo"], L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
+		texturePool.emplace("metal_metallic", Texture());
+		commandList->LoadTextureFromFile(texturePool["metal_metallic"], L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
+		texturePool.emplace("metal_normal", Texture());
+		commandList->LoadTextureFromFile(texturePool["metal_normal"], L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
+		texturePool.emplace("metal_roughness", Texture());
+		commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
 		auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 		commandQueue->WaitForFenceValue(fenceValue);
 	}
+
+	{ ///////////////////////// GameObject Gen
+		gameObjectPool.emplace("sphere",std::make_shared<GameObject>());
+		gameObjectPool["sphere"]->mesh = "sphere";
+		gameObjectPool["sphere"]->material.base = Material::White;
+		gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["sphere"]->material.tex = TextureMaterial("metal");
+
+		gameObjectPool.emplace("cube", std::make_shared<GameObject>());
+		gameObjectPool["cube"]->mesh = "cube";
+		gameObjectPool["cube"]->material.base = Material::White;
+		gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
+
+		gameObjectPool.emplace("torus", std::make_shared<GameObject>());
+		gameObjectPool["torus"]->mesh = "torus";
+		gameObjectPool["torus"]->material.base = Material::White;
+		gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["torus"]->material.tex = TextureMaterial("rusted_iron");
+
+		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
+		gameObjectPool["Floor plane"]->mesh = "plane";
+		gameObjectPool["Floor plane"]->material.base = Material::Red;
+		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
+
+		gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+		gameObjectPool["Back wall"]->mesh = "plane";
+		gameObjectPool["Back wall"]->material.base = Material::Green;
+		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+
+		gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+		gameObjectPool["Ceiling plane"]->mesh = "plane";
+		gameObjectPool["Ceiling plane"]->material.base = Material::Blue;
+		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+
+		gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+		gameObjectPool["Front wall"]->mesh = "plane";
+		gameObjectPool["Front wall"]->material.base = Material::Yellow;
+		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+
+		gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+		gameObjectPool["Left wall"]->mesh = "plane";
+		gameObjectPool["Left wall"]->material.base = Material::Cyan;
+		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+
+		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+		gameObjectPool["Right wall"]->mesh = "plane";
+		gameObjectPool["Right wall"]->material.base = Material::Magenta;
+		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+	}
     
-	{ // BackScreen RT Creation
+	{ ///////////////////////////// BackScreen RT Creation
 		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
 
@@ -242,7 +274,7 @@ bool HybridPipeline::LoadContent()
 		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
 	}
 
-	{/////////////////////////////////// Root Signature
+	{ /////////////////////////////////// Root Signature
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
@@ -311,7 +343,7 @@ bool HybridPipeline::LoadContent()
 			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
 		}
 
-		// Create the SDR Root Signature
+		// Create the PostProcessing Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
@@ -321,9 +353,9 @@ bool HybridPipeline::LoadContent()
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(1, rootParameters);
 
-			m_SDRRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+			m_PostProcessingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
-			// Create the SDR PSO
+			// Create the PostProcessing PSO
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
@@ -332,7 +364,7 @@ bool HybridPipeline::LoadContent()
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 
-			struct SDRPipelineStateStream
+			struct PostProcessingPipelineStateStream
 			{
 				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
 				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
@@ -340,23 +372,23 @@ bool HybridPipeline::LoadContent()
 				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
 				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
 				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} sdrPipelineStateStream;
+			} postProcessingPipelineStateStream;
 
-			sdrPipelineStateStream.pRootSignature = m_SDRRootSignature.GetRootSignature().Get();
-			sdrPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			sdrPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			sdrPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			sdrPipelineStateStream.Rasterizer = rasterizerDesc;
-			sdrPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+			postProcessingPipelineStateStream.pRootSignature = m_PostProcessingRootSignature.GetRootSignature().Get();
+			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
+			postProcessingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
 
-			D3D12_PIPELINE_STATE_STREAM_DESC sdrPipelineStateStreamDesc = {
-				sizeof(SDRPipelineStateStream), &sdrPipelineStateStream
+			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
+				sizeof(PostProcessingPipelineStateStream), & postProcessingPipelineStateStream
 			};
-			ThrowIfFailed(device->CreatePipelineState(&sdrPipelineStateStreamDesc, IID_PPV_ARGS(&m_SDRPipelineState)));
+			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostProcessingPipelineState)));
 		}
 	}
 
-	{
+	{ /////////////////////////////RT loading
 		createAccelerationStructures();
 		createRtPipelineState();
 		createShaderResources();
@@ -488,13 +520,46 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
         l.SpotAngle = XMConvertToRadians(45.0f);
         l.Attenuation = 0.0f;
     }
-}
 
-void XM_CALLCONV ComputeMatrices(FXMMATRIX model, CXMMATRIX view, CXMMATRIX viewProjection, Mat& mat)
-{
-    mat.ModelMatrix = model;
-    mat.InverseTransposeModelMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, mat.ModelMatrix));
-    mat.ModelViewProjectionMatrix = model * viewProjection;
+	// update the GameObject
+	gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
+	gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
+	gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+	gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
+	gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+	gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+	gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
+	gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+	gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+	float scalePlane = 20.0f;
+	float translateOffset = scalePlane / 2.0f;
+
+	gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+	gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
+	gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+	gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+	gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+	gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+	gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+	gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+	gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+	gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+	gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+	gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+	gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+	gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
+	gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+	gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+	gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
+	gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 }
 
 void HybridPipeline::OnRender(RenderEventArgs& e)
@@ -504,8 +569,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
-	/*// Rasterizing Pipe, deprecated
-	{
+	{// Rasterizing Pipe, deprecated
 		// Clear the render targets.
 		{
 			FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
@@ -526,173 +590,13 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			commandList->SetPipelineState(m_DeferredPipelineState);
 			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-			// Draw the sphere sphere
-			XMMATRIX translationMatrix = XMMatrixTranslation(-4.0f, 2.0f, -4.0f);
-			XMMATRIX rotationMatrix = XMMatrixIdentity();
-			XMMATRIX scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
-			XMMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-			XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-			XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
-
-			Mat matrices;
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_metal_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_metal_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_metal_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_metal_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_SphereMesh->Draw(*commandList);
-
-			// Draw a cube
-			translationMatrix = XMMatrixTranslation(4.0f, 2.0f, 4.0f);
-			rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
-			scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_gridMetal_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_gridMetal_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_gridMetal_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_gridMetal_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_CubeMesh->Draw(*commandList);
-
-			//// Draw a torus
-			translationMatrix = XMMatrixTranslation(4.0f, 0.6f, -4.0f);
-			rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
-			scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::White);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_rustedIron_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_rustedIron_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_rustedIron_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_rustedIron_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_TorusMesh->Draw(*commandList);
-
-			// Floor plane.
-			float scalePlane = 20.0f;
-			float translateOffset = scalePlane / 2.0f;
-
-			translationMatrix = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
-			rotationMatrix = XMMatrixIdentity();
-			scaleMatrix = XMMatrixScaling(scalePlane, 1.0f, scalePlane);
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Red);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
-
-			// Back wall
-			translationMatrix = XMMatrixTranslation(0, translateOffset, translateOffset);
-			rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90));
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Green);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
-
-			// Ceiling plane
-			translationMatrix = XMMatrixTranslation(0, translateOffset * 2.0f, 0);
-			rotationMatrix = XMMatrixRotationX(XMConvertToRadians(180));
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Blue);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
-
-			// Front wall
-			translationMatrix = XMMatrixTranslation(0, translateOffset, -translateOffset);
-			rotationMatrix = XMMatrixRotationX(XMConvertToRadians(90));
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Yellow);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
-
-			// Left wall
-			translationMatrix = XMMatrixTranslation(-translateOffset, translateOffset, 0);
-			rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90));
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Cyan);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
-
-			// Right wall
-			translationMatrix = XMMatrixTranslation(translateOffset, translateOffset, 0);
-			rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90));
-			worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-
-			ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
-
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Magenta);
-			commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
-			commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-			m_PlaneMesh->Draw(*commandList);
+			for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+				it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
+			}
 		}
+	}
 
-	}*/
-
-	{ // Let's raytrace
+	/*{ // Let's raytrace
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
 
 		commandList->TransitionBarrier(*mpOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -723,27 +627,23 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		// Dispatch
 		commandList->SetPipelineState1(mpPipelineState);
 		commandList->DispatchRays(&raytraceDesc);
-	}
-
-	// Perform off-screen texture to RT post processing
-	{
+	}*/
+	
+	{ // Perform off-screen texture to RT post processing
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
 		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-		commandList->SetPipelineState(m_SDRPipelineState);
+		commandList->SetPipelineState(m_PostProcessingPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_SDRRootSignature);
-		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
+		commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->Draw(3);
 	}
-
 
     commandQueue->ExecuteCommandList(commandList);
     // Present
     m_pWindow->Present();
 }
-
-static bool g_AllowFullscreenToggle = true;
 
 void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
 {
@@ -863,7 +763,6 @@ void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
     }
     
 }
-
 
 void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 {
@@ -1202,4 +1101,19 @@ void HybridPipeline::createShaderTable()
 
 	// Unmap
 	mpShaderTable->Unmap(0, nullptr);
+}
+
+void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
+{
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, material.base);
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, material.pbr);
+	commandList.SetShaderResourceView(RootParameters::Textures, 0, (texturePool.find(material.tex.AlbedoTexture)!=texturePool.end())?texturePool[material.tex.AlbedoTexture]: texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+	if (meshPool.find(mesh) != meshPool.end()) {
+		meshPool[mesh]->Draw(commandList);
+	}
 }

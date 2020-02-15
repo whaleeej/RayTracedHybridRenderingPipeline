@@ -1,5 +1,5 @@
 #pragma once
-
+#include <DX12LibPCH.h>
 #include <Camera.h>
 #include <Game.h>
 #include <IndexBuffer.h>
@@ -12,6 +12,7 @@
 #include <VertexBuffer.h>
 #include <RTHelper.h>
 #include <DirectXMath.h>
+#include <Material.h>
 
 class HybridPipeline : public Game
 {
@@ -66,55 +67,109 @@ protected:
     virtual void OnResize(ResizeEventArgs& e) override; 
 
 private:
-    // Some geometry to render.
-    std::unique_ptr<Mesh> m_CubeMesh;
-    std::unique_ptr<Mesh> m_SphereMesh;
-    std::unique_ptr<Mesh> m_ConeMesh;
-    std::unique_ptr<Mesh> m_TorusMesh;
-    std::unique_ptr<Mesh> m_PlaneMesh;
+	// Transform
+	struct MatCB
+	{
+		XMMATRIX ModelMatrix;
+		XMMATRIX InverseTransposeModelMatrix;
+		XMMATRIX ModelViewProjectionMatrix;
+	};
+	struct Transform
+	{
+		Transform(XMMATRIX trans, XMMATRIX rot, XMMATRIX scale) :
+			translationMatrix(trans), rotationMatrix(rot), scaleMatrix(scale) {};
+		XMMATRIX translationMatrix;
+		XMMATRIX rotationMatrix;
+		XMMATRIX scaleMatrix;
+		MatCB ComputeMatCB(CXMMATRIX view, CXMMATRIX projection)
+		{
+			MatCB matCB;
+			matCB.ModelMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+			matCB.InverseTransposeModelMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, matCB.ModelMatrix));
+			matCB.ModelViewProjectionMatrix = matCB.ModelMatrix * view * projection;
+			return matCB;
+		}
+	};
+	// Material
+	using BaseMaterial = Material;
+	using TextureIndex = std::string;
+	struct PBRMaterial
+	{
+		float metallic;
+		float roughness;
+		uint32_t  Padding[2];
+		PBRMaterial(float m, float r) :metallic(m), roughness(r), Padding{ 0 } {};
+	};
+	struct TextureMaterial
+	{
+		TextureMaterial(TextureIndex index_leading) {
+			AlbedoTexture = index_leading + "_albedo";
+			MetallicTexture = index_leading + "_metallic";
+			NormalTexture = index_leading + "_normal";
+			RoughnessTexture = index_leading + "_roughness";
+		}
+		TextureIndex AlbedoTexture;
+		TextureIndex MetallicTexture;
+		TextureIndex NormalTexture;
+		TextureIndex RoughnessTexture;
+	};
+	struct HybridMaterial
+	{
+		HybridMaterial(TextureIndex index_leading) 
+			:base{ Material::White }, pbr{ 1.0f, 1.0f }, tex(index_leading){}
+		BaseMaterial base;
+		PBRMaterial pbr;
+		TextureMaterial tex;
+	};
+	// Mesh
+	using MeshIndex = std::string;
+	// GameObject
+	using GameObjectIndex = std::string;
+	class GameObject {
+	public:
+		MeshIndex mesh;
+		Transform transform;
+		HybridMaterial material;
 
-    std::unique_ptr<Mesh> m_SkyboxMesh;
-
-	// old texture
-    Texture m_DefaultTexture;
-    Texture m_EarthTexture;
-    Texture m_MonaLisaTexture;
-    Texture m_GraceCathedralTexture;
-    Texture m_GraceCathedralCubemap;
-
-	// pbr texture
-	//// pipeline default
-	Texture m_default_albedo_texture;
-	Texture m_default_metallic_texture;
-	Texture m_default_normal_texture;
-	Texture m_default_roughness_texture;
-	//// rust iron
-	Texture m_rustedIron_albedo_texture;
-	Texture m_rustedIron_metallic_texture;
-	Texture m_rustedIron_normal_texture;
-	Texture m_rustedIron_roughness_texture;
-	//// grid metal
-	Texture m_gridMetal_albedo_texture;
-	Texture m_gridMetal_metallic_texture;
-	Texture m_gridMetal_normal_texture;
-	Texture m_gridMetal_roughness_texture;
-	//// metal
-	Texture m_metal_albedo_texture;
-	Texture m_metal_metallic_texture;
-	Texture m_metal_normal_texture;
-	Texture m_metal_roughness_texture;
+		GameObject() :
+			mesh(""),
+			transform(XMMatrixTranslation(0, 0, 0), XMMatrixIdentity(), XMMatrixScaling(1.0f, 1.0f, 1.0f)),
+			material("default") {}
+		void Translate(XMMATRIX translationMatrix) {
+			transform.translationMatrix = translationMatrix;
+		}
+		void Rotate(XMMATRIX rotationMatrix) {
+			transform.rotationMatrix = rotationMatrix;
+		}
+		void Scale(XMMATRIX scaleMatrix) {
+			transform.scaleMatrix = scaleMatrix;
+		}
+		void Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool);
+	};
+	// Light
+	struct LightProperties
+	{
+		uint32_t NumPointLights;
+		uint32_t NumSpotLights;
+	};
+	// Container
+	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
+	std::map<TextureIndex, Texture> texturePool;
+	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
+	std::vector<PointLight> m_PointLights;
+	std::vector<SpotLight> m_SpotLights;
 
     // Deferred Render target
     RenderTarget m_DeferredRenderTarget;
 
     // Root signatures
     RootSignature m_DeferredRootSignature;
-    RootSignature m_SDRRootSignature;
+    RootSignature m_PostProcessingRootSignature;
 
     // Pipeline state object.
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-    // HDR -> SDR tone mapping PSO.
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SDRPipelineState;
+    // HDR -> PostProcessing tone mapping PSO.
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
 
     D3D12_VIEWPORT m_Viewport;
     D3D12_RECT m_ScissorRect;
@@ -145,10 +200,6 @@ private:
 
     int m_Width;
     int m_Height;
-
-	// Define some lights.
-	std::vector<PointLight> m_PointLights;
-	std::vector<SpotLight> m_SpotLights;
 
 	////////////////////////////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();

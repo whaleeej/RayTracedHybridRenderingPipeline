@@ -28,7 +28,7 @@
  *
  *  @brief Precompiled Header File for DX12Lib.
  */
-
+#define _ENABLE_EXTENDED_ALIGNED_STORAGE
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h> // For CommandLineToArgvW

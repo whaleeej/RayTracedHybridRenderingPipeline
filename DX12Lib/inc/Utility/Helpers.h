@@ -308,6 +308,13 @@ namespace Math
     }
 }
 
+// Clamp a value between a min and max range.
+template<typename T>
+constexpr const T& clamp(const T& val, const T& min = T(0), const T& max = T(1))
+{
+	return val < min ? min : val > max ? max : val;
+}
+
 #define STR1(x) #x
 #define STR(x) STR1(x)
 #define WSTR1(x) L##x
