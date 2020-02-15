@@ -20,5 +20,5 @@ add_subdirectory( RTPipeline )
 
 # Set the startup project.
 set_directory_properties( PROPERTIES 
-    VS_STARTUP_PROJECT HybridPipeline
+    VS_STARTUP_PROJECT RTPipeline
 )

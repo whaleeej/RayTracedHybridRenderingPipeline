@@ -83,6 +83,8 @@ public:
     static std::unique_ptr<Mesh> CreateTorus(CommandList& commandList, float diameter = 1, float thickness = 0.333f, size_t tessellation = 32, bool rhcoords = false);
     static std::unique_ptr<Mesh> CreatePlane(CommandList& commandList, float width = 1, float height = 1, bool rhcoords = false);
 
+	VertexBuffer getVertexBuffer() { return m_VertexBuffer; }
+	IndexBuffer getIndexBuffer() { return m_IndexBuffer; }
 protected:
 
 private:

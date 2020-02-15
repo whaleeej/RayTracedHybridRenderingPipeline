@@ -623,7 +623,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 		// Bind the empty root signature
 		commandList->SetComputeRootSignature(mpEmptyRootSig);
-
 		// Dispatch
 		commandList->SetPipelineState1(mpPipelineState);
 		commandList->DispatchRays(&raytraceDesc);
