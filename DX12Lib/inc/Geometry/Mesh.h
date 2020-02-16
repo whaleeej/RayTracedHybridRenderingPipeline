@@ -85,6 +85,8 @@ public:
 
 	VertexBuffer getVertexBuffer() { return m_VertexBuffer; }
 	IndexBuffer getIndexBuffer() { return m_IndexBuffer; }
+	UINT getVertexCount() { return m_VertexCount; }
+	UINT getIndexCount() { return m_IndexCount; }
 protected:
 
 private:
@@ -99,5 +101,6 @@ private:
     VertexBuffer m_VertexBuffer;
     IndexBuffer m_IndexBuffer;
 
+	UINT m_VertexCount;
     UINT m_IndexCount;
 };

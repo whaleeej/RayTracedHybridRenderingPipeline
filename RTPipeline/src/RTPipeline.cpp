@@ -214,6 +214,47 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 	}
     
+	{ // Initial the transform
+		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
+		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+		gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
+		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
+		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+		float scalePlane = 20.0f;
+		float translateOffset = scalePlane / 2.0f;
+
+		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
+		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
+		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+	}
+
 	{ ///////////////////////////// BackScreen RT Creation
 		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
@@ -521,45 +562,47 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
         l.Attenuation = 0.0f;
     }
 
-	// update the GameObject
-	gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
-	gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-	gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+	{
+		//// update the GameObject
+		//gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
+		//gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
+		//gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-	gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
-	gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-	gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		//gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
+		//gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		//gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-	gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
-	gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-	gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		//gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
+		//gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		//gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-	float scalePlane = 20.0f;
-	float translateOffset = scalePlane / 2.0f;
+		//float scalePlane = 20.0f;
+		//float translateOffset = scalePlane / 2.0f;
 
-	gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-	gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
-	gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+		//gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
+		//gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-	gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-	gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-	gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+		//gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+		//gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-	gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-	gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-	gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+		//gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+		//gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-	gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-	gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-	gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+		//gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+		//gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-	gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-	gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
-	gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+		//gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
+		//gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-	gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-	gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
-	gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+		//gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
+		//gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+	}
 }
 
 void HybridPipeline::OnRender(RenderEventArgs& e)
@@ -569,34 +612,33 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
-	{// Rasterizing Pipe, deprecated
-		// Clear the render targets.
-		{
-			FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+	//{// Rasterizing Pipe, deprecated
+	//	{
+	//		FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
-			commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
-		}
+	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
+	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
+	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
+	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
+	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
+	//		commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
+	//	}
 
-		// Deferred Pipeline
-		{
-			commandList->SetViewport(m_Viewport);
-			commandList->SetScissorRect(m_ScissorRect);
-			commandList->SetRenderTarget(m_DeferredRenderTarget);
-			commandList->SetPipelineState(m_DeferredPipelineState);
-			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
+	//	// Deferred Pipeline
+	//	{
+	//		commandList->SetViewport(m_Viewport);
+	//		commandList->SetScissorRect(m_ScissorRect);
+	//		commandList->SetRenderTarget(m_DeferredRenderTarget);
+	//		commandList->SetPipelineState(m_DeferredPipelineState);
+	//		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-			for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
-				it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
-			}
-		}
-	}
+	//		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+	//			it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
+	//		}
+	//	}
+	//}
 
-	/*{ // Let's raytrace
+	{ // Let's raytrace
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
 
 		commandList->TransitionBarrier(*mpOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -626,7 +668,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		// Dispatch
 		commandList->SetPipelineState1(mpPipelineState);
 		commandList->DispatchRays(&raytraceDesc);
-	}*/
+	}
 	
 	{ // Perform off-screen texture to RT post processing
 		commandList->SetViewport(m_Viewport);
@@ -635,7 +677,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPipelineState(m_PostProcessingPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
-		commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->Draw(3);
 	}
 
@@ -803,32 +845,49 @@ void HybridPipeline::createAccelerationStructures()
 	auto commandQueue = Application::Get().GetCommandQueue();
 	auto commandList = commandQueue->GetCommandList();
 
-	{ // mpVertexBuffer
-		float vertices[][3] =
-		{
-			{0, 1.73205f,  0},
-			{1.0f,  0, 0},
-			{-1.0f, 0, 0},
-		};
-		// For simplicity, we create the vertex buffer on the upload heap, but that's not required
-		mpVertexBuffer = createBuffer(pDevice, sizeof(vertices), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-		uint8_t* pData;
-		mpVertexBuffer->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, vertices, sizeof(vertices));
-		mpVertexBuffer->Unmap(0, nullptr);
-		// 成员变量持有，全局记录持久资源的状态
-		ResourceStateTracker::AddGlobalResourceState(mpVertexBuffer.Get(), D3D12_RESOURCE_STATE_GENERIC_READ);
-		NAME_D3D12_OBJECT(mpVertexBuffer);
-	}
+	//{ // mpVertexBuffer // 临时生成的三角形
+	//	float vertices[][3] =
+	//	{
+	//		{0, 1.73205f,  0},
+	//		{1.0f,  0, 0},
+	//		{-1.0f, 0, 0},
+	//	};
+	//	// For simplicity, we create the vertex buffer on the upload heap, but that's not required
+	//	mpVertexBuffer = createBuffer(pDevice, sizeof(vertices), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+	//	uint8_t* pData;
+	//	mpVertexBuffer->Map(0, nullptr, (void**)& pData);
+	//	memcpy(pData, vertices, sizeof(vertices));
+	//	mpVertexBuffer->Unmap(0, nullptr);
+	//	// 成员变量持有，全局记录持久资源的状态
+	//	ResourceStateTracker::AddGlobalResourceState(mpVertexBuffer.Get(), D3D12_RESOURCE_STATE_GENERIC_READ);
+	//	NAME_D3D12_OBJECT(mpVertexBuffer);
+	//}
 	
-	AccelerationStructureBuffers bottomLevelBuffers;
-	{ //mpBottomLevelAS
+	std::vector<AccelerationStructureBuffers> bottomLevelBuffers;
+	mpBottomLevelASes.resize(meshPool.size()); 
+	bottomLevelBuffers.resize(meshPool.size());//Before the commandQueue finishes its execution of AS creation, these resources' lifecycle have to be held
+	std::map<MeshIndex, int> MeshIndex2blasSeqCache; // Record MeshIndex to the sequence of mesh in mpBottomLevelASes
+
+	int blasSeqCount=0;
+	for (auto it = meshPool.begin(); it != meshPool.end(); it++) { //mpBottomLevelASes
+
+		MeshIndex2blasSeqCache.emplace(it->first, blasSeqCount);
+		auto pMesh = it->second;
+
+		// set the index and vertex buffer to generic read status //Crucial!!!!!!!! // Make Sure the correct status // hey yeah
+		commandList->TransitionBarrier(pMesh->getVertexBuffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
+		commandList->TransitionBarrier(pMesh->getIndexBuffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
+
 		D3D12_RAYTRACING_GEOMETRY_DESC geomDesc = {};
 		geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geomDesc.Triangles.VertexBuffer.StartAddress = mpVertexBuffer->GetGPUVirtualAddress();
-		geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(float) * 3;
-		geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geomDesc.Triangles.VertexCount = 3;
+		geomDesc.Triangles.VertexBuffer.StartAddress = pMesh->getVertexBuffer().GetD3D12Resource()->GetGPUVirtualAddress();//Vertex Setup
+		geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexPositionNormalTexture);
+		geomDesc.Triangles.VertexFormat = VertexPositionNormalTexture::InputElements[0].Format;
+		geomDesc.Triangles.VertexCount = pMesh->getVertexCount();
+		geomDesc.Triangles.IndexBuffer = pMesh->getIndexBuffer().GetD3D12Resource()->GetGPUVirtualAddress(); //Index Setup
+		geomDesc.Triangles.IndexFormat = pMesh->getIndexBuffer().GetIndexBufferView().Format;
+		geomDesc.Triangles.IndexCount = pMesh->getIndexCount();
+		
 		geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 		// Get the size requirements for the scratch and AS buffers
@@ -843,34 +902,36 @@ void HybridPipeline::createAccelerationStructures()
 		pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
-		bottomLevelBuffers.pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
-		bottomLevelBuffers.pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
+		bottomLevelBuffers[blasSeqCount].pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
+		bottomLevelBuffers[blasSeqCount].pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
 		// 成员变量持有，全局记录持久资源的状态
 		ASBuffer asBuffer;
-		mpBottomLevelAS = bottomLevelBuffers.pResult;
-		asBuffer.SetD3D12Resource(mpBottomLevelAS);
-		asBuffer.SetName(L"BottomLevelAS");
-		ResourceStateTracker::AddGlobalResourceState(mpBottomLevelAS.Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+		mpBottomLevelASes[blasSeqCount] = bottomLevelBuffers[blasSeqCount].pResult;
+		asBuffer.SetD3D12Resource(mpBottomLevelASes[blasSeqCount]);
+		asBuffer.SetName(L"BottomLevelAS"+string_2_wstring(it->first));
+		ResourceStateTracker::AddGlobalResourceState(mpBottomLevelASes[blasSeqCount].Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
 		// Create the bottom-level AS
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 		asDesc.Inputs = inputs;
-		asDesc.DestAccelerationStructureData = bottomLevelBuffers.pResult->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = bottomLevelBuffers.pScratch->GetGPUVirtualAddress();
+		asDesc.DestAccelerationStructureData = bottomLevelBuffers[blasSeqCount].pResult->GetGPUVirtualAddress();
+		asDesc.ScratchAccelerationStructureData = bottomLevelBuffers[blasSeqCount].pScratch->GetGPUVirtualAddress();
 
 		commandList->BuildRaytracingAccelerationStructure(&asDesc);
 
 		// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
 		commandList->UAVBarrier(asBuffer, true);
+		blasSeqCount++;
 	}
 
-	AccelerationStructureBuffers topLevelBuffers;
+	AccelerationStructureBuffers topLevelBuffers; //构建GameObject
 	{ // topLevelBuffers
+		int gameObjectCount = gameObjectPool.size();
 		// First, get the size of the TLAS buffers and create them
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-		inputs.NumDescs = 1;
+		inputs.NumDescs = gameObjectCount;
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
@@ -888,20 +949,25 @@ void HybridPipeline::createAccelerationStructures()
 		ResourceStateTracker::AddGlobalResourceState(mpTopLevelAS.Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
 		// The instance desc should be inside a buffer, create and map the buffer
-		topLevelBuffers.pInstanceDesc = createBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		topLevelBuffers.pInstanceDesc = createBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * gameObjectCount, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
 		topLevelBuffers.pInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
-		// Initialize the instance desc. We only have a single instance
-		pInstanceDesc->InstanceID = 0;                            // This value will be exposed to the shader via InstanceID()
-		pInstanceDesc->InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-		pInstanceDesc->Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		XMMATRIX m(1.0f, 0.0f, 0.0f, 0.0f,
-								0.0f, 1.0f, 0.0f, 0.0f,
-								0.0f, 0.0f, 1.0f, 0.0f,
-								0.0f, 0.0f, 0.0f, 1.0f); // Identity matrix
-		memcpy(pInstanceDesc->Transform, m.r, sizeof(pInstanceDesc->Transform));
-		pInstanceDesc->AccelerationStructure = mpBottomLevelAS->GetGPUVirtualAddress();
-		pInstanceDesc->InstanceMask = 0xFF;
+		ZeroMemory(pInstanceDesc, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * gameObjectCount);
+
+		int tlasGoCount=0;
+		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		{
+			// Initialize the instance desc. We only have a single instance
+			pInstanceDesc[tlasGoCount].InstanceID = tlasGoCount;                            // This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[tlasGoCount].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			pInstanceDesc[tlasGoCount].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			XMMATRIX m = XMMatrixTranspose(it->second->transform.ComputeModel());
+			memcpy(pInstanceDesc[tlasGoCount].Transform, m.r, sizeof(pInstanceDesc[tlasGoCount].Transform));
+			pInstanceDesc[tlasGoCount].AccelerationStructure =/* mpBottomLevelAS->GetGPUVirtualAddress();*/ mpBottomLevelASes[MeshIndex2blasSeqCache[it->second->mesh]]->GetGPUVirtualAddress();
+			pInstanceDesc[tlasGoCount].InstanceMask = 0xFF;
+			tlasGoCount++;
+		}
+		
 		// Unmap
 		topLevelBuffers.pInstanceDesc->Unmap(0, nullptr);
 

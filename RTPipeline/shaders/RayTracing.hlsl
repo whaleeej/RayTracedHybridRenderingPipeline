@@ -29,14 +29,18 @@ void rayGen()
     float aspectRatio = dims.x / dims.y;
 
     RayDesc ray;
-    ray.Origin = float3(0, 0, -2);
+    ray.Origin = float3(0, 5, -20);
 	ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
 
     ray.TMin = 0;
     ray.TMax = 100000;
 
     RayPayload payload;
-    TraceRay( gRtScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload );
+	TraceRay(gRtScene, 
+		RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*RayFlags*/, 0xFF /*InstanceInclusionMask*/,
+		0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/,
+		ray, payload
+	);
     float3 col = linearToSrgb(payload.color);
     gOutput[launchIndex.xy] = float4(col, 1);
 }
@@ -56,5 +60,6 @@ void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
     const float3 B = float3(0, 1, 0);
     const float3 C = float3(0, 0, 1);
 
-    payload.color = A * barycentrics.x + B * barycentrics.y + C * barycentrics.z;
+	payload.color = A * barycentrics.x + B * barycentrics.y + C * barycentrics.z;
+	//payload.color = float3(1, 0, 0);
 }

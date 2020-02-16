@@ -394,5 +394,6 @@ void Mesh::Initialize(CommandList& commandList, VertexCollection& vertices, Inde
     commandList.CopyVertexBuffer(m_VertexBuffer, vertices);
     commandList.CopyIndexBuffer(m_IndexBuffer, indices);
 
+	m_VertexCount = static_cast<UINT>(vertices.size());
     m_IndexCount = static_cast<UINT>(indices.size());
 }

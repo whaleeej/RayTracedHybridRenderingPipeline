@@ -81,6 +81,11 @@ private:
 		XMMATRIX translationMatrix;
 		XMMATRIX rotationMatrix;
 		XMMATRIX scaleMatrix;
+
+		XMMATRIX ComputeModel()
+		{
+			return scaleMatrix * rotationMatrix * translationMatrix;
+		}
 		MatCB ComputeMatCB(CXMMATRIX view, CXMMATRIX projection)
 		{
 			MatCB matCB;
@@ -89,6 +94,7 @@ private:
 			matCB.ModelViewProjectionMatrix = matCB.ModelMatrix * view * projection;
 			return matCB;
 		}
+
 	};
 	// Material
 	using BaseMaterial = Material;
@@ -203,9 +209,9 @@ private:
 
 	////////////////////////////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
-	Microsoft::WRL::ComPtr < ID3D12Resource > mpVertexBuffer;
+	//Microsoft::WRL::ComPtr < ID3D12Resource > mpVertexBuffer;
 	Microsoft::WRL::ComPtr < ID3D12Resource > mpTopLevelAS;
-	Microsoft::WRL::ComPtr < ID3D12Resource > mpBottomLevelAS;
+	std::vector<Microsoft::WRL::ComPtr < ID3D12Resource >> mpBottomLevelASes;
 	uint64_t mTlasSize = 0;
 
 	void createRtPipelineState();
