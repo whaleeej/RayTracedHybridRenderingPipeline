@@ -219,6 +219,8 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
 		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
+		auto CB = gameObjectPool["sphere"]->transform.ComputeMatCB(XMMatrixIdentity(), XMMatrixIdentity());
+
 		gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
 		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
 		gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
@@ -497,6 +499,18 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
     XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 
+	// update the camera for rt
+	{
+		CameraRTCB mRTCameraCB;
+		mRTCameraCB.PositionWS = m_Camera.get_Translation();
+		mRTCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+		mRTCameraCB.fov = m_Camera.get_FoV();
+		void* pData;
+		mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &mRTCameraCB, sizeof(CameraRTCB));
+		mpRTCameraConstantBuffer->Unmap(0, nullptr);
+	}
+
     const int numPointLights = 4;
     const int numSpotLights = 4;
 
@@ -563,45 +577,45 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
     }
 
 	{
-		//// update the GameObject
-		//gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
-		//gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-		//gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		// update the GameObject
+		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
+		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-		//gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
-		//gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		//gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
+		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-		//gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
-		//gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		//gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
+		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
-		//float scalePlane = 20.0f;
-		//float translateOffset = scalePlane / 2.0f;
+		float scalePlane = 20.0f;
+		float translateOffset = scalePlane / 2.0f;
 
-		//gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-		//gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
-		//gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-		//gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-		//gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-		//gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-		//gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-		//gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-		//gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-		//gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
-		//gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
+		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-		//gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
-		//gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
+		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 }
 
@@ -678,6 +692,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
 		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		//commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->Draw(3);
 	}
 
@@ -1078,13 +1093,17 @@ RootSignatureDesc HybridPipeline::createRayGenRootDesc()
 	desc.range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	desc.range[1].OffsetInDescriptorsFromTableStart = 1;
 
-	desc.rootParams.resize(1);
+	desc.rootParams.resize(2);
 	desc.rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	desc.rootParams[0].DescriptorTable.NumDescriptorRanges = 2;
 	desc.rootParams[0].DescriptorTable.pDescriptorRanges = desc.range.data();
 
+	desc.rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	desc.rootParams[1].Descriptor.RegisterSpace = 0;
+	desc.rootParams[1].Descriptor.ShaderRegister = 0;
+
 	// Create the desc
-	desc.desc.NumParameters = 1;
+	desc.desc.NumParameters = 2;
 	desc.desc.pParameters = desc.rootParams.data();
 	desc.desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 
@@ -1107,6 +1126,19 @@ void HybridPipeline::createShaderResources()
 	resDesc.Width = m_Viewport.Width;
 	//d3d_call(mpDevice->CreateCommittedResource(&kDefaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&mpOutputResource))); // Starting as copy-source to simplify onFrameRender()
 	mpOutputTexture = std::make_shared<Texture>(resDesc, nullptr, TextureUsage::RenderTarget, L"mpOutputTexture");
+
+	//create the constant buffer resource for cameraCB
+	CameraRTCB mRTCameraCB;
+	mRTCameraCB.PositionWS = m_Camera.get_Translation();
+	mRTCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+	mRTCameraCB.fov = m_Camera.get_FoV();
+	mpRTCameraConstantBuffer = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
+	void* pData;
+	mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
+	memcpy(pData, &mRTCameraCB, sizeof(CameraRTCB));
+	mpRTCameraConstantBuffer->Unmap(0, nullptr);
+	
+
 
 	// Create an SRV/UAV descriptor heap. Need 2 entries - 1 SRV for the scene and 1 UAV for the output
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -1156,6 +1188,7 @@ void HybridPipeline::createShaderTable()
 	memcpy(pData, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 	uint64_t heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 	*(uint64_t*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES+8) = mpRTCameraConstantBuffer->GetGPUVirtualAddress();
 
 	// Entry 1 - miss program
 	memcpy(pData + mShaderTableEntrySize, pRtsoProps->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);

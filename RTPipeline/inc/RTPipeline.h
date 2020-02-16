@@ -94,7 +94,6 @@ private:
 			matCB.ModelViewProjectionMatrix = matCB.ModelMatrix * view * projection;
 			return matCB;
 		}
-
 	};
 	// Material
 	using BaseMaterial = Material;
@@ -180,6 +179,13 @@ private:
     D3D12_VIEWPORT m_Viewport;
     D3D12_RECT m_ScissorRect;
 
+	struct CameraRTCB
+	{
+		XMVECTOR PositionWS;
+		XMMATRIX InverseViewMatrix;
+		float fov;
+		float padding[3];
+	}; 
     Camera m_Camera;
     struct alignas( 16 ) CameraData
     {
@@ -221,8 +227,9 @@ private:
 
 	void createShaderResources();
 	std::shared_ptr< Texture > mpOutputTexture;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraConstantBuffer;
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	const uint32_t kSrvUavHeapSize = 2;
+	const uint32_t kSrvUavHeapSize =3;
 
 	void createShaderTable();
 	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;

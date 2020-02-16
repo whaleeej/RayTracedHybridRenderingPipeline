@@ -1,15 +1,16 @@
 RaytracingAccelerationStructure gRtScene : register(t0);
 RWTexture2D<float4> gOutput : register(u0);
-
-float3 linearToSrgb(float3 c)
+struct Camera
 {
-    // Based on http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
-    float3 sq1 = sqrt(c);
-    float3 sq2 = sqrt(sq1);
-    float3 sq3 = sqrt(sq2);
-    float3 srgb = 0.662002687 * sq1 + 0.684122060 * sq2 - 0.323583601 * sq3 - 0.0225411470 * c;
-    return srgb;
-}
+	float4 PositionWS;
+	//----------------------------------- (16 byte boundary)
+	float4x4 InverseViewMatrix;
+	//----------------------------------- (64 byte boundary)
+	float fov;
+	float3 padding;
+	//----------------------------------- (16 byte boundary)
+}; // Total:                              16 * 6 = 64 bytes
+ConstantBuffer<Camera> CameraCB : register(b0);
 
 struct RayPayload
 {
@@ -27,10 +28,14 @@ void rayGen()
 
     float2 d = ((crd/dims) * 2.f - 1.f);
     float aspectRatio = dims.x / dims.y;
+	
+	float3 cameraPositionWS = CameraCB.PositionWS.xyz;
+	float3 cameraDirectionWS = normalize(float3(d.x * aspectRatio, -d.y, 1 / tan(radians(CameraCB.fov / 2.0))));
+	float3 viewDirectionWS = mul((float3x3) CameraCB.InverseViewMatrix, cameraDirectionWS);
 
     RayDesc ray;
-    ray.Origin = float3(0, 5, -20);
-	ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
+	ray.Origin = cameraPositionWS;
+	ray.Direction = viewDirectionWS;
 
     ray.TMin = 0;
     ray.TMax = 100000;
@@ -41,7 +46,7 @@ void rayGen()
 		0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/,
 		ray, payload
 	);
-    float3 col = linearToSrgb(payload.color);
+    float3 col =payload.color;
     gOutput[launchIndex.xy] = float4(col, 1);
 }
 
