@@ -1071,6 +1071,7 @@ void CommandList::Dispatch( uint32_t numGroupsX, uint32_t numGroupsY, uint32_t n
 
 void CommandList::DispatchRays(D3D12_DISPATCH_RAYS_DESC* desc)
 {
+	FlushResourceBarriers();
 	m_d3d12CommandList->DispatchRays(desc);
 }
 

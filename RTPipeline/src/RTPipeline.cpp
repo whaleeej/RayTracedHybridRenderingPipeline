@@ -117,7 +117,6 @@ bool HybridPipeline::LoadContent()
 		meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
 
 		// load PBR textures
-		//// default
 		texturePool.emplace("default_albedo", Texture());
 		commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
 		texturePool.emplace("default_metallic", Texture());
@@ -317,6 +316,13 @@ bool HybridPipeline::LoadContent()
 		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
 	}
 
+	{ // RT Gen
+		createAccelerationStructures();
+		createRtPipelineState();
+		createShaderResourcesAndSrvUavheap();
+		createShaderTable();
+	}
+
 	{ /////////////////////////////////// Root Signature
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -431,14 +437,7 @@ bool HybridPipeline::LoadContent()
 		}
 	}
 
-	{ /////////////////////////////RT loading
-		createAccelerationStructures();
-		createRtPipelineState();
-		createShaderResources();
-		createShaderTable();
-	}
-
-    return true;
+	return true;
 }
 
 void HybridPipeline::OnResize(ResizeEventArgs& e)
@@ -471,113 +470,140 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
     super::OnUpdate(e);
 
-    totalTime += e.ElapsedTime;
-    frameCount++;
+	{// frametime
+		totalTime += e.ElapsedTime;
+		frameCount++;
 
-    if (totalTime > 1.0)
-    {
-        double fps = frameCount / totalTime;
+		if (totalTime > 1.0)
+		{
+			double fps = frameCount / totalTime;
 
-        char buffer[512];
-        sprintf_s(buffer, "FPS: %f\n", fps);
-        OutputDebugStringA(buffer);
+			char buffer[512];
+			sprintf_s(buffer, "FPS: %f\n", fps);
+			OutputDebugStringA(buffer);
 
-        frameCount = 0;
-        totalTime = 0.0;
-    }
-
-    // Update the camera.
-    float speedMultipler = (m_Shift ? 16.0f : 4.0f);
-
-    XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-    XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-    m_Camera.Translate(cameraTranslate, Space::Local);
-    m_Camera.Translate(cameraPan, Space::Local);
-
-    XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
-    m_Camera.set_Rotation(cameraRotation);
-
-    XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-
-	// update the camera for rt
-	{
-		CameraRTCB mRTCameraCB;
-		mRTCameraCB.PositionWS = m_Camera.get_Translation();
-		mRTCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-		mRTCameraCB.fov = m_Camera.get_FoV();
-		void* pData;
-		mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &mRTCameraCB, sizeof(CameraRTCB));
-		mpRTCameraConstantBuffer->Unmap(0, nullptr);
+			frameCount = 0;
+			totalTime = 0.0;
+		}
 	}
 
-    const int numPointLights = 4;
-    const int numSpotLights = 4;
+	{// camera
 
-    static const XMVECTORF32 LightColors[] =
-    {
-        Colors::White, Colors::Orange, Colors::Yellow, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::White
-    };
+		 // Update the camera.
+		float speedMultipler = (m_Shift ? 16.0f : 4.0f);
 
-    static float lightAnimTime = 0.0f;
-    if (m_AnimateLights)
-    {
-        lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
-    }
+		XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+		XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+		m_Camera.Translate(cameraTranslate, Space::Local);
+		m_Camera.Translate(cameraPan, Space::Local);
 
-    const float radius = 8.0f;
-    const float offset = 2.0f * XM_PI / numPointLights;
-    const float offset2 = offset + (offset / 2.0f);
+		XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
+		m_Camera.set_Rotation(cameraRotation);
 
-    // Setup the light buffers.
-    m_PointLights.resize(numPointLights);
-    for (int i = 0; i < numPointLights; ++i)
-    {
-        PointLight& l = m_PointLights[i];
+		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 
-        l.PositionWS = {
-            static_cast<float>(std::sin(lightAnimTime + offset * i)) * radius,
-            9.0f,
-            static_cast<float>(std::cos(lightAnimTime + offset * i)) * radius,
-            1.0f
-        };
-        XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
-        XMVECTOR positionVS = XMVector3TransformCoord(positionWS, viewMatrix);
-        XMStoreFloat4(&l.PositionVS, positionVS);
+		// update the camera for rt
+		{
+			CameraRTCB mCameraCB;
+			mCameraCB.PositionWS = m_Camera.get_Translation();
+			mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+			mCameraCB.fov = m_Camera.get_FoV();
+			void* pData;
+			mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
+			memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
+			mpRTCameraConstantBuffer->Unmap(0, nullptr);
+		}
+	}
+   
+	{ // light
+		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 
-        l.Color = XMFLOAT4(LightColors[i]);
-        l.Intensity = 1.0f;
-        l.Attenuation = 0.0f;
-    }
+		static const XMVECTORF32 LightColors[] =
+		{
+			Colors::White, Colors::Orange, Colors::Yellow, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::White
+		};
 
-    m_SpotLights.resize(numSpotLights);
-    for (int i = 0; i < numSpotLights; ++i)
-    {
-        SpotLight& l = m_SpotLights[i];
+		static float lightAnimTime = 0.0f;
+		if (m_AnimateLights)
+		{
+			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
+		}
 
-        l.PositionWS = {
-            static_cast<float>(std::sin(lightAnimTime + offset * i + offset2)) * radius,
-            9.0f,
-            static_cast<float>(std::cos(lightAnimTime + offset * i + offset2)) * radius,
-            1.0f
-        };
-        XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
-        XMVECTOR positionVS = XMVector3TransformCoord(positionWS, viewMatrix);
-        XMStoreFloat4(&l.PositionVS, positionVS);
+		const float radius = 8.0f;
+		const float offset = 2.0f * XM_PI / numPointLights;
+		const float offset2 = offset + (offset / 2.0f);
 
-        XMVECTOR directionWS = XMVector3Normalize(XMVectorSetW(XMVectorNegate(positionWS), 0));
-        XMVECTOR directionVS = XMVector3Normalize(XMVector3TransformNormal(directionWS, viewMatrix));
-        XMStoreFloat4(&l.DirectionWS, directionWS);
-        XMStoreFloat4(&l.DirectionVS, directionVS);
+		// Setup the light buffers.
+		m_PointLights.resize(numPointLights);
+		for (int i = 0; i < numPointLights; ++i)
+		{
+			PointLight& l = m_PointLights[i];
 
-        l.Color = XMFLOAT4(LightColors[numPointLights + i]);
-        l.Intensity = 1.0f;
-        l.SpotAngle = XMConvertToRadians(45.0f);
-        l.Attenuation = 0.0f;
-    }
+			l.PositionWS = {
+				static_cast<float>(std::sin(lightAnimTime + offset * i)) * radius,
+				9.0f,
+				static_cast<float>(std::cos(lightAnimTime + offset * i)) * radius,
+				1.0f
+			};
+			XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
+			l.Color = XMFLOAT4(LightColors[i]);
+			l.Intensity = 1.0f;
+			l.Attenuation = 0.0f;
+		}
 
-	{
-		// update the GameObject
+		m_SpotLights.resize(numSpotLights);
+		for (int i = 0; i < numSpotLights; ++i)
+		{
+			SpotLight& l = m_SpotLights[i];
+
+			l.PositionWS = {
+				static_cast<float>(std::sin(lightAnimTime + offset * i + offset2)) * radius,
+				9.0f,
+				static_cast<float>(std::cos(lightAnimTime + offset * i + offset2)) * radius,
+				1.0f
+			};
+			XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
+
+			XMVECTOR directionWS = XMVector3Normalize(XMVectorSetW(XMVectorNegate(positionWS), 0));
+			XMStoreFloat4(&l.DirectionWS, directionWS);
+
+			l.Color = XMFLOAT4(LightColors[numPointLights + i]);
+			l.Intensity = 1.0f;
+			l.SpotAngle = XMConvertToRadians(45.0f);
+			l.Attenuation = 0.0f;
+		}
+
+		{ // update the light for rt
+			// update the mpRTLightPropertiesCB
+			{
+				LightPropertiesCB mLightPropertiesCB;
+				mLightPropertiesCB.NumPointLights = numPointLights;
+				mLightPropertiesCB.NumSpotLights = numSpotLights;
+				void* pData;
+				mpRTLightPropertiesCB->Map(0, nullptr, (void**)& pData);
+				memcpy(pData, &mLightPropertiesCB, sizeof(LightPropertiesCB));
+				mpRTLightPropertiesCB->Unmap(0, nullptr);
+			}
+
+			// update the structure buffer of Pointlight
+			{
+				void* pData;
+				mpRTPointLightSB->Map(0, nullptr, (void**)& pData);
+				memcpy(pData, &(m_PointLights[0]), sizeof(PointLight) * numPointLights);
+				mpRTPointLightSB->Unmap(0, nullptr);
+			}
+			// update the structure buffer of spotlight
+			{
+				void* pData;
+				mpRTSpotLightSB->Map(0, nullptr, (void**)& pData);
+				memcpy(pData, &(m_SpotLights[0]), sizeof(SpotLight) * numSpotLights);
+				mpRTSpotLightSB->Unmap(0, nullptr);
+			}
+		}
+	}
+
+	{// update the GameObject
+		
 		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
 		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
 		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
@@ -626,36 +652,40 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
-	//{// Rasterizing Pipe, deprecated
-	//	{
-	//		FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+	{// Rasterizing Pipe, deprecated
+		{
+			FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
+			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
+			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
+			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
+			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
+			commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
+		}
 
-	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
-	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
-	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
-	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
-	//		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
-	//		commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
-	//	}
+		// Deferred Pipeline
+		{
+			commandList->SetViewport(m_Viewport);
+			commandList->SetScissorRect(m_ScissorRect);
+			commandList->SetRenderTarget(m_DeferredRenderTarget);
+			commandList->SetPipelineState(m_DeferredPipelineState);
+			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-	//	// Deferred Pipeline
-	//	{
-	//		commandList->SetViewport(m_Viewport);
-	//		commandList->SetScissorRect(m_ScissorRect);
-	//		commandList->SetRenderTarget(m_DeferredRenderTarget);
-	//		commandList->SetPipelineState(m_DeferredPipelineState);
-	//		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
-
-	//		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
-	//			it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
-	//		}
-	//	}
-	//}
+			for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+				it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
+			}
+		}
+	}
 
 	{ // Let's raytrace
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
 
 		commandList->TransitionBarrier(*mpOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		D3D12_DISPATCH_RAYS_DESC raytraceDesc = {};
 		raytraceDesc.Width = m_Viewport.Width;
 		raytraceDesc.Height = m_Viewport.Height;
@@ -756,7 +786,8 @@ void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
         m_AnimateLights = !m_AnimateLights;
         break;
     case KeyCode::ShiftKey:
-        m_Shift = true;
+        //m_Shift = true;
+		// disable the shift key
         break;
     }
     
@@ -1029,7 +1060,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createRayGenRootDesc().desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,8,2).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 2
@@ -1074,92 +1105,120 @@ void HybridPipeline::createRtPipelineState()
 	ThrowIfFailed(mpDevice->CreateStateObject(&desc, IID_PPV_ARGS(&mpPipelineState)));
 }
 
-RootSignatureDesc HybridPipeline::createRayGenRootDesc()
+RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int cbv_num)
 {
-	// Create the root-signature
+	// Create the root-signature 
+	//******Layout*********/
+	// Param[0] = DescriptorTable
+	/////////////// |---------------range for UAV---------------| |-------------------range for SRV-------------------|
+	// Param[1-n] = 
 	RootSignatureDesc desc;
 	desc.range.resize(2);
-	// gOutput
+	// UAV: gOutput 
 	desc.range[0].BaseShaderRegister = 0;
-	desc.range[0].NumDescriptors = 1;
+	desc.range[0].NumDescriptors = uav_num;
 	desc.range[0].RegisterSpace = 0;
 	desc.range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 	desc.range[0].OffsetInDescriptorsFromTableStart = 0;
 
-	// gRtScene
+	// SRV: gRtScene GBuffer(1-5)
 	desc.range[1].BaseShaderRegister = 0;
-	desc.range[1].NumDescriptors = 1;
+	desc.range[1].NumDescriptors = srv_num;
 	desc.range[1].RegisterSpace = 0;
 	desc.range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	desc.range[1].OffsetInDescriptorsFromTableStart = 1;
+	desc.range[1].OffsetInDescriptorsFromTableStart = uav_num;
 
-	desc.rootParams.resize(2);
+	desc.rootParams.resize(1+ cbv_num);
+
 	desc.rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	desc.rootParams[0].DescriptorTable.NumDescriptorRanges = 2;
 	desc.rootParams[0].DescriptorTable.pDescriptorRanges = desc.range.data();
 
-	desc.rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	desc.rootParams[1].Descriptor.RegisterSpace = 0;
-	desc.rootParams[1].Descriptor.ShaderRegister = 0;
+	for (int i = 1; i <= cbv_num; i++) {
+		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		desc.rootParams[i].Descriptor.RegisterSpace = 0;
+		desc.rootParams[i].Descriptor.ShaderRegister = i-1;
+	}
 
 	// Create the desc
-	desc.desc.NumParameters = 2;
+	desc.desc.NumParameters = 1 + cbv_num;
 	desc.desc.pParameters = desc.rootParams.data();
 	desc.desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 
 	return desc;
 }
 
-void HybridPipeline::createShaderResources()
+void HybridPipeline::createShaderResourcesAndSrvUavheap()
 {
 	auto pDevice = Application::Get().GetDevice();
-	// Create the output resource. The dimensions and format should match the swap-chain
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // The backbuffer is actually DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, but sRGB formats can't be used with UAVs. We will convert to sRGB ourselves in the shader
-	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	resDesc.Height = m_Viewport.Height;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.Width = m_Viewport.Width;
-	//d3d_call(mpDevice->CreateCommittedResource(&kDefaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&mpOutputResource))); // Starting as copy-source to simplify onFrameRender()
-	mpOutputTexture = std::make_shared<Texture>(resDesc, nullptr, TextureUsage::RenderTarget, L"mpOutputTexture");
+	//****************************UAV Resource
+	// gOutput
+	mpOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_R8G8B8A8_UNORM, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
+	), nullptr, TextureUsage::RenderTarget, L"mpOutputTexture");
 
+	//****************************SRV Resource
+	//gRtScene / GPosition / GAlbedo / GMetallic / GNormal / GRoughness
+	//PointLights // SpotLight
+	mpRTPointLightSB = createBuffer(pDevice, numPointLights * sizeof(PointLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+	mpRTSpotLightSB = createBuffer(pDevice, numSpotLights * sizeof(SpotLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+
+	//****************************CBV Resource
 	//create the constant buffer resource for cameraCB
-	CameraRTCB mRTCameraCB;
-	mRTCameraCB.PositionWS = m_Camera.get_Translation();
-	mRTCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-	mRTCameraCB.fov = m_Camera.get_FoV();
 	mpRTCameraConstantBuffer = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
-	void* pData;
-	mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
-	memcpy(pData, &mRTCameraCB, sizeof(CameraRTCB));
-	mpRTCameraConstantBuffer->Unmap(0, nullptr);
-	
+	mpRTLightPropertiesCB = createBuffer(pDevice, sizeof(LightPropertiesCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 
 
-	// Create an SRV/UAV descriptor heap. Need 2 entries - 1 SRV for the scene and 1 UAV for the output
+	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = kSrvUavHeapSize;
+	desc.NumDescriptors = 9;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
+	D3D12_CPU_DESCRIPTOR_HANDLE uavSrvHandle = mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
-	// Create the UAV. Based on the root signature we created it should be the first entry
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	pDevice->CreateUnorderedAccessView(mpOutputTexture->GetD3D12Resource().Get(), nullptr, &uavDesc, mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart());
+	// Create the UAV for GOutput
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavGOutputDesc = {};
+	uavGOutputDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	pDevice->CreateUnorderedAccessView(mpOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// Create the TLAS SRV right after the UAV. Note that we are using a different SRV desc here
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.RaytracingAccelerationStructure.Location = mpTopLevelAS->GetGPUVirtualAddress();
-	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-	srvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	pDevice->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
+	// Create srv for TLAS
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvTLASDesc = {};
+	srvTLASDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+	srvTLASDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvTLASDesc.RaytracingAccelerationStructure.Location = mpTopLevelAS->GetGPUVirtualAddress();
+	pDevice->CreateShaderResourceView(nullptr, &srvTLASDesc, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	//GBuffer
+	for (int i = 0; i < 5; i++) {
+		UINT pDestDescriptorRangeSizes[] = { 1 };
+		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+			1, &m_DeferredRenderTarget.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvPointLight = {};
+	srvPointLight.Format = DXGI_FORMAT_UNKNOWN;
+	srvPointLight.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;	
+	srvPointLight.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvPointLight.Buffer.FirstElement = 0;
+	srvPointLight.Buffer.NumElements = numPointLights;
+	srvPointLight.Buffer.StructureByteStride = sizeof(PointLight);
+	pDevice->CreateShaderResourceView(mpRTPointLightSB.Get(), &srvPointLight, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvSpotLight = {};
+	srvSpotLight.Format = DXGI_FORMAT_UNKNOWN;
+	srvSpotLight.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvSpotLight.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvSpotLight.Buffer.FirstElement = 0;
+	srvSpotLight.Buffer.NumElements = numSpotLights;
+	srvSpotLight.Buffer.StructureByteStride = sizeof(SpotLight);
+	pDevice->CreateShaderResourceView(mpRTSpotLightSB.Get(), &srvSpotLight, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 void HybridPipeline::createShaderTable()
@@ -1168,7 +1227,7 @@ void HybridPipeline::createShaderTable()
 
 	// Calculate the size and create the buffer
 	mShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	mShaderTableEntrySize += 8; // The ray-gen's descriptor table
+	mShaderTableEntrySize += 24; // The ray-gen's descriptor table
 	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
 	uint32_t shaderTableSize = mShaderTableEntrySize * 3;
 
@@ -1188,8 +1247,8 @@ void HybridPipeline::createShaderTable()
 	memcpy(pData, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 	uint64_t heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 	*(uint64_t*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES+8) = mpRTCameraConstantBuffer->GetGPUVirtualAddress();
-
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTCameraConstantBuffer->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 +8) = mpRTLightPropertiesCB->GetGPUVirtualAddress();
 	// Entry 1 - miss program
 	memcpy(pData + mShaderTableEntrySize, pRtsoProps->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 

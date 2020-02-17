@@ -151,13 +151,14 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(CommandList& commandList, st
             m_CurrentGPUDescriptorHandle = m_CurrentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
             m_NumFreeHandles = m_NumDescriptorsPerHeap;
 
-            commandList.SetDescriptorHeap(m_DescriptorHeapType, m_CurrentDescriptorHeap.Get());
-
             // When updating the descriptor heap on the command list, all descriptor
             // tables must be (re)recopied to the new descriptor heap (not just
             // the stale descriptor tables).
             m_StaleDescriptorTableBitMask = m_DescriptorTableBitMask;
         }
+
+		// 强制每次commit去绑定Descriptor heap
+		commandList.SetDescriptorHeap(m_DescriptorHeapType, m_CurrentDescriptorHeap.Get());
 
         DWORD rootIndex;
         // Scan from LSB to MSB for a bit set in staleDescriptorsBitMask

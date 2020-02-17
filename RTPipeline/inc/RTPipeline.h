@@ -152,47 +152,36 @@ private:
 		void Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool);
 	};
 	// Light
-	struct LightProperties
+	struct LightPropertiesCB
 	{
 		uint32_t NumPointLights;
 		uint32_t NumSpotLights;
+		float padding[2];
 	};
-	// Container
-	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
-	std::map<TextureIndex, Texture> texturePool;
-	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
-	std::vector<PointLight> m_PointLights;
-	std::vector<SpotLight> m_SpotLights;
-
-    // Deferred Render target
-    RenderTarget m_DeferredRenderTarget;
-
-    // Root signatures
-    RootSignature m_DeferredRootSignature;
-    RootSignature m_PostProcessingRootSignature;
-
-    // Pipeline state object.
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-    // HDR -> PostProcessing tone mapping PSO.
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
-
-    D3D12_VIEWPORT m_Viewport;
-    D3D12_RECT m_ScissorRect;
-
+	//Camera
 	struct CameraRTCB
 	{
 		XMVECTOR PositionWS;
 		XMMATRIX InverseViewMatrix;
 		float fov;
 		float padding[3];
-	}; 
-    Camera m_Camera;
-    struct alignas( 16 ) CameraData
-    {
-        DirectX::XMVECTOR m_InitialCamPos;
-        DirectX::XMVECTOR m_InitialCamRot;
-    };
-    CameraData* m_pAlignedCameraData;
+	};
+	struct alignas(16) CameraData
+	{
+		DirectX::XMVECTOR m_InitialCamPos;
+		DirectX::XMVECTOR m_InitialCamRot;
+	};
+
+	/////////////////////////////////////////////// Container
+	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
+	std::map<TextureIndex, Texture> texturePool;
+	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
+	int numPointLights = 2;
+	int numSpotLights = 3;
+	std::vector<PointLight> m_PointLights;
+	std::vector<SpotLight> m_SpotLights;
+	Camera m_Camera;
+	CameraData* m_pAlignedCameraData;
 
     // Camera controller
     float m_Forward;
@@ -201,35 +190,50 @@ private:
     float m_Right;
     float m_Up;
     float m_Down;
-
     float m_Pitch;
     float m_Yaw;
-
     // Rotate the lights in a circle.
     bool m_AnimateLights;
     // Set to true if the Shift key is pressed.
     bool m_Shift;
-
     int m_Width;
     int m_Height;
 
+
+	////////////////////////////////////////////////////////////////////// Raster  Object 
+	// Deferred Render target
+	RenderTarget m_DeferredRenderTarget;
+
+	// Root signatures
+	RootSignature m_DeferredRootSignature;
+	RootSignature m_PostProcessingRootSignature;
+
+	// Pipeline state object.
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
+	// HDR -> PostProcessing tone mapping PSO.
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
+
+	D3D12_VIEWPORT m_Viewport;
+	D3D12_RECT m_ScissorRect;
+
 	////////////////////////////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
-	//Microsoft::WRL::ComPtr < ID3D12Resource > mpVertexBuffer;
 	Microsoft::WRL::ComPtr < ID3D12Resource > mpTopLevelAS;
 	std::vector<Microsoft::WRL::ComPtr < ID3D12Resource >> mpBottomLevelASes;
 	uint64_t mTlasSize = 0;
 
 	void createRtPipelineState();
-	RootSignatureDesc createRayGenRootDesc();
+	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int cbv_num);
 	Microsoft::WRL::ComPtr < ID3D12StateObject > mpPipelineState;
 	Microsoft::WRL::ComPtr < ID3D12RootSignature > mpEmptyRootSig;
 
-	void createShaderResources();
-	std::shared_ptr< Texture > mpOutputTexture;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraConstantBuffer;
+	void createShaderResourcesAndSrvUavheap();
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	const uint32_t kSrvUavHeapSize =3;
+	std::shared_ptr< Texture > mpOutputTexture;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightSB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTSpotLightSB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTLightPropertiesCB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraConstantBuffer;
 
 	void createShaderTable();
 	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;
