@@ -844,7 +844,7 @@ void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
     {
         m_Pitch -= e.RelY * mouseSpeed;
 
-        m_Pitch = clamp(m_Pitch, -90.0f, 90.0f);
+        m_Pitch = Math::clamp(m_Pitch, -90.0f, 90.0f);
 
         m_Yaw -= e.RelX * mouseSpeed;
     }
@@ -856,7 +856,7 @@ void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
     auto fov = m_Camera.get_FoV();
 
     fov -= e.WheelDelta;
-    fov = clamp(fov, 12.0f, 90.0f);
+    fov = Math::clamp(fov, 12.0f, 90.0f);
 
     m_Camera.set_FoV(fov);
 

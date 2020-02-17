@@ -1,9 +1,5 @@
 #pragma once
-
 #include <DX12LibPCH.h>
-#include <wrl.h>
-
-using namespace Microsoft::WRL;
 
 #define MAKE_SMART_COM_PTR(_a) _COM_SMARTPTR_TYPEDEF(_a, __uuidof(_a))
 MAKE_SMART_COM_PTR(IDxcCompiler);

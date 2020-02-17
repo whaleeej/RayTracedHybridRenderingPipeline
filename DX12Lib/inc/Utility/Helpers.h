@@ -1,51 +1,11 @@
 #pragma once
 
-/*
- *  Copyright(c) 2017 Jeremiah van Oosten
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files(the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions :
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *  IN THE SOFTWARE.
- */
-
-/**
- *  @file Helpers.h
- *  @date August 28, 2017
- *  @author Jeremiah van Oosten
- *
- *  @brief Helper functions.
- */
-
 #include <cstdint>
 #include <functional>
 #include <DX12LibPCH.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h> // For HRESULT
-
-// From DXSampleHelper.h 
-// Source: https://github.com/Microsoft/DirectX-Graphics-Samples
-inline void ThrowIfFailed(HRESULT hr)
-{
-    if (FAILED(hr))
-    {
-        throw std::exception();
-    }
-}
 
 // Hashers for view descriptions.
 namespace std
@@ -306,13 +266,13 @@ namespace Math
 
         return v;
     }
-}
 
-// Clamp a value between a min and max range.
-template<typename T>
-constexpr const T& clamp(const T& val, const T& min = T(0), const T& max = T(1))
-{
-	return val < min ? min : val > max ? max : val;
+	// Clamp a value between a min and max range.
+	template<typename T>
+	constexpr const T& clamp(const T& val, const T& min = T(0), const T& max = T(1))
+	{
+		return val < min ? min : val > max ? max : val;
+	}
 }
 
 #define STR1(x) #x
@@ -323,8 +283,13 @@ constexpr const T& clamp(const T& val, const T& min = T(0), const T& max = T(1))
 
 #define arraysize(a) (sizeof(a)/sizeof(a[0]))
 
+#define ThrowIfFailed(a) {HRESULT hr_ = a; if(FAILED(hr_)) { d3dTraceHR( #a, hr_); }}
+
+
 // Display a message-box
 void msgBox(const std::string& msg);
+// Trace a d3d error and convert the result to a human-readable string
+void d3dTraceHR(const std::string& msg, HRESULT hr);
 // Convert a string to a wide-string
 std::wstring string_2_wstring(const std::string& s);
 // Convert a wide-string to a string
