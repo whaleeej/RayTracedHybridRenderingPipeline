@@ -86,7 +86,7 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Height(0)
 {
 
-    XMVECTOR cameraPos = XMVectorSet(0, 5, -20, 1);
+    XMVECTOR cameraPos = XMVectorSet(0, 10, -35 , 1);
     XMVECTOR cameraTarget = XMVectorSet(0, 5, 0, 1);
     XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
 
@@ -162,7 +162,7 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["sphere"]->mesh = "sphere";
 		gameObjectPool["sphere"]->material.base = Material::White;
 		gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool["sphere"]->material.tex = TextureMaterial("metal");
+		gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
 
 		gameObjectPool.emplace("cube", std::make_shared<GameObject>());
 		gameObjectPool["cube"]->mesh = "cube";
@@ -174,7 +174,7 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["torus"]->mesh = "torus";
 		gameObjectPool["torus"]->material.base = Material::White;
 		gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool["torus"]->material.tex = TextureMaterial("rusted_iron");
+		gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
 
 		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
 		gameObjectPool["Floor plane"]->mesh = "plane";
@@ -214,17 +214,15 @@ bool HybridPipeline::LoadContent()
 	}
     
 	{ // Initial the transform
-		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
+		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
 		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
 
-		auto CB = gameObjectPool["sphere"]->transform.ComputeMatCB(XMMatrixIdentity(), XMMatrixIdentity());
-
-		gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
+		gameObjectPool["cube"]->Translate(XMMatrixTranslation(-4.0f, 3.0f, -2.0f));
 		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		gameObjectPool["cube"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
 
-		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
+		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -6.0f));
 		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
 		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
@@ -520,7 +518,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 		static const XMVECTORF32 LightColors[] =
 		{
-			Colors::White, Colors::Orange, Colors::Yellow, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::White
+			Colors::White, Colors::Yellow, Colors::Red, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::Orange
 		};
 
 		static float lightAnimTime = 0.0f;
@@ -548,7 +546,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
 			l.Color = XMFLOAT4(LightColors[i]);
 			l.Intensity = 1.0f;
-			l.Attenuation = 0.0f;
+			l.Attenuation = 0.01f;
 		}
 
 		m_SpotLights.resize(numSpotLights);
@@ -570,7 +568,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			l.Color = XMFLOAT4(LightColors[numPointLights + i]);
 			l.Intensity = 1.0f;
 			l.SpotAngle = XMConvertToRadians(45.0f);
-			l.Attenuation = 0.0f;
+			l.Attenuation = 0.01f;
 		}
 
 		{ // update the light for rt
@@ -600,48 +598,6 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 				mpRTSpotLightSB->Unmap(0, nullptr);
 			}
 		}
-	}
-
-	{// update the GameObject
-		
-		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(-4.0f, 2.0f, -4.0f));
-		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["sphere"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
-
-		gameObjectPool["cube"]->Translate(XMMatrixTranslation(4.0f, 2.0f, 4.0f));
-		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["cube"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
-
-		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -4.0f));
-		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
-
-		float scalePlane = 20.0f;
-		float translateOffset = scalePlane / 2.0f;
-
-		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(-90)));
-		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90))* XMMatrixRotationY(XMConvertToRadians(90)));
-		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 }
 
@@ -722,7 +678,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
 		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		//commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		//commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->Draw(3);
 	}
 
@@ -1052,11 +1008,12 @@ void HybridPipeline::createRtPipelineState()
 
 	// Compile the shader
 	auto pDxilLib = compileLibrary(L"RTPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
-	const WCHAR* entryPoints[] = { kRayGenShader, kMissShader, kClosestHitShader };
+	const WCHAR* entryPoints[] = { kRayGenShader, kMissShader,kAnyHitShader ,kClosestHitShader };
 	DxilLibrary dxilLib = DxilLibrary(pDxilLib, entryPoints, arraysize(entryPoints));
 	subobjects[index++] = dxilLib.stateSubobject; // 0 Library
 
-	HitProgram hitProgram(nullptr, kClosestHitShader, kHitGroup);
+	//HitProgram hitProgram(kAnyHitShader, nullptr, kHitGroup);
+	HitProgram hitProgram(kAnyHitShader, kClosestHitShader, kHitGroup);
 	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
@@ -1074,7 +1031,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index] = hitMissRootSignature.subobject; // 4 Root Sig to be shared between Miss and CHS
 
 	uint32_t hitMissRootIndex = index++; // 4
-	const WCHAR* missHitExportName[] = { kMissShader, kClosestHitShader };
+	const WCHAR* missHitExportName[] = { kMissShader, kAnyHitShader, kClosestHitShader };
 	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
 	subobjects[index++] = missHitRootAssociation.subobject; // 5 Associate Root Sig to Miss and CHS
 
@@ -1083,7 +1040,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index] = shaderConfig.subobject; // 6 Shader Config
 
 	uint32_t shaderConfigIndex = index++; // 6
-	const WCHAR* shaderExports[] = { kMissShader, kClosestHitShader, kRayGenShader };
+	const WCHAR* shaderExports[] = { kMissShader, kAnyHitShader, kClosestHitShader, kRayGenShader };
 	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
 	subobjects[index++] = configAssociation.subobject; // 7 Associate Shader Config to Miss, CHS, RGS
 
@@ -1154,7 +1111,7 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 	//****************************UAV Resource
 	// gOutput
 	mpOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
-		DXGI_FORMAT_R8G8B8A8_UNORM, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
+		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
 		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
 	), nullptr, TextureUsage::RenderTarget, L"mpOutputTexture");
 

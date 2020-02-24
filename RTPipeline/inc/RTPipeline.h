@@ -130,7 +130,8 @@ private:
 	using MeshIndex = std::string;
 	// GameObject
 	using GameObjectIndex = std::string;
-	class GameObject {
+	class GameObject 
+	{
 	public:
 		MeshIndex mesh;
 		Transform transform;
@@ -196,8 +197,6 @@ private:
     bool m_AnimateLights;
     // Set to true if the Shift key is pressed.
     bool m_Shift;
-    int m_Width;
-    int m_Height;
 
 
 	////////////////////////////////////////////////////////////////////// Raster  Object 
@@ -215,6 +214,9 @@ private:
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;
+
+	int m_Width;
+	int m_Height;
 
 	////////////////////////////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
@@ -239,8 +241,10 @@ private:
 	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;
 	uint32_t mShaderTableEntrySize = 0;
 
+	/*|-RayGen-|-RayMiss-|-......-|-AnyHitShader-|-ChosetHitShader-|-......-|*/
 	const WCHAR* kRayGenShader = L"rayGen";
 	const WCHAR* kMissShader = L"miss";
+	const WCHAR* kAnyHitShader = L"ahs";
 	const WCHAR* kClosestHitShader = L"chs";
 	const WCHAR* kHitGroup = L"HitGroup";
 };
