@@ -26,7 +26,6 @@ struct SpotLight
 	float Padding;
 }; // Total:                              16 * 4 = 64 bytes
 StructuredBuffer<SpotLight> SpotLights : register(t7);
-
 struct Camera
 {
 	float4 PositionWS;
@@ -35,7 +34,6 @@ struct Camera
 	float3 padding;
 }; // Total:                              16 * 6 = 64 bytes
 ConstantBuffer<Camera> CameraCB : register(b0);
-
 struct LightProperties
 {
 	uint NumPointLights;
@@ -43,29 +41,12 @@ struct LightProperties
 	float2 Padding;
 };
 ConstantBuffer<LightProperties>LightPropertiesCB : register(b1);
-
 struct RayPayload
 {
 	bool hit;
 };
 
-////////////////////////////////////////////////////// Blinn phong
-struct LightResult
-{
-	float4 Diffuse;
-	float4 Specular;
-};
-float DoDiffuse(float3 N, float3 L)
-{
-	return max(0, dot(N, L));
-}
-float DoSpecular(float3 V, float3 N, float3 L)
-{
-	float3 in2LV = normalize(normalize(L) + normalize(V));
-	float NdotV = max(0, dot(N, in2LV));
-
-	return pow(NdotV, 32);
-}
+////////////////////////////////////////////////////// PBR workflow SchlickGGX
 float DoAttenuation(float attenuation, float distance)
 {
 	
@@ -79,39 +60,6 @@ float DoSpotCone(float3 spotDir, float3 L, float spotAngle)
 	float cosAngle = dot(spotDir, -L);
 	return smoothstep(minCos, maxCos, cosAngle);
 }
-LightResult DoPointLight(PointLight light, float3 V, float3 P, float3 N)
-{
-	LightResult result;
-	float3 L = (light.PositionWS.xyz - P);
-	float d = length(L);
-	L = L / d;
-
-	float attenuation = DoAttenuation(light.Attenuation, d);
-
-	result.Diffuse = DoDiffuse(N, L) * attenuation * light.Color * light.Intensity;
-	result.Specular = DoSpecular(V, N, L) * attenuation * light.Color * light.Intensity;
-
-	return result;
-}
-LightResult DoSpotLight(SpotLight light, float3 V, float3 P, float3 N)
-{
-	LightResult result;
-	float3 L = (light.PositionWS.xyz - P);
-	float d = length(L);
-	L = L / d;
-
-	float attenuation = DoAttenuation(light.Attenuation, d);
-
-	float spotIntensity = DoSpotCone(light.DirectionWS.xyz, L, light.SpotAngle);
-
-	result.Diffuse = DoDiffuse(N, L) * attenuation * spotIntensity * light.Color * light.Intensity;
-	result.Specular = DoSpecular(V, N, L) * attenuation * spotIntensity * light.Color * light.Intensity;
-
-	return result;
-}
-////////////////////////////////////////////////////// Blinn phong
-
-////////////////////////////////////////////////////// PBR workflow SchlickGGX
 float DistributionGGX(float3 N, float3 H, float roughness)
 {
 	const float PI = 3.14159265359;
@@ -277,48 +225,66 @@ void rayGen()
 	RayDesc ray;
 	ray.TMin = 0.01f;
 	RayPayload shadowPayload;
-	//LightResult totalResult = (LightResult) 0;
 	
 	uint i;
 	float3 Lo = 0;
 	for (i = 0; i < LightPropertiesCB.NumPointLights; ++i)
 	{
-		float dis = distance(PointLights[i].PositionWS.xyz, P);
-		ray.Origin = P;
-		ray.Direction = normalize(PointLights[i].PositionWS.xyz - P);
-		ray.TMax = dis;
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, shadowPayload);
-		if (shadowPayload.hit == false)
+		float shadow = 0.0f;
+		float bias = 0.1f;
+		float samples = 4.0f;
+		float offset = 0.1f;
+		for (float x = -offset; x < offset; x += offset / (samples * 0.5))
 		{
-			Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
-			//LightResult result = DoPointLight(PointLights[i], V, P, N);
-			//totalResult.Diffuse += result.Diffuse;
-			//totalResult.Specular += result.Specular;
+			for (float y = -offset; y < offset; y += offset / (samples * 0.5))
+			{
+				for (float z = -offset; z < offset; z += offset / (samples * 0.5))
+				{
+					float3 dest = PointLights[i].PositionWS.xyz + float3(x, y, z);
+					ray.Origin = P;
+					ray.Direction = normalize(dest - P);
+					ray.TMax = distance(dest, P);
+					TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, shadowPayload);
+					if (shadowPayload.hit == false)
+					{
+						shadow = shadow + 1.0f;
+					}
+				}
+			}
 		}
+		Lo += shadow * DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 
 	for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
 	{
-		float dis = distance(SpotLights[i].PositionWS.xyz, P);
-		ray.Origin = P;
-		ray.Direction = normalize(SpotLights[i].PositionWS.xyz - P);
-		ray.TMax = dis;
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, shadowPayload);
-		if (shadowPayload.hit == false)
+		float shadow = 0.0f;
+		float bias = 0.1f;
+		float samples = 4.0f;
+		float offset = 0.1f;
+		for (float x = -offset; x < offset; x += offset / (samples * 0.5))
 		{
-			Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
-			//LightResult result = DoSpotLight(SpotLights[i], V, P, N);
-			//totalResult.Diffuse += result.Diffuse;
-			//totalResult.Specular += result.Specular;
+			for (float y = -offset; y < offset; y += offset / (samples * 0.5))
+			{
+				for (float z = -offset; z < offset; z += offset / (samples * 0.5))
+				{
+					float3 dest = SpotLights[i].PositionWS.xyz + float3(x, y, z);
+					ray.Origin = P;
+					ray.Direction = normalize(dest - P);
+					ray.TMax = distance(dest, P);
+					TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, shadowPayload);
+					if (shadowPayload.hit == false)
+					{
+						shadow = shadow + 1.0f;
+					}
+				}
+			}
 		}
+		Lo += shadow * DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 	
 	float3 ambient = 0.01f * albedo;
 	float3 color = ambient + Lo;
 	gOutput[launchIndex.xy] = float4(color.rgb, 1);
-	
-	//float3 resultColor = albedo * totalResult.Diffuse.xyz + float3(1.0f, 1.0f, 1.0f) * totalResult.Specular.xyz;
-	//gOutput[launchIndex.xy] = float4(resultColor, 1);
 }
 
 [shader("miss")]
@@ -330,7 +296,7 @@ void miss(inout RayPayload payload)
 [shader("anyhit")]
 void ahs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	AcceptHitAndEndSearch();
+	//AcceptHitAndEndSearch();
 }
 
 [shader("closesthit")]

@@ -177,8 +177,8 @@ private:
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
 	std::map<TextureIndex, Texture> texturePool;
 	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
-	int numPointLights = 2;
-	int numSpotLights = 3;
+	int numPointLights = 1;
+	int numSpotLights = 1;
 	std::vector<PointLight> m_PointLights;
 	std::vector<SpotLight> m_SpotLights;
 	Camera m_Camera;
