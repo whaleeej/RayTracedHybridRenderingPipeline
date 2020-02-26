@@ -5,7 +5,6 @@ set( HEADER_FILES
     inc/Light.h
     inc/Material.h
     inc/HybridPipeline.h
-	inc/RTRenderer.h
 )
 
 set( SRC_FILES
@@ -14,14 +13,12 @@ set( SRC_FILES
     src/Light.cpp
     src/Material.cpp
     src/HybridPipeline.cpp
-	src/RTRenderer.cpp
 )
 
 set( VERTEX_SHADER_FILES 
     shaders/Deferred_VS.hlsl
     shaders/PostProcessing_VS.hlsl
     shaders/Skybox_VS.hlsl
-	shaders/RayTracing.hlsl
 )
 
 set( PIXEL_SHADER_FILES
