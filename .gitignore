@@ -13,4 +13,3 @@ CTestTestfile.cmake
 /DX12Lib/inc/GenerateMips_CS.inc
 /Data/Shaders/*.cso
 *.cso
-imgui.ini

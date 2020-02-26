@@ -15,13 +15,9 @@ project( DirectX12-Demo LANGUAGES CXX )
 
 add_subdirectory( DirectXTex )
 add_subdirectory( DX12Lib )
-add_subdirectory( Tutorial1 )
-add_subdirectory( Tutorial2 )
-add_subdirectory( Tutorial3 )
-add_subdirectory( Tutorial4 )
-add_subdirectory(HybridPipeline)
+add_subdirectory( RTPipeline)
 
 # Set the startup project.
 set_directory_properties( PROPERTIES 
-    VS_STARTUP_PROJECT HybridPipeline
+    VS_STARTUP_PROJECT RTPipeline
 )
