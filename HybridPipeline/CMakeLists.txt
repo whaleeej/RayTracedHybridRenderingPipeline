@@ -21,6 +21,7 @@ set( VERTEX_SHADER_FILES
     shaders/Deferred_VS.hlsl
     shaders/PostProcessing_VS.hlsl
     shaders/Skybox_VS.hlsl
+	shaders/RayTracing.hlsl
 )
 
 set( PIXEL_SHADER_FILES
