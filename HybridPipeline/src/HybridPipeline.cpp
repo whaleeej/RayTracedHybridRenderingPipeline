@@ -103,7 +103,6 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Shift(false)
     , m_Width(0)
     , m_Height(0)
-	,rtRenderer(width, height)
 {
 
     XMVECTOR cameraPos = XMVectorSet(0, 5, -20, 1);
@@ -128,14 +127,22 @@ bool HybridPipeline::LoadContent()
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
     auto commandList = commandQueue->GetCommandList();
 
-    // meshes
-	std::vector<Mesh*> meshes;
-    m_SphereMesh = Mesh::CreateSphere(*commandList); /*meshes.push_back(m_SphereMesh.get());*/
-	m_CubeMesh = Mesh::CreateCube(*commandList);  /*meshes.push_back(m_CubeMesh.get());*/
-    m_TorusMesh = Mesh::CreateTorus(*commandList); /*meshes.push_back(m_TorusMesh.get());*/
-    m_PlaneMesh = Mesh::CreatePlane(*commandList); meshes.push_back(m_PlaneMesh.get());
+    // Create a Cube mesh
+    m_CubeMesh = Mesh::CreateCube(*commandList);
+    m_SphereMesh = Mesh::CreateSphere(*commandList);
+    m_ConeMesh = Mesh::CreateCone(*commandList);
+    m_TorusMesh = Mesh::CreateTorus(*commandList);
+    m_PlaneMesh = Mesh::CreatePlane(*commandList);
+    // Create an inverted (reverse winding order) cube so the insides are not clipped.
+    m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
 
-    // load PBR textures
+    // Load some textures
+    commandList->LoadTextureFromFile(m_DefaultTexture, L"Assets/Textures/DefaultWhite.bmp", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_EarthTexture, L"Assets/Textures/earth.dds", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_MonaLisaTexture, L"Assets/Textures/Mona_Lisa.jpg", TextureUsage::Albedo);
+    commandList->LoadTextureFromFile(m_GraceCathedralTexture, L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+
+	// load PBR textures
 	//// default
 	commandList->LoadTextureFromFile(m_default_albedo_texture, L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
 	commandList->LoadTextureFromFile(m_default_metallic_texture, L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
@@ -157,8 +164,18 @@ bool HybridPipeline::LoadContent()
 	commandList->LoadTextureFromFile(m_metal_normal_texture, L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
 	commandList->LoadTextureFromFile(m_metal_roughness_texture, L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
+    // Create a cubemap for the HDR panorama.
+    auto cubemapDesc = m_GraceCathedralTexture.GetD3D12ResourceDesc();
+    cubemapDesc.Width = cubemapDesc.Height = 1024;
+    cubemapDesc.DepthOrArraySize = 6;
+    cubemapDesc.MipLevels = 0;
+
+    m_GraceCathedralCubemap = Texture(cubemapDesc, nullptr, TextureUsage::Albedo, L"Grace Cathedral Cubemap");
+    // Convert the 2D panorama to a 3D cubemap.
+    commandList->PanoToCubemap(m_GraceCathedralCubemap, m_GraceCathedralTexture);
+
     // Create an HDR intermediate render target.
-    DXGI_FORMAT DeferredFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
 
     // Disable the multiple sampling for performance and simplicity
@@ -166,7 +183,7 @@ bool HybridPipeline::LoadContent()
 
     // Create an off-screen multi render target(MRT) and a depth buffer.
 	// AttachmentPoint::Color0
-    auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(DeferredFormat,
+    auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
         m_Width, m_Height,
         1, 1,
         sampleDesc.Count, sampleDesc.Quality,
@@ -176,7 +193,7 @@ bool HybridPipeline::LoadContent()
     colorClearValue.Color[0] = 0.0f;
     colorClearValue.Color[1] = 0.0f;
     colorClearValue.Color[2] = 0.0f;
-    colorClearValue.Color[3] = 0.0f;
+    colorClearValue.Color[3] = 1.0f;
 
     Texture gPosition = Texture(colorDesc, &colorClearValue,
         TextureUsage::RenderTarget,
@@ -280,66 +297,56 @@ bool HybridPipeline::LoadContent()
         D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
             sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
         };
-
         ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
     }
 
-	// Create the SDR Root Signature
-	{
-		CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+    // Create the SDR Root Signature
+    {
+        CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-		CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-		rootParameters[0].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+        CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+        rootParameters[0].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-		rootSignatureDescription.Init_1_1(1, rootParameters);
+        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+        rootSignatureDescription.Init_1_1(1, rootParameters);
 
-		m_PostProcessingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+        m_SDRRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
-		// Create the SDR PSO
-		ComPtr<ID3DBlob> vs;
-		ComPtr<ID3DBlob> ps;
-		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_VS.cso", &vs));
-		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_PS.cso", &ps));
+        // Create the SDR PSO
+        ComPtr<ID3DBlob> vs;
+        ComPtr<ID3DBlob> ps;
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_VS.cso", &vs));
+        ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridPipeline/PostProcessing_PS.cso", &ps));
 
-		CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-		rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+        CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+        rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 
-		struct SDRPipelineStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-			CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-			CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-		} sdrPipelineStateStream;
+        struct SDRPipelineStateStream
+        {
+            CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+            CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+            CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+            CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+            CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+            CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+        } sdrPipelineStateStream;
 
-		sdrPipelineStateStream.pRootSignature = m_PostProcessingRootSignature.GetRootSignature().Get();
-		sdrPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		sdrPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-		sdrPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-		sdrPipelineStateStream.Rasterizer = rasterizerDesc;
-		sdrPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+        sdrPipelineStateStream.pRootSignature = m_SDRRootSignature.GetRootSignature().Get();
+        sdrPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        sdrPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+        sdrPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+        sdrPipelineStateStream.Rasterizer = rasterizerDesc;
+        sdrPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
 
-		D3D12_PIPELINE_STATE_STREAM_DESC sdrPipelineStateStreamDesc = {
-			sizeof(SDRPipelineStateStream), &sdrPipelineStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&sdrPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostProcessingPipelineState)));
-	}
+        D3D12_PIPELINE_STATE_STREAM_DESC sdrPipelineStateStreamDesc = {
+            sizeof(SDRPipelineStateStream), &sdrPipelineStateStream
+        };
+        ThrowIfFailed(device->CreatePipelineState(&sdrPipelineStateStreamDesc, IID_PPV_ARGS(&m_SDRPipelineState)));
+    }
 
     auto fenceValue = commandQueue->ExecuteCommandList(commandList);
     commandQueue->WaitForFenceValue(fenceValue);
 
-	// create for rt pipeline
-	{
-		rtRenderer.createAccelerationStructures(meshes);
-		rtRenderer.createRtPipelineState();
-		rtRenderer.createShaderResources(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3));
-		rtRenderer.createShaderTable();
-	}
-
-	
     return true;
 }
 
@@ -483,7 +490,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
     // Clear the render targets.
     {
-        FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
         commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
 		commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
@@ -497,8 +504,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     commandList->SetScissorRect(m_ScissorRect);
     commandList->SetRenderTarget(m_DeferredRenderTarget);
 
-	std::vector<XMMATRIX> trans;
-
 	// Deferred Pipeline
 	{
 		commandList->SetPipelineState(m_DeferredPipelineState);
@@ -511,7 +516,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		XMMATRIX worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 		XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
-		//trans.push_back(worldMatrix);
 
 		Mat matrices;
 		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
@@ -531,7 +535,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
 		scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
 		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-		//trans.push_back(worldMatrix);
 
 		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
@@ -550,7 +553,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		rotationMatrix = XMMatrixRotationY(XMConvertToRadians(45.0f));
 		scaleMatrix = XMMatrixScaling(4.0f, 4.0f, 4.0f);
 		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-		//trans.push_back(worldMatrix);
+
 		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
@@ -571,7 +574,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		rotationMatrix = XMMatrixIdentity();
 		scaleMatrix = XMMatrixScaling(scalePlane, 1.0f, scalePlane);
 		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-		trans.push_back(worldMatrix);
+
 		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
 
 		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
@@ -583,29 +586,155 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		m_PlaneMesh->Draw(*commandList);
-	}
 
-	//// Perform off-screen texture to RT post processing
-	{
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-			D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, true);
-		rtRenderer.onRender(*commandList, trans);
-	}
+		// Back wall
+		translationMatrix = XMMatrixTranslation(0, translateOffset, translateOffset);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
 
-	//// Perform Post Processing
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Green);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_PlaneMesh->Draw(*commandList);
+
+		// Ceiling plane
+		translationMatrix = XMMatrixTranslation(0, translateOffset * 2.0f, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(180));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Blue);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_PlaneMesh->Draw(*commandList);
+
+		// Front wall
+		translationMatrix = XMMatrixTranslation(0, translateOffset, -translateOffset);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Yellow);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_PlaneMesh->Draw(*commandList);
+
+		// Left wall
+		translationMatrix = XMMatrixTranslation(-translateOffset, translateOffset, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Cyan);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_PlaneMesh->Draw(*commandList);
+
+		// Right wall
+		translationMatrix = XMMatrixTranslation(translateOffset, translateOffset, 0);
+		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90));
+		worldMatrix = scaleMatrix * rotationMatrix * translationMatrix;
+
+		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, Material::Magenta);
+		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, PBRMaterial(1.0f, 1.0f));
+		commandList->SetShaderResourceView(RootParameters::Textures, 0, m_default_albedo_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 1, m_default_metallic_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 2, m_default_normal_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(RootParameters::Textures, 3, m_default_roughness_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		m_PlaneMesh->Draw(*commandList);
+	}
+    
+
+    // Draw shapes to visualize the position of the lights in the scene.
 	//{
-	//	commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-	//	commandList->SetPipelineState(m_PostProcessingPipelineState);
-	//	commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//	commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
-	// commandList->SetShaderResourceView(0, 0, rtRenderer.getOutputResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	//	commandList->Draw(3);
+	//	Material lightMaterial;
+	//	// No specular
+	//	lightMaterial.Specular = { 0, 0, 0, 1 };
+
+	//	// MVP matrices
+	//	XMMATRIX worldMatrix;
+	//	XMMATRIX rotationMatrix;
+	//	XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+	//	XMMATRIX viewProjectionMatrix = viewMatrix * m_Camera.get_ProjectionMatrix();
+	//	Mat matrices;
+
+	//	for (const auto& l : m_PointLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		worldMatrix = XMMatrixTranslationFromVector(lightPos);
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+
+	//		m_SphereMesh->Draw(*commandList);
+	//	}
+
+	//	for (const auto& l : m_SpotLights)
+	//	{
+	//		lightMaterial.Emissive = l.Color;
+	//		XMVECTOR lightPos = XMLoadFloat4(&l.PositionWS);
+	//		XMVECTOR lightDir = XMLoadFloat4(&l.DirectionWS);
+	//		XMVECTOR up = XMVectorSet(0, 1, 0, 0);
+
+	//		// Rotate the cone so it is facing the Z axis.
+	//		rotationMatrix = XMMatrixRotationX(XMConvertToRadians(-90.0f));
+	//		worldMatrix = rotationMatrix * LookAtMatrix(lightPos, lightDir, up);
+
+	//		ComputeMatrices(worldMatrix, viewMatrix, viewProjectionMatrix, matrices);
+
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, matrices);
+	//		commandList->SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, lightMaterial);
+
+	//		m_ConeMesh->Draw(*commandList);
+	//	}
+
 	//}
 
-    commandQueue->ExecuteCommandList(commandList);
+	// Perform off-screen texture to RT post processing
+	{
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_SDRPipelineState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_SDRRootSignature);
+		commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-	// Present
-    m_pWindow->Present(rtRenderer.getOutputResource());
+		commandList->Draw(3);
+	}
+
+    commandQueue->ExecuteCommandList(commandList);
+    // Present
+    m_pWindow->Present();
 }
 
 static bool g_AllowFullscreenToggle = true;

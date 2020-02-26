@@ -55,19 +55,14 @@ using namespace Microsoft::WRL;
 
 // DirectX 12 specific headers.
 #include "d3dx12.h"
-#include "DXCAPI/dxcapi.use.h"
 #include <dxgi1_6.h>
-#include <dxgiformat.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXTex.h>
 
-
 using namespace DirectX;
 
 // STL Headers
-#include <sstream>
-#include <fstream>
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -82,7 +77,6 @@ using namespace DirectX;
 #include <unordered_map>
 #include <thread>
 #include <vector>
-#include <array>
 
 namespace fs = std::experimental::filesystem;
 
@@ -91,22 +85,6 @@ namespace fs = std::experimental::filesystem;
 #include <comdef.h>
 
 #define MAKE_SMART_COM_PTR(_a) _COM_SMARTPTR_TYPEDEF(_a, __uuidof(_a))
-MAKE_SMART_COM_PTR(ID3D12Device5);
-MAKE_SMART_COM_PTR(ID3D12GraphicsCommandList4);
-MAKE_SMART_COM_PTR(ID3D12CommandQueue);
-MAKE_SMART_COM_PTR(IDXGISwapChain3);
-MAKE_SMART_COM_PTR(IDXGIFactory4);
-MAKE_SMART_COM_PTR(IDXGIAdapter1);
-MAKE_SMART_COM_PTR(ID3D12Fence);
-MAKE_SMART_COM_PTR(ID3D12CommandAllocator);
 MAKE_SMART_COM_PTR(ID3D12Resource);
-MAKE_SMART_COM_PTR(ID3D12DescriptorHeap);
-MAKE_SMART_COM_PTR(ID3D12Debug);
-MAKE_SMART_COM_PTR(ID3D12StateObject);
-MAKE_SMART_COM_PTR(ID3D12RootSignature);
-MAKE_SMART_COM_PTR(ID3DBlob);
-MAKE_SMART_COM_PTR(IDxcBlobEncoding);
-MAKE_SMART_COM_PTR(IDxcCompiler);
-MAKE_SMART_COM_PTR(IDxcLibrary);
-MAKE_SMART_COM_PTR(IDxcBlobEncoding);
-MAKE_SMART_COM_PTR(IDxcOperationResult);
+
+
