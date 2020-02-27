@@ -172,6 +172,12 @@ private:
 		DirectX::XMVECTOR m_InitialCamPos;
 		DirectX::XMVECTOR m_InitialCamRot;
 	};
+	// Frame
+	struct FrameIndexCB
+	{
+		uint32_t FrameIndex;
+		float padding[3];
+	};
 
 	/////////////////////////////////////////////// Container
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
@@ -225,7 +231,7 @@ private:
 	uint64_t mTlasSize = 0;
 
 	void createRtPipelineState();
-	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int cbv_num);
+	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int cbv_num, int c32_num);
 	Microsoft::WRL::ComPtr < ID3D12StateObject > mpPipelineState;
 	Microsoft::WRL::ComPtr < ID3D12RootSignature > mpEmptyRootSig;
 
@@ -235,7 +241,8 @@ private:
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightSB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTSpotLightSB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTLightPropertiesCB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraConstantBuffer;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpFrameIndexCB;
 
 	void createShaderTable();
 	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;

@@ -12,7 +12,7 @@ PUSHD %CMAKE_BINARY_DIR%
 
 %CMAKE% -G %CMAKE_GENERATOR% -Wno-dev "%~dp0"
 
-cd C:\Users\ceej_\Documents\DX12-HybridPipeline
+cd D:\Repos\DX12-HybridPipeline
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Release /e /I
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Debug /e /I
 

@@ -464,6 +464,7 @@ void HybridPipeline::UnloadContent()
 void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 {
     static uint64_t frameCount = 0;
+	static uint64_t totalFrameCount = 0;
     static double totalTime = 0.0;
 
     super::OnUpdate(e);
@@ -471,18 +472,29 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 	{// frametime
 		totalTime += e.ElapsedTime;
 		frameCount++;
+		totalFrameCount++;
 
 		if (totalTime > 1.0)
 		{
 			double fps = frameCount / totalTime;
 
 			char buffer[512];
-			sprintf_s(buffer, "FPS: %f\n", fps);
+			sprintf_s(buffer, "FPS: %f,  FrameCount: %lld\n", fps, totalFrameCount);
 			OutputDebugStringA(buffer);
 
 			frameCount = 0;
 			totalTime = 0.0;
 		}
+	}
+
+	// update the structure buffer of Pointlight
+	{
+		FrameIndexCB fid;
+		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
+		void* pData;
+		mpFrameIndexCB->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &fid, sizeof(FrameIndexCB));
+		mpFrameIndexCB->Unmap(0, nullptr);
 	}
 
 	{// camera
@@ -507,9 +519,9 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
 			mCameraCB.fov = m_Camera.get_FoV();
 			void* pData;
-			mpRTCameraConstantBuffer->Map(0, nullptr, (void**)& pData);
+			mpRTCameraCB->Map(0, nullptr, (void**)& pData);
 			memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
-			mpRTCameraConstantBuffer->Unmap(0, nullptr);
+			mpRTCameraCB->Unmap(0, nullptr);
 		}
 	}
    
@@ -1008,16 +1020,16 @@ void HybridPipeline::createRtPipelineState()
 
 	// Compile the shader
 	auto pDxilLib = compileLibrary(L"RTPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
-	const WCHAR* entryPoints[] = { kRayGenShader, kMissShader,kAnyHitShader ,kClosestHitShader };
+	const WCHAR* entryPoints[] = { kRayGenShader, kMissShader ,kClosestHitShader };
 	DxilLibrary dxilLib = DxilLibrary(pDxilLib, entryPoints, arraysize(entryPoints));
 	subobjects[index++] = dxilLib.stateSubobject; // 0 Library
 
 	//HitProgram hitProgram(kAnyHitShader, nullptr, kHitGroup);
-	HitProgram hitProgram(kAnyHitShader, kClosestHitShader, kHitGroup);
+	HitProgram hitProgram(0, kClosestHitShader, kHitGroup);
 	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,8,2).desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,8,3,0).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 2
@@ -1031,7 +1043,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index] = hitMissRootSignature.subobject; // 4 Root Sig to be shared between Miss and CHS
 
 	uint32_t hitMissRootIndex = index++; // 4
-	const WCHAR* missHitExportName[] = { kMissShader, kAnyHitShader, kClosestHitShader };
+	const WCHAR* missHitExportName[] = { kMissShader, kClosestHitShader };
 	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
 	subobjects[index++] = missHitRootAssociation.subobject; // 5 Associate Root Sig to Miss and CHS
 
@@ -1040,7 +1052,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index] = shaderConfig.subobject; // 6 Shader Config
 
 	uint32_t shaderConfigIndex = index++; // 6
-	const WCHAR* shaderExports[] = { kMissShader, kAnyHitShader, kClosestHitShader, kRayGenShader };
+	const WCHAR* shaderExports[] = { kMissShader, kClosestHitShader, kRayGenShader };
 	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
 	subobjects[index++] = configAssociation.subobject; // 7 Associate Shader Config to Miss, CHS, RGS
 
@@ -1062,7 +1074,7 @@ void HybridPipeline::createRtPipelineState()
 	ThrowIfFailed(mpDevice->CreateStateObject(&desc, IID_PPV_ARGS(&mpPipelineState)));
 }
 
-RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int cbv_num)
+RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int cbv_num, int c32_num)
 {
 	// Create the root-signature 
 	//******Layout*********/
@@ -1085,7 +1097,7 @@ RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, 
 	desc.range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	desc.range[1].OffsetInDescriptorsFromTableStart = uav_num;
 
-	desc.rootParams.resize(1+ cbv_num);
+	desc.rootParams.resize(1+ cbv_num + c32_num);
 
 	desc.rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	desc.rootParams[0].DescriptorTable.NumDescriptorRanges = 2;
@@ -1097,8 +1109,15 @@ RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, 
 		desc.rootParams[i].Descriptor.ShaderRegister = i-1;
 	}
 
+	for (int i = cbv_num+1; i <= cbv_num + c32_num; i++) {
+		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		desc.rootParams[i].Constants.Num32BitValues = 1;
+		desc.rootParams[i].Constants.RegisterSpace = 0;
+		desc.rootParams[i].Constants.ShaderRegister = i - 1;
+	}
+
 	// Create the desc
-	desc.desc.NumParameters = 1 + cbv_num;
+	desc.desc.NumParameters = 1 + cbv_num+ c32_num;
 	desc.desc.pParameters = desc.rootParams.data();
 	desc.desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 
@@ -1123,9 +1142,9 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 
 	//****************************CBV Resource
 	//create the constant buffer resource for cameraCB
-	mpRTCameraConstantBuffer = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
+	mpRTCameraCB = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
 	mpRTLightPropertiesCB = createBuffer(pDevice, sizeof(LightPropertiesCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-
+	mpFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 
 	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -1204,8 +1223,9 @@ void HybridPipeline::createShaderTable()
 	memcpy(pData, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 	uint64_t heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 	*(uint64_t*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTCameraConstantBuffer->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTCameraCB->GetGPUVirtualAddress();
 	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 +8) = mpRTLightPropertiesCB->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 + 8 + 8) = mpFrameIndexCB->GetGPUVirtualAddress();
 	// Entry 1 - miss program
 	memcpy(pData + mShaderTableEntrySize, pRtsoProps->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
