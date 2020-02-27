@@ -404,6 +404,16 @@ float3 UniformSampleCone(float2 u, float cosThetaMax)
 	float phi = u.y * 2 * 3.141592653f;
 	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 }
+float3 SampleTan2W(float3 H, float3 N)
+{
+	float3 up = abs(N.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
+	float3 tangent = normalize(cross(up, N));
+	float3 bitangent = cross(N, tangent);
+	
+	float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+	return sampleVec;
+}
+//////////////////////////////////////////////////// Sampling method
 [shader("raygeneration")]
 void rayGen()
 {
@@ -411,12 +421,12 @@ void rayGen()
 	//	RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*RayFlags*/, 0xFF /*InstanceInclusionMask*/,
 	//	0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/,
 	
-    uint3 launchIndex = DispatchRaysIndex();
+	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDimension = DispatchRaysDimensions();
 	float hit = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
 	if (hit == 0)
 	{
-		gOutput[launchIndex.xy] = float4(0,0,0,1);
+		gOutput[launchIndex.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 	float3 position = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
@@ -430,6 +440,17 @@ void rayGen()
 	float3 N = normalize(normal);
 	float3 P = position;
 	
+	uint seed = FrameIndexCB.FrameIndex % (launchIndex.x + (launchIndex.y * launchDimension.y));
+	RandomSeedInit(seed);
+	HaltonState hState;
+	uint useed = Random(seed, 0, 255); /*[0,255]*/
+	uint mIncrement = 23;
+	haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 145321, mIncrement);
+	float rnd1 = frac(haltonNext(hState, mIncrement));
+	float rnd2 = frac(haltonNext(hState, mIncrement));
+	
+	float3 sampleDestRadius = 2.0f;
+	
 	// shadow and lighting
 	RayDesc ray;
 	ray.TMin = 0.00f;
@@ -438,72 +459,93 @@ void rayGen()
 	float3 Lo = 0;
 	for (i = 0; i < LightPropertiesCB.NumPointLights; ++i)
 	{
-		float shadow = 0.0f;
-		float bias = 0.1f;
-		float samples = 1.0f;
-		float offset = 0.1f;
-		for (float x = -offset; x < offset; x += offset / (samples * 0.5))
+		// area Point Light
+		float3 dest = PointLights[i].PositionWS.xyz;
+		float3 distan = distance(P, dest);
+		float3 dir = (dest - P) / distan;
+		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+		ray.Origin = P;
+		ray.Direction = distributedDir;
+		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+		shadowPayload.hit = false;
+		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+		if (shadowPayload.hit == false)
 		{
-			for (float y = -offset; y < offset; y += offset / (samples * 0.5))
-			{
-				for (float z = -offset; z < offset; z += offset / (samples * 0.5))
-				{
-					float3 dest = PointLights[i].PositionWS.xyz + float3(x, y, z);
-					ray.Origin = P;
-					ray.Direction = normalize(dest - P);
-					ray.TMax = distance(dest, P);
-					shadowPayload.hit = false;
-					TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-					if (shadowPayload.hit == false)
-					{
-						shadow = shadow + 1.0f;
-					}
-				}
-			}
+			Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
 		}
-		Lo += shadow * DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
+		//// hard Shadow
+		//float shadow = 0.0f;
+		//float samples = 1.0f;
+		//float offset = 0.1f;
+		//for (float x = -offset; x < offset; x += offset / (samples * 0.5))
+		//{
+		//	for (float y = -offset; y < offset; y += offset / (samples * 0.5))
+		//	{
+		//		for (float z = -offset; z < offset; z += offset / (samples * 0.5))
+		//		{
+		//			float3 dest = PointLights[i].PositionWS.xyz + float3(x, y, z);
+		//			ray.Origin = P;
+		//			ray.Direction = normalize(dest - P);
+		//			ray.TMax = distance(dest, P);
+		//			shadowPayload.hit = false;
+		//			TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+		//			if (shadowPayload.hit == false)
+		//			{
+		//				shadow = shadow + 1.0f;
+		//			}
+		//		}
+		//	}
+		//}
+		//Lo += shadow * DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 	for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
 	{
-		float shadow = 0.0f;
-		float bias = 0.1f;
-		float samples = 1.0f;
-		float offset = 0.1f;
-		for (float x = -offset; x < offset; x += offset / (samples * 0.5))
+		// area Point Light
+		float3 dest = SpotLights[i].PositionWS.xyz;
+		float3 distan = distance(P, dest);
+		float3 dir = (dest - P) / distan;
+		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+		ray.Origin = P;
+		ray.Direction = distributedDir;
+		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+		shadowPayload.hit = false;
+		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+		if (shadowPayload.hit == false)
 		{
-			for (float y = -offset; y < offset; y += offset / (samples * 0.5))
-			{
-				for (float z = -offset; z < offset; z += offset / (samples * 0.5))
-				{
-					float3 dest = SpotLights[i].PositionWS.xyz + float3(x, y, z);
-					ray.Origin = P;
-					ray.Direction = normalize(dest - P);
-					ray.TMax = distance(dest, P);
-					shadowPayload.hit = false;
-					TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES|RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH , 0xFF, 0, 0, 0, ray, shadowPayload);
-					if (shadowPayload.hit == false)
-					{
-						shadow = shadow + 1.0f;
-					}
-				}
-			}
+			Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
 		}
-		Lo += shadow * DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
+		//// hard Shadow
+		//float shadow = 0.0f;
+		//float samples = 1.0f;
+		//float offset = 0.1f;
+		//for (float x = -offset; x < offset; x += offset / (samples * 0.5))
+		//{
+		//	for (float y = -offset; y < offset; y += offset / (samples * 0.5))
+		//	{
+		//		for (float z = -offset; z < offset; z += offset / (samples * 0.5))
+		//		{
+		//			float3 dest = SpotLights[i].PositionWS.xyz + float3(x, y, z);
+		//			ray.Origin = P;
+		//			ray.Direction = normalize(dest - P);
+		//			ray.TMax = distance(dest, P);
+		//			shadowPayload.hit = false;
+		//			TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+		//			if (shadowPayload.hit == false)
+		//			{
+		//				shadow = shadow + 1.0f;
+		//			}
+		//		}
+		//	}
+		//}
+		//Lo += shadow * DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 	
-	HaltonState hState;
-	uint useed = 123; /*[0,255]*/
-	uint mIncrement = 37;
-	haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 1, mIncrement);
-	uint seed = FrameIndexCB.FrameIndex % (launchIndex.x + (launchIndex.y * launchDimension.y));
-	RandomSeedInit(seed);
-	float rnd1 = frac(haltonNext(hState, mIncrement) + Random01inclusive(seed));
-	float rnd2 = frac(haltonNext(hState, mIncrement) + Random01inclusive(seed));
-	
-	float3 ambient = 0.01f * albedo;
-	float3 color = ambient + Lo;
-	color = float3(rnd1, rnd2,0);
-	gOutput[launchIndex.xy] = float4(color.rgb, 1);
+	float3 color = Lo;
+	gOutput[launchIndex.xy] = float4(color, 1);
 }
 
 [shader("miss")]
