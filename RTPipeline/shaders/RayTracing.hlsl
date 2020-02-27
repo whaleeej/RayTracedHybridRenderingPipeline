@@ -186,9 +186,7 @@ struct HaltonState
 	int dimension;
 	int sequenceIndex;
 };
-
 int haltonIndex(int x, int y, int i, inout uint mIncrement);
-
 void haltonInit(inout HaltonState hState, int x, int y, int path, int numPaths,
                 int frameId, int loop, inout uint mIncrement)
 {
@@ -197,7 +195,6 @@ void haltonInit(inout HaltonState hState, int x, int y, int path, int numPaths,
 	hState.sequenceIndex =
         haltonIndex(x, y, (frameId * numPaths + path) % (loop * numPaths), mIncrement);
 }
-
 float haltonSample(int dimension, int sampleIndex)
 {
 	int base = 0;
@@ -318,14 +315,11 @@ float haltonSample(int dimension, int sampleIndex)
 
 	return a;
 }
-
 float haltonNext(inout HaltonState state, inout uint mIncrement)
 {
 	mIncrement = mIncrement < 1 ? 1 : mIncrement + 1;
 	return haltonSample(state.dimension++, state.sequenceIndex);
 }
-
-// Modified from [pbrt]
 int halton2Inverse(int index, int digits)
 {
 	index = (index << 16) | (index >> 16);
@@ -335,8 +329,6 @@ int halton2Inverse(int index, int digits)
 	index = ((index & 0x55555555) << 1) | ((index & 0xaaaaaaaa) >> 1);
 	return index >> (32 - digits);
 }
-
-// Modified from [pbrt]
 int halton3Inverse(int index, int digits)
 {
 	int result = 0;
@@ -347,8 +339,6 @@ int halton3Inverse(int index, int digits)
 	}
 	return result;
 }
-
-// Modified from [pbrt]
 int haltonIndex(int x, int y, int i, inout uint mIncrement)
 {
 	return ((halton2Inverse(x % 256, 8) * 76545 +
@@ -414,6 +404,7 @@ float3 SampleTan2W(float3 H, float3 N)
 	return sampleVec;
 }
 //////////////////////////////////////////////////// Sampling method
+
 [shader("raygeneration")]
 void rayGen()
 {
@@ -475,30 +466,6 @@ void rayGen()
 		{
 			Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
 		}
-		//// hard Shadow
-		//float shadow = 0.0f;
-		//float samples = 1.0f;
-		//float offset = 0.1f;
-		//for (float x = -offset; x < offset; x += offset / (samples * 0.5))
-		//{
-		//	for (float y = -offset; y < offset; y += offset / (samples * 0.5))
-		//	{
-		//		for (float z = -offset; z < offset; z += offset / (samples * 0.5))
-		//		{
-		//			float3 dest = PointLights[i].PositionWS.xyz + float3(x, y, z);
-		//			ray.Origin = P;
-		//			ray.Direction = normalize(dest - P);
-		//			ray.TMax = distance(dest, P);
-		//			shadowPayload.hit = false;
-		//			TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-		//			if (shadowPayload.hit == false)
-		//			{
-		//				shadow = shadow + 1.0f;
-		//			}
-		//		}
-		//	}
-		//}
-		//Lo += shadow * DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 	for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
 	{
@@ -518,30 +485,6 @@ void rayGen()
 		{
 			Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
 		}
-		//// hard Shadow
-		//float shadow = 0.0f;
-		//float samples = 1.0f;
-		//float offset = 0.1f;
-		//for (float x = -offset; x < offset; x += offset / (samples * 0.5))
-		//{
-		//	for (float y = -offset; y < offset; y += offset / (samples * 0.5))
-		//	{
-		//		for (float z = -offset; z < offset; z += offset / (samples * 0.5))
-		//		{
-		//			float3 dest = SpotLights[i].PositionWS.xyz + float3(x, y, z);
-		//			ray.Origin = P;
-		//			ray.Direction = normalize(dest - P);
-		//			ray.TMax = distance(dest, P);
-		//			shadowPayload.hit = false;
-		//			TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-		//			if (shadowPayload.hit == false)
-		//			{
-		//				shadow = shadow + 1.0f;
-		//			}
-		//		}
-		//	}
-		//}
-		//Lo += shadow * DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic) / (samples * samples * samples);
 	}
 	
 	float3 color = Lo;
@@ -553,7 +496,6 @@ void miss(inout RayPayload payload)
 {
 	//payload.hit = false;
 }
-
 
 [shader("closesthit")]
 void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
