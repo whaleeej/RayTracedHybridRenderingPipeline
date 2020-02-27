@@ -183,20 +183,150 @@ float3 DoPbrSpotLight(SpotLight light, float3 N, float3 V, float3 P, float3 albe
 ///////////////////////////////////////////////////// Halton Sampling
 struct HaltonState
 {
-	uint dimension;
-	uint sequenceIndex;
+	int dimension;
+	int sequenceIndex;
 };
-uint halton3Inverse(uint index, uint digits)
+
+int haltonIndex(int x, int y, int i, inout uint mIncrement);
+
+void haltonInit(inout HaltonState hState, int x, int y, int path, int numPaths,
+                int frameId, int loop, inout uint mIncrement)
 {
-	uint result = 0;
-	for (uint d = 0; d < digits; ++d)
-	{
-		result = result * 3 + index % 3;
-		index /= 3;
-	}
-	return result;
+
+	hState.dimension = 2;
+	hState.sequenceIndex =
+        haltonIndex(x, y, (frameId * numPaths + path) % (loop * numPaths), mIncrement);
 }
-uint halton2Inverse(uint index, uint digits)
+
+float haltonSample(int dimension, int sampleIndex)
+{
+	int base = 0;
+
+    // Use a prime number.
+	switch (dimension)
+	{
+		case 0:
+			base = 2;
+			break;
+		case 1:
+			base = 3;
+			break;
+		case 2:
+			base = 5;
+			break;
+		case 3:
+			base = 7;
+			break;
+		case 4:
+			base = 11;
+			break;
+		case 5:
+			base = 13;
+			break;
+		case 6:
+			base = 17;
+			break;
+		case 7:
+			base = 19;
+			break;
+		case 8:
+			base = 23;
+			break;
+		case 9:
+			base = 29;
+			break;
+		case 10:
+			base = 31;
+			break;
+		case 11:
+			base = 37;
+			break;
+		case 12:
+			base = 41;
+			break;
+		case 13:
+			base = 43;
+			break;
+		case 14:
+			base = 47;
+			break;
+		case 15:
+			base = 53;
+			break;
+		case 16:
+			base = 59;
+			break;
+		case 17:
+			base = 61;
+			break;
+		case 18:
+			base = 67;
+			break;
+		case 19:
+			base = 71;
+			break;
+		case 20:
+			base = 73;
+			break;
+		case 21:
+			base = 79;
+			break;
+		case 22:
+			base = 83;
+			break;
+		case 23:
+			base = 89;
+			break;
+		case 24:
+			base = 97;
+			break;
+		case 25:
+			base = 101;
+			break;
+		case 26:
+			base = 103;
+			break;
+		case 27:
+			base = 107;
+			break;
+		case 28:
+			base = 109;
+			break;
+		case 29:
+			base = 113;
+			break;
+		case 30:
+			base = 127;
+			break;
+		case 31:
+			base = 131;
+			break;
+		default:
+			base = 2;
+			break;
+	}
+
+    // Compute the radical inverse.
+	float a = 0.0;
+	float invBase = 1.0 / float(base);
+
+	for (float mult = invBase; sampleIndex != 0;
+         sampleIndex /= base, mult *= invBase)
+	{
+		a += float(sampleIndex % base) * mult;
+	}
+
+	return a;
+}
+
+float haltonNext(inout HaltonState state, inout uint mIncrement)
+{
+	mIncrement = mIncrement < 1 ? 1 : mIncrement + 1;
+	return haltonSample(state.dimension++, state.sequenceIndex);
+}
+
+// Modified from [pbrt]
+int halton2Inverse(int index, int digits)
 {
 	index = (index << 16) | (index >> 16);
 	index = ((index & 0x00ff00ff) << 8) | ((index & 0xff00ff00) >> 8);
@@ -205,48 +335,26 @@ uint halton2Inverse(uint index, uint digits)
 	index = ((index & 0x55555555) << 1) | ((index & 0xaaaaaaaa) >> 1);
 	return index >> (32 - digits);
 }
-uint haltonIndex(uint x, uint y, uint i, uint mIncrement)
+
+// Modified from [pbrt]
+int halton3Inverse(int index, int digits)
+{
+	int result = 0;
+	for (int d = 0; d < digits; ++d)
+	{
+		result = result * 3 + index % 3;
+		index /= 3;
+	}
+	return result;
+}
+
+// Modified from [pbrt]
+int haltonIndex(int x, int y, int i, inout uint mIncrement)
 {
 	return ((halton2Inverse(x % 256, 8) * 76545 +
-				halton3Inverse(y % 256, 6) * 110080) % 
-				mIncrement) + 
-				i * 186624;
-}
-float haltonSample(uint dimension, uint index)
-{
-	uint mapTable[32] = { 2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131};
-	uint sampleIndex = index;
-	int base = 0;
-    // Use a prime number.
-	base = 2;
-	if (dimension < 32 && dimension >= 0)
-	{
-		base = mapTable[dimension];
-	}
-    // Compute the radical inverse.
-	float a = 0;
-	float invBase = 1.0f / float(base);
-  
-	for (float mult = invBase; sampleIndex != 0; sampleIndex /= base, mult *= invBase)
-	{
-		a += float(sampleIndex % base) * mult;
-	}
-	return a;
-}
-void haltonInit(inout HaltonState hState,
-						int x, int y,
-						int path,
-						int numPaths,
-						int frameId,
-						int loop)
-{
-	uint mIncrement = 1;
-	hState.dimension = 2;
-	hState.sequenceIndex = haltonIndex(x, y, (frameId * numPaths + path) % (loop * numPaths), mIncrement);
-}
-float haltonNext(inout HaltonState state)
-{
-	return haltonSample(state.dimension++, state.sequenceIndex);
+             halton3Inverse(y % 256, 6) * 110080) %
+            mIncrement) +
+           i * 186624;
 }
 ///////////////////////////////////////////////////// Halton Sampling
 
@@ -288,6 +396,14 @@ uint Random(inout uint state, uint lower, uint upper)
 }
 //////////////////////////////////////////////////// Random Utility
 
+//////////////////////////////////////////////////// Sampling method
+float3 UniformSampleCone(float2 u, float cosThetaMax)
+{
+	float cosTheta = (1.0f - u.x) + u.x * cosThetaMax;
+	float sinTheta = sqrt( 1.0f - cosTheta * cosTheta);
+	float phi = u.y * 2 * 3.141592653f;
+	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
 [shader("raygeneration")]
 void rayGen()
 {
@@ -376,16 +492,17 @@ void rayGen()
 	}
 	
 	HaltonState hState;
-	uint useed = 125; /*[0,255]*/
-	haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 1);
-	uint seed = launchIndex.x + (launchIndex.y * launchDimension.y) + FrameIndexCB.FrameIndex;
+	uint useed = 123; /*[0,255]*/
+	uint mIncrement = 37;
+	haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 1, mIncrement);
+	uint seed = FrameIndexCB.FrameIndex % (launchIndex.x + (launchIndex.y * launchDimension.y));
 	RandomSeedInit(seed);
-	float rnd1 = frac(haltonNext(hState) /*+ Random01inclusive(seed)*/);
-	float rnd2 = frac(haltonNext(hState) /*+ Random01inclusive(seed)*/);
+	float rnd1 = frac(haltonNext(hState, mIncrement) + Random01inclusive(seed));
+	float rnd2 = frac(haltonNext(hState, mIncrement) + Random01inclusive(seed));
 	
 	float3 ambient = 0.01f * albedo;
 	float3 color = ambient + Lo;
-	color = float3(haltonNext(hState), rnd2, 0);
+	color = float3(rnd1, rnd2,0);
 	gOutput[launchIndex.xy] = float4(color.rgb, 1);
 }
 
