@@ -161,7 +161,7 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool.emplace("sphere",std::make_shared<GameObject>());
 		gameObjectPool["sphere"]->mesh = "sphere";
 		gameObjectPool["sphere"]->material.base = Material::White;
-		gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["sphere"]->material.pbr = PBRMaterial(0.0f, 1.0f);
 		gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
 
 		gameObjectPool.emplace("cube", std::make_shared<GameObject>());
@@ -179,37 +179,37 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
 		gameObjectPool["Floor plane"]->mesh = "plane";
 		gameObjectPool["Floor plane"]->material.base = Material::Red;
-		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
 		gameObjectPool["Back wall"]->mesh = "plane";
 		gameObjectPool["Back wall"]->material.base = Material::Green;
-		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
 		gameObjectPool["Ceiling plane"]->mesh = "plane";
 		gameObjectPool["Ceiling plane"]->material.base = Material::Blue;
-		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
 		gameObjectPool["Front wall"]->mesh = "plane";
 		gameObjectPool["Front wall"]->material.base = Material::Yellow;
-		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
 		gameObjectPool["Left wall"]->mesh = "plane";
 		gameObjectPool["Left wall"]->material.base = Material::Cyan;
-		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
 		gameObjectPool["Right wall"]->mesh = "plane";
 		gameObjectPool["Right wall"]->material.base = Material::Magenta;
-		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 	}
     
@@ -530,7 +530,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 		static const XMVECTORF32 LightColors[] =
 		{
-			Colors::White, Colors::Yellow, Colors::Red, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::Orange
+			Colors::White, Colors::White, Colors::Red, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::Orange
 		};
 
 		static float lightAnimTime = 0.0f;

@@ -138,6 +138,9 @@ float3 DoPbrPointLight(PointLight light, float3 N, float3 V, float3 P, float3 al
 
     // add to outgoing radiance Lo
 	return (kD * albedo / PI + specular) * radiance * NdotL;
+	//return (kD * albedo / PI ) * radiance * NdotL;
+	//return ( specular) * radiance * NdotL;
+	//return radiance * NdotL;
 }
 float3 DoPbrSpotLight(SpotLight light, float3 N, float3 V, float3 P, float3 albedo, float roughness, float metallic)
 {
@@ -177,214 +180,257 @@ float3 DoPbrSpotLight(SpotLight light, float3 N, float3 V, float3 P, float3 albe
 
     // add to outgoing radiance Lo
 	return (kD * albedo / PI + specular) * radiance * NdotL;
+	//return (kD * albedo / PI ) * radiance * NdotL;
+	//return (specular) * radiance * NdotL;
+	//return radiance * NdotL;
 }
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
-///////////////////////////////////////////////////// Halton Sampling
-struct HaltonState
-{
-	int dimension;
-	int sequenceIndex;
-};
-int haltonIndex(int x, int y, int i, inout uint mIncrement);
-void haltonInit(inout HaltonState hState, int x, int y, int path, int numPaths,
-                int frameId, int loop, inout uint mIncrement)
-{
+/////////////////////////////////////////////////////// Halton Sampling // from hybrid ray tracing paper // deprecated
+//struct HaltonState
+//{
+//	int dimension;
+//	int sequenceIndex;
+//};
+//int haltonIndex(int x, int y, int i, inout uint mIncrement);
+//void haltonInit(inout HaltonState hState, int x, int y, int path, int numPaths,
+//                int frameId, int loop, inout uint mIncrement)
+//{
 
-	hState.dimension = 2;
-	hState.sequenceIndex =
-        haltonIndex(x, y, (frameId * numPaths + path) % (loop * numPaths), mIncrement);
-}
-float haltonSample(int dimension, int sampleIndex)
-{
-	int base = 0;
+//	hState.dimension = 2;
+//	hState.sequenceIndex =
+//        haltonIndex(x, y, (frameId * numPaths + path) % (loop * numPaths), mIncrement);
+//}
+//float haltonSample(int dimension, int sampleIndex)
+//{
+//	int base = 0;
 
-    // Use a prime number.
-	switch (dimension)
+//    // Use a prime number.
+//	switch (dimension)
+//	{
+//		case 0:
+//			base = 2;
+//			break;
+//		case 1:
+//			base = 3;
+//			break;
+//		case 2:
+//			base = 5;
+//			break;
+//		case 3:
+//			base = 7;
+//			break;
+//		case 4:
+//			base = 11;
+//			break;
+//		case 5:
+//			base = 13;
+//			break;
+//		case 6:
+//			base = 17;
+//			break;
+//		case 7:
+//			base = 19;
+//			break;
+//		case 8:
+//			base = 23;
+//			break;
+//		case 9:
+//			base = 29;
+//			break;
+//		case 10:
+//			base = 31;
+//			break;
+//		case 11:
+//			base = 37;
+//			break;
+//		case 12:
+//			base = 41;
+//			break;
+//		case 13:
+//			base = 43;
+//			break;
+//		case 14:
+//			base = 47;
+//			break;
+//		case 15:
+//			base = 53;
+//			break;
+//		case 16:
+//			base = 59;
+//			break;
+//		case 17:
+//			base = 61;
+//			break;
+//		case 18:
+//			base = 67;
+//			break;
+//		case 19:
+//			base = 71;
+//			break;
+//		case 20:
+//			base = 73;
+//			break;
+//		case 21:
+//			base = 79;
+//			break;
+//		case 22:
+//			base = 83;
+//			break;
+//		case 23:
+//			base = 89;
+//			break;
+//		case 24:
+//			base = 97;
+//			break;
+//		case 25:
+//			base = 101;
+//			break;
+//		case 26:
+//			base = 103;
+//			break;
+//		case 27:
+//			base = 107;
+//			break;
+//		case 28:
+//			base = 109;
+//			break;
+//		case 29:
+//			base = 113;
+//			break;
+//		case 30:
+//			base = 127;
+//			break;
+//		case 31:
+//			base = 131;
+//			break;
+//		default:
+//			base = 2;
+//			break;
+//	}
+
+//    // Compute the radical inverse.
+//	float a = 0.0;
+//	float invBase = 1.0 / float(base);
+
+//	for (float mult = invBase; sampleIndex != 0;
+//         sampleIndex /= base, mult *= invBase)
+//	{
+//		a += float(sampleIndex % base) * mult;
+//	}
+
+//	return a;
+//}
+//float haltonNext(inout HaltonState state, inout uint mIncrement)
+//{
+//	mIncrement = mIncrement < 1 ? 1 : mIncrement + 1;
+//	return haltonSample(state.dimension++, state.sequenceIndex);
+//}
+//int halton2Inverse(int index, int digits)
+//{
+//	index = (index << 16) | (index >> 16);
+//	index = ((index & 0x00ff00ff) << 8) | ((index & 0xff00ff00) >> 8);
+//	index = ((index & 0x0f0f0f0f) << 4) | ((index & 0xf0f0f0f0) >> 4);
+//	index = ((index & 0x33333333) << 2) | ((index & 0xcccccccc) >> 2);
+//	index = ((index & 0x55555555) << 1) | ((index & 0xaaaaaaaa) >> 1);
+//	return index >> (32 - digits);
+//}
+//int halton3Inverse(int index, int digits)
+//{
+//	int result = 0;
+//	for (int d = 0; d < digits; ++d)
+//	{
+//		result = result * 3 + index % 3;
+//		index /= 3;
+//	}
+//	return result;
+//}
+//int haltonIndex(int x, int y, int i, inout uint mIncrement)
+//{
+//	return ((halton2Inverse(x % 256, 8) * 76545 +
+//             halton3Inverse(y % 256, 6) * 110080) %
+//            mIncrement) +
+//           i * 186624;
+//}
+/////////////////////////////////////////////////////// Halton Sampling
+
+////////////////////////////////////////////////////// Random Utility from MicrosoftDX Sample Repo // deprecated
+//// Create an initial random number for this thread
+//void RandomSeedInit(inout uint seed)
+//{
+//    // Thomas Wang hash 
+//    // Ref: http://www.burtleburtle.net/bob/hash/integer.html
+//	seed = (seed ^ 61) ^ (seed >> 16);
+//	seed *= 9;
+//	seed = seed ^ (seed >> 4);
+//	seed *= 0x27d4eb2d;
+//	seed = seed ^ (seed >> 15);
+//}
+//// Generate a random 32-bit integer
+//uint Random(inout uint state)
+//{
+//    // Xorshift algorithm from George Marsaglia's paper.
+//	state ^= (state << 13);
+//	state ^= (state >> 17);
+//	state ^= (state << 5);
+//	return state;
+//}
+//// Generate a random float in the range [0.0f, 1.0f)
+//float Random01(inout uint state)
+//{
+//	return asfloat(0x3f800000 | Random(state) >> 9) - 1.0;
+//}
+//// Generate a random float in the range [0.0f, 1.0f]
+//float Random01inclusive(inout uint state)
+//{
+//	return Random(state) / float(0xffffffff);
+//}
+//// Generate a random integer in the range [lower, upper]
+//uint Random(inout uint state, uint lower, uint upper)
+//{
+//	return lower + uint(float(upper - lower + 1) * Random01(state));
+//}
+////////////////////////////////////////////////////// Random Utility
+
+//////////////////////////////////////////////////// Random Utility1 from svgf paper
+unsigned int initRand(unsigned int val0, unsigned int val1, unsigned int backoff = 16)
+{
+	unsigned int v0 = val0, v1 = val1, s0 = 0;
+
+	for (unsigned int n = 0; n < backoff; n++)
 	{
-		case 0:
-			base = 2;
-			break;
-		case 1:
-			base = 3;
-			break;
-		case 2:
-			base = 5;
-			break;
-		case 3:
-			base = 7;
-			break;
-		case 4:
-			base = 11;
-			break;
-		case 5:
-			base = 13;
-			break;
-		case 6:
-			base = 17;
-			break;
-		case 7:
-			base = 19;
-			break;
-		case 8:
-			base = 23;
-			break;
-		case 9:
-			base = 29;
-			break;
-		case 10:
-			base = 31;
-			break;
-		case 11:
-			base = 37;
-			break;
-		case 12:
-			base = 41;
-			break;
-		case 13:
-			base = 43;
-			break;
-		case 14:
-			base = 47;
-			break;
-		case 15:
-			base = 53;
-			break;
-		case 16:
-			base = 59;
-			break;
-		case 17:
-			base = 61;
-			break;
-		case 18:
-			base = 67;
-			break;
-		case 19:
-			base = 71;
-			break;
-		case 20:
-			base = 73;
-			break;
-		case 21:
-			base = 79;
-			break;
-		case 22:
-			base = 83;
-			break;
-		case 23:
-			base = 89;
-			break;
-		case 24:
-			base = 97;
-			break;
-		case 25:
-			base = 101;
-			break;
-		case 26:
-			base = 103;
-			break;
-		case 27:
-			base = 107;
-			break;
-		case 28:
-			base = 109;
-			break;
-		case 29:
-			base = 113;
-			break;
-		case 30:
-			base = 127;
-			break;
-		case 31:
-			base = 131;
-			break;
-		default:
-			base = 2;
-			break;
+		s0 += 0x9e3779b9;
+		v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+		v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
 	}
+	return v0;
+}
+float nextRand(inout unsigned int s)
+{
+	s = (1664525u * s + 1013904223u);
+	return float(s & 0x00FFFFFF) / float(0x01000000);
+}
+uint nextRandomRange(inout uint state, uint lower, uint upper) // [lower, upper]
+{
+	return lower + uint(float(upper - lower + 1) * nextRand(state));
+}
+//////////////////////////////////////////////////// Random Utility1
 
-    // Compute the radical inverse.
-	float a = 0.0;
-	float invBase = 1.0 / float(base);
-
-	for (float mult = invBase; sampleIndex != 0;
-         sampleIndex /= base, mult *= invBase)
-	{
-		a += float(sampleIndex % base) * mult;
-	}
-
-	return a;
-}
-float haltonNext(inout HaltonState state, inout uint mIncrement)
+//////////////////////////////////////////////////// A low-discrepancy sequence
+float RadicalInverse_VdC(uint bits)
 {
-	mIncrement = mIncrement < 1 ? 1 : mIncrement + 1;
-	return haltonSample(state.dimension++, state.sequenceIndex);
+	bits = (bits << 16u) | (bits >> 16u);
+	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+	return float(bits) * 2.3283064365386963e-10; // / 0x100000000
 }
-int halton2Inverse(int index, int digits)
+float2 Hammersley(uint i, uint N)
 {
-	index = (index << 16) | (index >> 16);
-	index = ((index & 0x00ff00ff) << 8) | ((index & 0xff00ff00) >> 8);
-	index = ((index & 0x0f0f0f0f) << 4) | ((index & 0xf0f0f0f0) >> 4);
-	index = ((index & 0x33333333) << 2) | ((index & 0xcccccccc) >> 2);
-	index = ((index & 0x55555555) << 1) | ((index & 0xaaaaaaaa) >> 1);
-	return index >> (32 - digits);
+	return float2(float(i) / float(N), RadicalInverse_VdC(i));
 }
-int halton3Inverse(int index, int digits)
-{
-	int result = 0;
-	for (int d = 0; d < digits; ++d)
-	{
-		result = result * 3 + index % 3;
-		index /= 3;
-	}
-	return result;
-}
-int haltonIndex(int x, int y, int i, inout uint mIncrement)
-{
-	return ((halton2Inverse(x % 256, 8) * 76545 +
-             halton3Inverse(y % 256, 6) * 110080) %
-            mIncrement) +
-           i * 186624;
-}
-///////////////////////////////////////////////////// Halton Sampling
-
-//////////////////////////////////////////////////// Random Utility
-// Create an initial random number for this thread
-void RandomSeedInit(inout uint seed)
-{
-    // Thomas Wang hash 
-    // Ref: http://www.burtleburtle.net/bob/hash/integer.html
-	seed = (seed ^ 61) ^ (seed >> 16);
-	seed *= 9;
-	seed = seed ^ (seed >> 4);
-	seed *= 0x27d4eb2d;
-	seed = seed ^ (seed >> 15);
-}
-// Generate a random 32-bit integer
-uint Random(inout uint state)
-{
-    // Xorshift algorithm from George Marsaglia's paper.
-	state ^= (state << 13);
-	state ^= (state >> 17);
-	state ^= (state << 5);
-	return state;
-}
-// Generate a random float in the range [0.0f, 1.0f)
-float Random01(inout uint state)
-{
-	return asfloat(0x3f800000 | Random(state) >> 9) - 1.0;
-}
-// Generate a random float in the range [0.0f, 1.0f]
-float Random01inclusive(inout uint state)
-{
-	return Random(state) / float(0xffffffff);
-}
-// Generate a random integer in the range [lower, upper]
-uint Random(inout uint state, uint lower, uint upper)
-{
-	return lower + uint(float(upper - lower + 1) * Random01(state));
-}
-//////////////////////////////////////////////////// Random Utility
+//////////////////////////////////////////////////// A low-discrepancy sequence
 
 //////////////////////////////////////////////////// Sampling method
 float3 UniformSampleCone(float2 u, float cosThetaMax)
@@ -431,33 +477,40 @@ void rayGen()
 	float3 N = normalize(normal);
 	float3 P = position;
 	
-	uint seed = FrameIndexCB.FrameIndex % (launchIndex.x + (launchIndex.y * launchDimension.y));
-	RandomSeedInit(seed);
-	HaltonState hState;
-	uint useed = Random(seed, 0, 255); /*[0,255]*/
-	uint mIncrement = 23;
-	haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 145321, mIncrement);
-	float rnd1 = frac(haltonNext(hState, mIncrement));
-	float rnd2 = frac(haltonNext(hState, mIncrement));
+	//uint seed = (FrameIndexCB.FrameIndex +14129891) % (launchIndex.x + (launchIndex.y * launchDimension.y));
+	//RandomSeedInit(seed);
+	//HaltonState hState;
+	//uint useed = Random(seed, 0, 255); /*[0,255]*/
+	//uint mIncrement = 23;
+	//haltonInit(hState, launchIndex.x, launchIndex.y, useed, 255, FrameIndexCB.FrameIndex, 145321, mIncrement);
+	//float rnd1 = frac(haltonNext(hState, mIncrement));
+	//float rnd2 = frac(haltonNext(hState, mIncrement));
 	
-	float3 sampleDestRadius = 2.0f;
-	
+	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), FrameIndexCB.FrameIndex, 16);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+	float rnd1 = lowDiscrepSeq.x;
+	float rnd2 = lowDiscrepSeq.y;
+
 	// shadow and lighting
+	float3 sampleDestRadius = 1.0f;
 	RayDesc ray;
-	ray.TMin = 0.00f;
+	ray.TMin = 0.0f;
 	RayPayload shadowPayload;
 	uint i;
 	float3 Lo = 0;
 	for (i = 0; i < LightPropertiesCB.NumPointLights; ++i)
 	{
 		// area Point Light
+		float bias = 0.01f;
+		float3 P_biased = P + N * bias;
 		float3 dest = PointLights[i].PositionWS.xyz;
-		float3 distan = distance(P, dest);
-		float3 dir = (dest - P) / distan;
+		float3 distan = distance(P_biased, dest);
+		float3 dir = (dest - P_biased) / distan;
+		
 		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
 		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
 		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
-		ray.Origin = P;
+		ray.Origin = P_biased;
 		ray.Direction = distributedDir;
 		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
 		shadowPayload.hit = false;
@@ -467,25 +520,27 @@ void rayGen()
 			Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
 		}
 	}
-	for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
-	{
-		// area Point Light
-		float3 dest = SpotLights[i].PositionWS.xyz;
-		float3 distan = distance(P, dest);
-		float3 dir = (dest - P) / distan;
-		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
-		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
-		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
-		ray.Origin = P;
-		ray.Direction = distributedDir;
-		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
-		shadowPayload.hit = false;
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-		if (shadowPayload.hit == false)
-		{
-			Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
-		}
-	}
+	//for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
+	//{
+	//	// area Point Light
+	//	float bias = 0.01f;
+	//	float3 P_biased = P + N * bias;
+	//	float3 dest = SpotLights[i].PositionWS.xyz;
+	//	float3 distan = distance(P_biased, dest);
+	//	float3 dir = (dest - P_biased) / distan;
+	//	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+	//	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+	//	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+	//	ray.Origin = P_biased;
+	//	ray.Direction = distributedDir;
+	//	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+	//	shadowPayload.hit = false;
+	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+	//	if (shadowPayload.hit == false)
+	//	{
+	//		Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
+	//	}
+	//}
 	
 	float3 color = Lo;
 	gOutput[launchIndex.xy] = float4(color, 1);
