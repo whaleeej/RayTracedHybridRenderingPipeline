@@ -1,10 +1,9 @@
 RWTexture2D<float4> gOutput : register(u0);
 RaytracingAccelerationStructure gRtScene : register(t0);
 Texture2D<float4> GPosition : register(t1);
-Texture2D<float4> GAlbedo : register(t2);
-Texture2D<float4> GMetallic : register(t3);
-Texture2D<float4> GNormal : register(t4);
-Texture2D<float4> GRoughness : register(t5);
+Texture2D<float4> GAlbedoMetallic : register(t2);
+Texture2D<float4> GNormalRoughness : register(t3);
+Texture2D<float4> GExtra : register(t4);
 struct PointLight
 {
 	float4 PositionWS;
@@ -13,7 +12,7 @@ struct PointLight
 	float Attenuation;
 	float2 Padding; // Pad to 16 bytes
 }; // Total:                              16 * 3 = 48 bytes
-StructuredBuffer<PointLight> PointLights : register(t6);
+StructuredBuffer<PointLight> PointLights : register(t5);
 struct SpotLight
 {
 	float4 PositionWS;
@@ -24,7 +23,7 @@ struct SpotLight
 	float Attenuation;
 	float Padding;
 }; // Total:                              16 * 4 = 64 bytes
-StructuredBuffer<SpotLight> SpotLights : register(t7);
+StructuredBuffer<SpotLight> SpotLights : register(t6);
 struct Camera
 {
 	float4 PositionWS;
@@ -186,7 +185,7 @@ float3 DoPbrSpotLight(SpotLight light, float3 N, float3 V, float3 P, float3 albe
 }
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
-//////////////////////////////////////////////////// Random Utility1 from svgf paper
+//////////////////////////////////////////////////// Random Utility from svgf paper
 unsigned int initRand(unsigned int val0, unsigned int val1, unsigned int backoff = 16)
 {
 	unsigned int v0 = val0, v1 = val1, s0 = 0;
@@ -208,7 +207,7 @@ uint nextRandomRange(inout uint state, uint lower, uint upper) // [lower, upper]
 {
 	return lower + uint(float(upper - lower + 1) * nextRand(state));
 }
-//////////////////////////////////////////////////// Random Utility1
+//////////////////////////////////////////////////// Random Utility
 
 //////////////////////////////////////////////////// A low-discrepancy sequence: Hammersley Sequence
 // ref: https://learnopengl.com/PBR/IBL/Specular-IBL
@@ -249,9 +248,10 @@ float3 SampleTan2W(float3 H, float3 N)
 [shader("raygeneration")]
 void rayGen()
 {
-	//TraceRay(gRtScene,
+	// TraceRay(gRtScene,
 	//	RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*RayFlags*/, 0xFF /*InstanceInclusionMask*/,
-	//	0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/,
+	//	0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/, 
+	// ray, rayPayload)
 	
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDimension = DispatchRaysDimensions();
@@ -262,15 +262,17 @@ void rayGen()
 		return;
 	}
 	float3 position = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
-	float3 albedo = GAlbedo.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
-	float roughness = GRoughness.Load(int3(launchIndex.x, launchIndex.y, 0)).x;
-	float metallic = GMetallic.Load(int3(launchIndex.x, launchIndex.y, 0)).x;
-	float3 normal = GNormal.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
+	float3 albedo = GAlbedoMetallic.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
+	float roughness = GNormalRoughness.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
+	float metallic = GAlbedoMetallic.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
+	float3 normal = GNormalRoughness.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
+	float3 emissive = GExtra.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
+	float gid = GExtra.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
 	
 	// Lighting is performed in world space.
+	float3 P = position;
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
-	float3 P = position;
 	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), FrameIndexCB.FrameIndex, 16);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
@@ -287,7 +289,7 @@ void rayGen()
 	for (i = 0; i < LightPropertiesCB.NumPointLights; ++i)
 	{
 		// area Point Light
-		float bias = 0.01f;
+		float bias = 1e-2f;
 		float3 P_biased = P + N * bias;
 		float3 dest = PointLights[i].PositionWS.xyz;
 		float3 distan = distance(P_biased, dest);
@@ -303,7 +305,8 @@ void rayGen()
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
 		if (shadowPayload.hit == false)
 		{
-			Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
+			//Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
+			Lo += 1.0f;
 		}
 	}
 	//for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
@@ -335,7 +338,7 @@ void rayGen()
 [shader("miss")]
 void miss(inout RayPayload payload)
 {
-	//payload.hit = false;
+	payload.hit = false;
 }
 
 [shader("closesthit")]

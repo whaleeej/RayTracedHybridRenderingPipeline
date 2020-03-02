@@ -133,6 +133,7 @@ private:
 	class GameObject 
 	{
 	public:
+		float gid;
 		MeshIndex mesh;
 		Transform transform;
 		HybridMaterial material;
@@ -187,10 +188,10 @@ private:
 	int numSpotLights = 1;
 	std::vector<PointLight> m_PointLights;
 	std::vector<SpotLight> m_SpotLights;
+
+	// Camera controller
 	Camera m_Camera;
 	CameraData* m_pAlignedCameraData;
-
-    // Camera controller
     float m_Forward;
     float m_Backward;
     float m_Left;
@@ -207,7 +208,24 @@ private:
 
 	////////////////////////////////////////////////////////////////////// Raster  Object 
 	// Deferred Render target
-	RenderTarget m_DeferredRenderTarget;
+	RenderTarget m_GBuffer;
+	Texture gPosition; //srv
+	Texture gAlbedoMetallic; //srv
+	Texture gNormalRoughness; //srv
+	Texture gExtra; //srv
+	Texture col_acc; //uav
+	Texture moment_acc; //uav
+	Texture his_length; //uav
+
+	Texture gPosition_prev; //srv
+	Texture gAlbedoMetallic_prev; //srv
+	Texture gNormalRoughness_prev; //srv
+	Texture gExtra_prev; //srv
+	Texture col_acc_prev; //srv
+	Texture moment_acc_prev; //srv
+	Texture his_length_prev; //srv
+
+	XMMATRIX viewProjectMatrix_prev;
 
 	// Root signatures
 	RootSignature m_DeferredRootSignature;

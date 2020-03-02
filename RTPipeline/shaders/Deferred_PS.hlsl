@@ -8,10 +8,9 @@ struct PixelShaderInput
 struct PixelShaderOutput
 {
 	float4 GPosition : SV_Target0;
-	float4 GAlbedo : SV_Target1;
-	float4 GMetallic : SV_Target2;
-	float4 GNormal : SV_Target3;
-	float4 GRoughness : SV_Target4;
+	float4 GAlbedoMetallic : SV_Target1;
+	float4 GNormalRoughness : SV_Target2;
+	float4 GExtra : SV_Target3;
 };
 
 struct Material
@@ -30,9 +29,14 @@ struct PBRMaterial
 	float Roughness;
 	float2 Padding;
 };// Totoal: 4*2 +8 = 16 bytes
-
+struct ObjectIndex
+{
+	float index;
+	float3 padding;
+};
 ConstantBuffer<Material> MaterialCB : register( b0, space1 );
 ConstantBuffer<PBRMaterial> PBRMaterialCB : register(b1, space1);
+ConstantBuffer<ObjectIndex> GameObjectIndex : register(b2, space1);
 Texture2D AlbedoTexture            : register( t0 );
 Texture2D MetallicTexture           : register( t1 );
 Texture2D NormalTexture            : register( t2 );
@@ -68,11 +72,14 @@ PixelShaderOutput main(PixelShaderInput IN)
 	float metallic = PBRMaterialCB.Metallic;
 	float roughness = PBRMaterialCB.Roughness;
 	
-	pso.GPosition = IN.PositionWS;
-	pso.GAlbedo = AlbedoTexture.Sample(AnisotropicSampler, IN.TexCoord) * diffuse;
-	pso.GMetallic = MetallicTexture.Sample(AnisotropicSampler, IN.TexCoord) * metallic;
-	pso.GNormal = float4(getFromNormalMapping(NormalTexture.Sample(AnisotropicSampler, IN.TexCoord), IN), 1.0f);
-	pso.GRoughness = RoughnessTexture.Sample(AnisotropicSampler, IN.TexCoord) * roughness;
+	//xyz =POSITION w=Hit
+	pso.GPosition = IN.PositionWS; 
+	//xyz=Albedo w=metallic
+	pso.GAlbedoMetallic = float4(AlbedoTexture.Sample(AnisotropicSampler, IN.TexCoord).xyz * diffuse.xyz, MetallicTexture.Sample(AnisotropicSampler, IN.TexCoord).x * metallic);
+	//xyz=Normal w=roughness
+	pso.GNormalRoughness = float4(getFromNormalMapping(NormalTexture.Sample(AnisotropicSampler, IN.TexCoord), IN), RoughnessTexture.Sample(AnisotropicSampler, IN.TexCoord).x * roughness);
+	//xyz=Emissive w=gid
+	pso.GExtra = float4(MaterialCB.Emissive.xyz, GameObjectIndex.index);
 	
 	return pso;
 }

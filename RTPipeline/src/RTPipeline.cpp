@@ -39,6 +39,7 @@ enum RootParameters
     MatricesCB,         // ConstantBuffer<Mat> MatCB : register(b0);
     MaterialCB,         // ConstantBuffer<Material> MaterialCB : register( b0, space1 );
 	PBRMaterialCB,  // ConstantBuffer<PBRMaterial> PBRMaterialCB: register(b1, space1);
+	GameObjectIndex, //// ConstantBuffer<float> GameObjectIndex: register(b2, space1);
     Textures,            // Texture2D DiffuseTextures : register( t0-tN );
     NumRootParameters
 };
@@ -105,7 +106,8 @@ HybridPipeline::~HybridPipeline()
 bool HybridPipeline::LoadContent()
 {
 	auto device = Application::Get().GetDevice();
-	{ // Resource Loading
+	/////////////////////////////////// Resource Loading
+	{ 
 		auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 		auto commandList = commandQueue->GetCommandList();
 
@@ -157,63 +159,76 @@ bool HybridPipeline::LoadContent()
 		commandQueue->WaitForFenceValue(fenceValue);
 	}
 
-	{ ///////////////////////// GameObject Gen
-		gameObjectPool.emplace("sphere",std::make_shared<GameObject>());
+	/////////////////////////////////// GameObject Gen
+	{
+		float gid = 0.0f;
+
+		gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
+		gameObjectPool["sphere"]->gid = gid++;
 		gameObjectPool["sphere"]->mesh = "sphere";
 		gameObjectPool["sphere"]->material.base = Material::White;
-		gameObjectPool["sphere"]->material.pbr = PBRMaterial(0.0f, 1.0f);
+		gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
 		gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
 
 		gameObjectPool.emplace("cube", std::make_shared<GameObject>());
+		gameObjectPool["cube"]->gid = gid++;
 		gameObjectPool["cube"]->mesh = "cube";
 		gameObjectPool["cube"]->material.base = Material::White;
 		gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
 		gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
 
 		gameObjectPool.emplace("torus", std::make_shared<GameObject>());
+		gameObjectPool["torus"]->gid = gid++;
 		gameObjectPool["torus"]->mesh = "torus";
 		gameObjectPool["torus"]->material.base = Material::White;
 		gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
 		gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
 
 		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
+		gameObjectPool["Floor plane"]->gid = gid++;
 		gameObjectPool["Floor plane"]->mesh = "plane";
 		gameObjectPool["Floor plane"]->material.base = Material::Red;
 		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+		gameObjectPool["Back wall"]->gid = gid++;
 		gameObjectPool["Back wall"]->mesh = "plane";
 		gameObjectPool["Back wall"]->material.base = Material::Green;
 		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+		gameObjectPool["Ceiling plane"]->gid = gid++;
 		gameObjectPool["Ceiling plane"]->mesh = "plane";
 		gameObjectPool["Ceiling plane"]->material.base = Material::Blue;
 		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+		gameObjectPool["Front wall"]->gid = gid++;
 		gameObjectPool["Front wall"]->mesh = "plane";
 		gameObjectPool["Front wall"]->material.base = Material::Yellow;
 		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+		gameObjectPool["Left wall"]->gid = gid++;
 		gameObjectPool["Left wall"]->mesh = "plane";
 		gameObjectPool["Left wall"]->material.base = Material::Cyan;
 		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+		gameObjectPool["Right wall"]->gid = gid++;
 		gameObjectPool["Right wall"]->mesh = "plane";
 		gameObjectPool["Right wall"]->material.base = Material::Magenta;
 		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 	}
     
-	{ // Initial the transform
+	/////////////////////////////////// Initial the transform
+	{ 
 		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
 		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
 		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
@@ -254,15 +269,15 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 
-	{ ///////////////////////////// BackScreen RT Creation
-		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	/////////////////////////////////// BackScreen RT Creation and other intermediate textures
+	{
+		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
 
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
 
 		// Create an off-screen multi render target(MRT) and a depth buffer.
-		// AttachmentPoint::Color0
 		auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
 			1, 1,
@@ -275,21 +290,18 @@ bool HybridPipeline::LoadContent()
 		colorClearValue.Color[2] = 0.0f;
 		colorClearValue.Color[3] = 1.0f;
 
-		Texture gPosition = Texture(colorDesc, &colorClearValue,
+		gPosition = Texture(colorDesc, &colorClearValue,
 			TextureUsage::RenderTarget,
-			L"gPosition Texture");
-		Texture gAlbedo = Texture(colorDesc, &colorClearValue,
+			L"gPosition+HitTexture");
+		gAlbedoMetallic = Texture(colorDesc, &colorClearValue,
 			TextureUsage::RenderTarget,
-			L"gAlbedo Texture");
-		Texture gMetallic = Texture(colorDesc, &colorClearValue,
+			L"gAlbedoMetallic Texture");
+		gNormalRoughness = Texture(colorDesc, &colorClearValue,
 			TextureUsage::RenderTarget,
-			L"gMetallic Texture");
-		Texture gNormal = Texture(colorDesc, &colorClearValue,
+			L"gNormalRoughness Texture");
+		gExtra = Texture(colorDesc, &colorClearValue,
 			TextureUsage::RenderTarget,
-			L"gNormal Texture");
-		Texture gRoughness = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gRoughness Texture");
+			L"gExtra: ObjectId Texture");
 
 		// Create a depth buffer for the Deferred render target.
 		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
@@ -306,22 +318,47 @@ bool HybridPipeline::LoadContent()
 			L"Depth Render Target");
 
 		// Attach the HDR texture to the HDR render target.
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color0, gPosition);
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color1, gAlbedo);
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color2, gMetallic);
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color3, gNormal);
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::Color4, gRoughness);
-		m_DeferredRenderTarget.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
+		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
+
+		// uav creation
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
+		moment_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc");
+		his_length = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"his_length");
+
+		// srv creation
+		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_NONE);
+		gPosition_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gPosition_prev");
+		gAlbedoMetallic_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gAlbedoMetallic_prev");
+		gNormalRoughness_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gNormalRoughness_prev");
+		gExtra_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gExtra_prev");
+		col_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc_prev");
+		moment_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc_prev");
+		his_length_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"his_length_prev");
 	}
 
-	{ // RT Gen
+	/////////////////////////////////// RT Gen
+	{ 
 		createAccelerationStructures();
 		createRtPipelineState();
 		createShaderResourcesAndSrvUavheap();
 		createShaderTable();
 	}
 
-	{ /////////////////////////////////// Root Signature
+	/////////////////////////////////// Root Signature
+	{ 
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
@@ -352,6 +389,7 @@ bool HybridPipeline::LoadContent()
 			rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
 			rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[RootParameters::PBRMaterialCB].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[RootParameters::GameObjectIndex].InitAsConstants(1,2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[RootParameters::Textures].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
 			//CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
@@ -380,8 +418,8 @@ bool HybridPipeline::LoadContent()
 			deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 			deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 			deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			deferredPipelineStateStream.DSVFormat = m_DeferredRenderTarget.GetDepthStencilFormat();
-			deferredPipelineStateStream.RTVFormats = m_DeferredRenderTarget.GetRenderTargetFormats();
+			deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
+			deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
 			deferredPipelineStateStream.SampleDesc = sampleDesc;
 
 			D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
@@ -392,13 +430,16 @@ bool HybridPipeline::LoadContent()
 
 		// Create the PostProcessing Root Signature
 		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0) };
 
-			CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-			rootParameters[0].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(1, rootParameters);
+			rootSignatureDescription.Init_1_1(2, rootParameters);
 
 			m_PostProcessingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
@@ -453,7 +494,7 @@ void HybridPipeline::OnResize(ResizeEventArgs& e)
         m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
             static_cast<float>(m_Width), static_cast<float>(m_Height));
 
-		m_DeferredRenderTarget.Resize(m_Width, m_Height);
+		m_GBuffer.Resize(m_Width, m_Height);
     }
 }
 
@@ -487,8 +528,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		}
 	}
 
-	// update the structure buffer of Pointlight
-	{
+	{// update the structure buffer of frameId
 		FrameIndexCB fid;
 		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
 		void* pData;
@@ -498,8 +538,6 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 	}
 
 	{// camera
-
-		 // Update the camera.
 		float speedMultipler = (m_Shift ? 16.0f : 4.0f);
 
 		XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
@@ -620,22 +658,21 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
-	{// Rasterizing Pipe, deprecated
+	// Rasterizing Pipe, G-Buffer-Gen
+	{
 		{
 			FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), clearColor);
-			commandList->ClearTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), clearColor);
-			commandList->ClearDepthStencilTexture(m_DeferredRenderTarget.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
+			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
+			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
+			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
+			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
+			commandList->ClearDepthStencilTexture(m_GBuffer.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
 		}
-
 		// Deferred Pipeline
 		{
 			commandList->SetViewport(m_Viewport);
 			commandList->SetScissorRect(m_ScissorRect);
-			commandList->SetRenderTarget(m_DeferredRenderTarget);
+			commandList->SetRenderTarget(m_GBuffer);
 			commandList->SetPipelineState(m_DeferredPipelineState);
 			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
@@ -645,15 +682,15 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		}
 	}
 
-	{ // Let's raytrace
+	// Let's raytrace
+	{ 
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
 
 		commandList->TransitionBarrier(*mpOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color4), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		D3D12_DISPATCH_RAYS_DESC raytraceDesc = {};
 		raytraceDesc.Width = m_Viewport.Width;
 		raytraceDesc.Height = m_Viewport.Height;
@@ -682,16 +719,44 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->DispatchRays(&raytraceDesc);
 	}
 	
-	{ // Perform off-screen texture to RT post processing
+	// Perform off-screen texture to RT post processing
+	{ 
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
 		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
 		commandList->SetPipelineState(m_PostProcessingPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
-		commandList->SetShaderResourceView(0, 0, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		//commandList->SetShaderResourceView(0, 0, m_DeferredRenderTarget.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetGraphicsDynamicConstantBuffer(1, viewProjectMatrix_prev);
 		commandList->Draw(3);
+	}
+
+	// prev buffer cache
+	{
+		viewProjectMatrix_prev = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
+		commandList->CopyResource(gPosition_prev, gPosition);
+		commandList->CopyResource(gAlbedoMetallic_prev, gAlbedoMetallic);
+		commandList->CopyResource(gNormalRoughness_prev, gNormalRoughness);
+		commandList->CopyResource(gExtra_prev, gExtra);
+		commandList->CopyResource(col_acc_prev, col_acc);
+		commandList->CopyResource(moment_acc_prev, moment_acc);
+		commandList->CopyResource(his_length_prev, his_length);
 	}
 
     commandQueue->ExecuteCommandList(commandList);
@@ -1029,7 +1094,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,8,3,0).desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,7,3,0).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 2
@@ -1148,7 +1213,7 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 
 	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = 9;
+	desc.NumDescriptors = 8;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
@@ -1169,10 +1234,10 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	//GBuffer
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 4; i++) {
 		UINT pDestDescriptorRangeSizes[] = { 1 };
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &m_DeferredRenderTarget.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			1, &m_GBuffer.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
@@ -1242,6 +1307,7 @@ void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, 
 	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
 	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, material.base);
 	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, material.pbr);
+	commandList.SetGraphics32BitConstants(RootParameters::GameObjectIndex, gid);
 	commandList.SetShaderResourceView(RootParameters::Textures, 0, (texturePool.find(material.tex.AlbedoTexture)!=texturePool.end())?texturePool[material.tex.AlbedoTexture]: texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	commandList.SetShaderResourceView(RootParameters::Textures, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	commandList.SetShaderResourceView(RootParameters::Textures, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);

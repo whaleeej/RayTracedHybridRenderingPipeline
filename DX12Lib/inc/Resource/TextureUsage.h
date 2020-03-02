@@ -24,5 +24,6 @@ enum class TextureUsage
 	Normalmap,
 	RenderTarget,           // Texture is used as a render target.
 	MetallicMap,
-	RoughnessMap
+	RoughnessMap,
+	IntermediateBuffer
 };
