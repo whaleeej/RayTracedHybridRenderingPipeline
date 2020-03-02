@@ -333,6 +333,19 @@ bool HybridPipeline::LoadContent()
 		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
 		moment_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc");
 		his_length = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"his_length");
+		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
+		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
+		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
+		
+		
+		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
+		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS| D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		variance_inout[1] = Texture(uavRtDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
+		m_VarianceBuffer.AttachTexture(AttachmentPoint::Color0, variance_inout[1]);
 
 		// srv creation
 		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
@@ -428,7 +441,7 @@ bool HybridPipeline::LoadContent()
 			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
 		}
 
-		// Create the PostProcessing Root Signature
+		// Create the PostTempral_PS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
 				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
@@ -441,13 +454,13 @@ bool HybridPipeline::LoadContent()
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(2, rootParameters);
 
-			m_PostProcessingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+			m_PostTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 			// Create the PostProcessing PSO
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporal_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -462,17 +475,64 @@ bool HybridPipeline::LoadContent()
 				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 			} postProcessingPipelineStateStream;
 
-			postProcessingPipelineStateStream.pRootSignature = m_PostProcessingRootSignature.GetRootSignature().Get();
+			postProcessingPipelineStateStream.pRootSignature = m_PostTemporalRootSignature.GetRootSignature().Get();
 			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
 			postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postProcessingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+			postProcessingPipelineStateStream.RTVFormats = m_VarianceBuffer.GetRenderTargetFormats();
 
 			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
 				sizeof(PostProcessingPipelineStateStream), & postProcessingPipelineStateStream
 			};
-			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostProcessingPipelineState)));
+			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalPipelineState)));
+		}
+
+		// Create the PostATrous_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0) 
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstants(4,0,0, D3D12_SHADER_VISIBILITY_PIXEL);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostATrous_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostATrousPipelineStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postATrousPipelineStateStream;
+
+			postATrousPipelineStateStream.pRootSignature = m_PostATrousRootSignature.GetRootSignature().Get();
+			postATrousPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postATrousPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postATrousPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postATrousPipelineStateStream.Rasterizer = rasterizerDesc;
+			postATrousPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
+				sizeof(PostATrousPipelineStateStream), & postATrousPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostATrousPipelineState)));
 		}
 	}
 
@@ -658,27 +718,26 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
+	FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
 	// Rasterizing Pipe, G-Buffer-Gen
 	{
 		{
-			FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
 			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
 			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
 			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
 			commandList->ClearDepthStencilTexture(m_GBuffer.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
 		}
-		// Deferred Pipeline
-		{
-			commandList->SetViewport(m_Viewport);
-			commandList->SetScissorRect(m_ScissorRect);
-			commandList->SetRenderTarget(m_GBuffer);
-			commandList->SetPipelineState(m_DeferredPipelineState);
-			commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-			for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
-				it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
-			}
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_GBuffer);
+		commandList->SetPipelineState(m_DeferredPipelineState);
+		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
+
+		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+			it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
 		}
 	}
 
@@ -719,14 +778,18 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->DispatchRays(&raytraceDesc);
 	}
 	
-	// Perform off-screen texture to RT post processing
+	// Perform Temporal Accumulation and Variance Estimation
 	{ 
+		{
+			commandList->ClearTexture(m_VarianceBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
+		}
+
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-		commandList->SetPipelineState(m_PostProcessingPipelineState);
+		commandList->SetRenderTarget(m_VarianceBuffer);
+		commandList->SetPipelineState(m_PostTemporalPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostProcessingRootSignature);
+		commandList->SetGraphicsRootSignature(m_PostTemporalRootSignature);
 		uint32_t ppSrvUavOffset = 0;
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -746,6 +809,39 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetGraphicsDynamicConstantBuffer(1, viewProjectMatrix_prev);
 		commandList->Draw(3);
 	}
+	
+	// Perform ATrous Iteration
+	{
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_PostATrousPipelineState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_PostATrousRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		
+		// pingpang interation
+		for (uint32_t level = 1; level <= ATrous_Level_Max; level++) {
+			uint32_t pingPangSrvUavOffset = ppSrvUavOffset;
+			Texture color_in = (level==1)? col_acc : color_inout[level % 2];
+			Texture color_out = color_inout[(level + 1) % 2];
+			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
+			Texture variance_out = variance_inout[(level + 1) % 2];
+			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, variance_in, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			commandList->SetGraphics32BitConstants(1, level);
+			commandList->Draw(3);
+			if (level == ATrous_Level_Max) {
+				commandList->CopyResource(col_acc_prev, color_out);
+			}
+		}
+	}
 
 	// prev buffer cache
 	{
@@ -753,8 +849,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->CopyResource(gPosition_prev, gPosition);
 		commandList->CopyResource(gAlbedoMetallic_prev, gAlbedoMetallic);
 		commandList->CopyResource(gNormalRoughness_prev, gNormalRoughness);
-		commandList->CopyResource(gExtra_prev, gExtra);
-		commandList->CopyResource(col_acc_prev, col_acc);
+		commandList->CopyResource(gExtra_prev, gExtra);	
 		commandList->CopyResource(moment_acc_prev, moment_acc);
 		commandList->CopyResource(his_length_prev, his_length);
 	}

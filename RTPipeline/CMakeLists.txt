@@ -2,6 +2,7 @@ cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this fil
 
 set( HEADER_FILES
     inc/Camera.h
+    inc/GameObject.h
     inc/Light.h
     inc/Material.h
     inc/RTPipeline.h
@@ -18,13 +19,12 @@ set( SRC_FILES
 set( VERTEX_SHADER_FILES 
     shaders/Deferred_VS.hlsl
     shaders/PostProcessing_VS.hlsl
-    shaders/Skybox_VS.hlsl
 )
 
 set( PIXEL_SHADER_FILES
     shaders/Deferred_PS.hlsl
-    shaders/PostProcessing_PS.hlsl
-    shaders/Skybox_PS.hlsl
+    shaders/PostATrous_PS.hlsl
+    shaders/PostTemporal_PS.hlsl
 )
 
 set( RT_SHADER_FILES

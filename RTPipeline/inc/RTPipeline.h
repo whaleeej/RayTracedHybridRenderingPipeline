@@ -21,49 +21,16 @@ public:
 
     HybridPipeline(const std::wstring& name, int width, int height, bool vSync = false);
     virtual ~HybridPipeline();
-
-    /**
-     *  Load content required for the demo.
-     */
     virtual bool LoadContent() override;
-
-    /**
-     *  Unload demo specific content that was loaded in LoadContent.
-     */
     virtual void UnloadContent() override;
+
 protected:
-    /**
-     *  Update the game logic.
-     */
     virtual void OnUpdate(UpdateEventArgs& e) override;
-
-    /**
-     *  Render stuff.
-     */
     virtual void OnRender(RenderEventArgs& e) override;
-
-    /**
-     * Invoked by the registered window when a key is pressed
-     * while the window has focus.
-     */
     virtual void OnKeyPressed(KeyEventArgs& e) override;
-
-    /**
-     * Invoked when a key on the keyboard is released.
-     */
     virtual void OnKeyReleased(KeyEventArgs& e);
-
-    /**
-     * Invoked when the mouse is moved over the registered window.
-     */
     virtual void OnMouseMoved(MouseMotionEventArgs& e);
-
-    /**
-     * Invoked when the mouse wheel is scrolled while the registered window has focus.
-     */
     virtual void OnMouseWheel(MouseWheelEventArgs& e) override;
-
-
     virtual void OnResize(ResizeEventArgs& e) override; 
 
 private:
@@ -189,7 +156,7 @@ private:
 	std::vector<PointLight> m_PointLights;
 	std::vector<SpotLight> m_SpotLights;
 
-	// Camera controller
+	/////////////////////////////////////////////// Camera controller
 	Camera m_Camera;
 	CameraData* m_pAlignedCameraData;
     float m_Forward;
@@ -205,18 +172,19 @@ private:
     // Set to true if the Shift key is pressed.
     bool m_Shift;
 
-
-	////////////////////////////////////////////////////////////////////// Raster  Object 
-	// Deferred Render target
+	/////////////////////////////////////////////// Raster  Object 
+	// Deferred gbuffer gen
 	RenderTarget m_GBuffer;
 	Texture gPosition; //srv
 	Texture gAlbedoMetallic; //srv
 	Texture gNormalRoughness; //srv
 	Texture gExtra; //srv
+	
+	// Post Temporal
+	RenderTarget m_VarianceBuffer;  // = variance_inout[1];
 	Texture col_acc; //uav
 	Texture moment_acc; //uav
 	Texture his_length; //uav
-
 	Texture gPosition_prev; //srv
 	Texture gAlbedoMetallic_prev; //srv
 	Texture gNormalRoughness_prev; //srv
@@ -227,25 +195,31 @@ private:
 
 	XMMATRIX viewProjectMatrix_prev;
 
+	// PostATrous
+	Texture color_inout[2];
+	Texture variance_inout[2];
+
+	uint32_t ATrous_Level_Max = 3;
+
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
-	RootSignature m_PostProcessingRootSignature;
+	RootSignature m_PostTemporalRootSignature;
+	RootSignature m_PostATrousRootSignature;
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-	// HDR -> PostProcessing tone mapping PSO.
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostProcessingPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostATrousPipelineState;
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;
-
 	int m_Width;
 	int m_Height;
 
-	////////////////////////////////////////////////////////////////////// RT Object 
+	/////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
 	Microsoft::WRL::ComPtr < ID3D12Resource > mpTopLevelAS;
-	std::vector<Microsoft::WRL::ComPtr < ID3D12Resource >> mpBottomLevelASes;
+	std::vector<Microsoft::WRL::ComPtr < ID3D12Resource>> mpBottomLevelASes;
 	uint64_t mTlasSize = 0;
 
 	void createRtPipelineState();
