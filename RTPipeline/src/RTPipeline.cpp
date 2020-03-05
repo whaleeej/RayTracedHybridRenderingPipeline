@@ -641,11 +641,11 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		}
 
 		// Setup the light buffers.
-		const float radius = 8.0f;
+		const float radius = 6.0f;
 		PointLight& l = m_PointLight;
 		l.PositionWS = {
 			static_cast<float>(std::sin(lightAnimTime )) * radius,
-			9.0f,
+			15.0f,
 			static_cast<float>(std::cos(lightAnimTime)) * radius,
 			1.0f
 		};
