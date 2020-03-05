@@ -225,6 +225,15 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["Right wall"]->material.base = Material::Magenta;
 		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+
+		// light object
+		lightObjectIndex = "sphere light";
+		gameObjectPool.emplace(lightObjectIndex, std::make_shared<GameObject>());//7
+		gameObjectPool[lightObjectIndex]->gid = gid++;
+		gameObjectPool[lightObjectIndex]->mesh = "sphere";
+		gameObjectPool[lightObjectIndex]->material.base = Material::EmissiveWhite;
+		gameObjectPool[lightObjectIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool[lightObjectIndex]->material.tex = TextureMaterial("default");
 	}
     
 	/////////////////////////////////// Initial the transform
@@ -625,89 +634,41 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
    
 	{ // light
 		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-
-		static const XMVECTORF32 LightColors[] =
-		{
-			Colors::White, Colors::White, Colors::Red, Colors::Green, Colors::Blue, Colors::Indigo, Colors::Violet, Colors::Orange
-		};
-
 		static float lightAnimTime = 0.0f;
 		if (m_AnimateLights)
 		{
 			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
 		}
 
-		const float radius = 8.0f;
-		const float offset = 2.0f * XM_PI / numPointLights;
-		const float offset2 = offset + (offset / 2.0f);
-
 		// Setup the light buffers.
-		m_PointLights.resize(numPointLights);
-		for (int i = 0; i < numPointLights; ++i)
+		const float radius = 8.0f;
+		PointLight& l = m_PointLight;
+		l.PositionWS = {
+			static_cast<float>(std::sin(lightAnimTime )) * radius,
+			9.0f,
+			static_cast<float>(std::cos(lightAnimTime)) * radius,
+			1.0f
+		};
+		l.Color = XMFLOAT4(Colors::White);
+		l.Intensity = 1.0f;
+		l.Attenuation = 0.01f;
+		l.Radius = 1.0f;
+
+		// Update the pointlight gameobject
 		{
-			PointLight& l = m_PointLights[i];
-
-			l.PositionWS = {
-				static_cast<float>(std::sin(lightAnimTime + offset * i)) * radius,
-				9.0f,
-				static_cast<float>(std::cos(lightAnimTime + offset * i)) * radius,
-				1.0f
-			};
-			XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
-			l.Color = XMFLOAT4(LightColors[i]);
-			l.Intensity = 1.0f;
-			l.Attenuation = 0.01f;
+			gameObjectPool[lightObjectIndex]->Translate(XMMatrixTranslation(l.PositionWS.x, l.PositionWS.y, l.PositionWS.z));
+			gameObjectPool[lightObjectIndex]->Scale(XMMatrixScaling(l.Radius, l.Radius, l.Radius));
 		}
 
-		m_SpotLights.resize(numSpotLights);
-		for (int i = 0; i < numSpotLights; ++i)
-		{
-			SpotLight& l = m_SpotLights[i];
-
-			l.PositionWS = {
-				static_cast<float>(std::sin(lightAnimTime + offset * i + offset2)) * radius,
-				9.0f,
-				static_cast<float>(std::cos(lightAnimTime + offset * i + offset2)) * radius,
-				1.0f
-			};
-			XMVECTOR positionWS = XMLoadFloat4(&l.PositionWS);
-
-			XMVECTOR directionWS = XMVector3Normalize(XMVectorSetW(XMVectorNegate(positionWS), 0));
-			XMStoreFloat4(&l.DirectionWS, directionWS);
-
-			l.Color = XMFLOAT4(LightColors[numPointLights + i]);
-			l.Intensity = 1.0f;
-			l.SpotAngle = XMConvertToRadians(45.0f);
-			l.Attenuation = 0.01f;
+		// update the light for rt
+		{ 
+			void* pData;
+			mpRTPointLightCB->Map(0, nullptr, (void**)& pData);
+			memcpy(pData, &(m_PointLight), sizeof(PointLight));
+			mpRTPointLightCB->Unmap(0, nullptr);
 		}
 
-		{ // update the light for rt
-			// update the mpRTLightPropertiesCB
-			{
-				LightPropertiesCB mLightPropertiesCB;
-				mLightPropertiesCB.NumPointLights = numPointLights;
-				mLightPropertiesCB.NumSpotLights = numSpotLights;
-				void* pData;
-				mpRTLightPropertiesCB->Map(0, nullptr, (void**)& pData);
-				memcpy(pData, &mLightPropertiesCB, sizeof(LightPropertiesCB));
-				mpRTLightPropertiesCB->Unmap(0, nullptr);
-			}
-
-			// update the structure buffer of Pointlight
-			{
-				void* pData;
-				mpRTPointLightSB->Map(0, nullptr, (void**)& pData);
-				memcpy(pData, &(m_PointLights[0]), sizeof(PointLight) * numPointLights);
-				mpRTPointLightSB->Unmap(0, nullptr);
-			}
-			// update the structure buffer of spotlight
-			{
-				void* pData;
-				mpRTSpotLightSB->Map(0, nullptr, (void**)& pData);
-				memcpy(pData, &(m_SpotLights[0]), sizeof(SpotLight) * numSpotLights);
-				mpRTSpotLightSB->Unmap(0, nullptr);
-			}
-		}
+		
 	}
 }
 
@@ -1100,12 +1061,21 @@ void HybridPipeline::createAccelerationStructures()
 
 	AccelerationStructureBuffers topLevelBuffers; //构建GameObject
 	{ // topLevelBuffers
+		uint32_t nonLightCount = 0;
+		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		{
+			std::string objIndex = it->first;
+			if (objIndex.find("light") != std::string::npos) {
+				continue;
+			}
+			nonLightCount++;
+		}
 		int gameObjectCount = gameObjectPool.size();
 		// First, get the size of the TLAS buffers and create them
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-		inputs.NumDescs = gameObjectCount;
+		inputs.NumDescs = nonLightCount;
 		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
@@ -1122,15 +1092,23 @@ void HybridPipeline::createAccelerationStructures()
 		asBuffer.SetName(L"TopLevelAS");
 		ResourceStateTracker::AddGlobalResourceState(mpTopLevelAS.Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 
+		
+
 		// The instance desc should be inside a buffer, create and map the buffer
-		topLevelBuffers.pInstanceDesc = createBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * gameObjectCount, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		topLevelBuffers.pInstanceDesc = createBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * nonLightCount, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
 		topLevelBuffers.pInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
-		ZeroMemory(pInstanceDesc, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * gameObjectCount);
+		ZeroMemory(pInstanceDesc, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * nonLightCount);
 
 		int tlasGoCount=0;
 		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
 		{
+			// 特殊处理剔除光源不加入光追
+			std::string objIndex = it->first;
+			if (objIndex.find("light")!=std::string::npos) {
+				continue;
+			}
+
 			// Initialize the instance desc. We only have a single instance
 			pInstanceDesc[tlasGoCount].InstanceID = tlasGoCount;                            // This value will be exposed to the shader via InstanceID()
 			pInstanceDesc[tlasGoCount].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
@@ -1189,7 +1167,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,7,3,0).desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,3,0).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 2
@@ -1296,19 +1274,16 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 
 	//****************************SRV Resource
 	//gRtScene / GPosition / GAlbedo / GMetallic / GNormal / GRoughness
-	//PointLights // SpotLight
-	mpRTPointLightSB = createBuffer(pDevice, numPointLights * sizeof(PointLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-	mpRTSpotLightSB = createBuffer(pDevice, numSpotLights * sizeof(SpotLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-
+	
 	//****************************CBV Resource
 	//create the constant buffer resource for cameraCB
+	mpRTPointLightCB = createBuffer(pDevice, sizeof(PointLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 	mpRTCameraCB = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
-	mpRTLightPropertiesCB = createBuffer(pDevice, sizeof(LightPropertiesCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 	mpFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 
 	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = 8;
+	desc.NumDescriptors = 6;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
@@ -1335,26 +1310,6 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 			1, &m_GBuffer.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvPointLight = {};
-	srvPointLight.Format = DXGI_FORMAT_UNKNOWN;
-	srvPointLight.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;	
-	srvPointLight.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvPointLight.Buffer.FirstElement = 0;
-	srvPointLight.Buffer.NumElements = numPointLights;
-	srvPointLight.Buffer.StructureByteStride = sizeof(PointLight);
-	pDevice->CreateShaderResourceView(mpRTPointLightSB.Get(), &srvPointLight, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvSpotLight = {};
-	srvSpotLight.Format = DXGI_FORMAT_UNKNOWN;
-	srvSpotLight.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	srvSpotLight.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvSpotLight.Buffer.FirstElement = 0;
-	srvSpotLight.Buffer.NumElements = numSpotLights;
-	srvSpotLight.Buffer.StructureByteStride = sizeof(SpotLight);
-	pDevice->CreateShaderResourceView(mpRTSpotLightSB.Get(), &srvSpotLight, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 void HybridPipeline::createShaderTable()
@@ -1363,7 +1318,7 @@ void HybridPipeline::createShaderTable()
 
 	// Calculate the size and create the buffer
 	mShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	mShaderTableEntrySize += 24; // The ray-gen's descriptor table
+	mShaderTableEntrySize += 32; // The ray-gen's descriptor table
 	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
 	uint32_t shaderTableSize = mShaderTableEntrySize * 3;
 
@@ -1383,9 +1338,10 @@ void HybridPipeline::createShaderTable()
 	memcpy(pData, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 	uint64_t heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 	*(uint64_t*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTCameraCB->GetGPUVirtualAddress();
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 +8) = mpRTLightPropertiesCB->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTPointLightCB->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 +8) = mpRTCameraCB->GetGPUVirtualAddress();
 	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 + 8 + 8) = mpFrameIndexCB->GetGPUVirtualAddress();
+	
 	// Entry 1 - miss program
 	memcpy(pData + mShaderTableEntrySize, pRtsoProps->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 

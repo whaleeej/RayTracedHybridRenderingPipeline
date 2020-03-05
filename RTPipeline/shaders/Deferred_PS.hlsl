@@ -15,12 +15,12 @@ struct PixelShaderOutput
 
 struct Material
 {
-	float4 Emissive; //----------------------------------- (16 byte boundary)
-	float4 Ambient; //----------------------------------- (16 byte boundary)
-	float4 Diffuse; //----------------------------------- (16 byte boundary)
-	float4 Specular; //----------------------------------- (16 byte boundary)
+	float4 Emissive;
+	float4 Ambient;
+	float4 Diffuse;
+	float4 Specular;
     float   SpecularPower;
-	float3 Padding; //----------------------------------- (16 byte boundary)
+	float3 Padding;
 }; // Total:                              16 * 5 = 80 bytes
 
 struct PBRMaterial
@@ -73,13 +73,19 @@ PixelShaderOutput main(PixelShaderInput IN)
 	float roughness = PBRMaterialCB.Roughness;
 	
 	//xyz =POSITION w=Hit
-	pso.GPosition = IN.PositionWS; 
+	pso.GPosition = IN.PositionWS;
 	//xyz=Albedo w=metallic
 	pso.GAlbedoMetallic = float4(AlbedoTexture.Sample(AnisotropicSampler, IN.TexCoord).xyz * diffuse.xyz, MetallicTexture.Sample(AnisotropicSampler, IN.TexCoord).x * metallic);
 	//xyz=Normal w=roughness
 	pso.GNormalRoughness = float4(getFromNormalMapping(NormalTexture.Sample(AnisotropicSampler, IN.TexCoord), IN), RoughnessTexture.Sample(AnisotropicSampler, IN.TexCoord).x * roughness);
 	//xyz=Emissive w=gid
 	pso.GExtra = float4(MaterialCB.Emissive.xyz, GameObjectIndex.index);
+	
+	// handle emmisive material->light sphere
+	if (emissive.x != 0.0 || emissive.y != 0.0 || emissive.z != 0.0)
+	{
+		pso.GPosition.w = 0.0;
+	}
 	
 	return pso;
 }

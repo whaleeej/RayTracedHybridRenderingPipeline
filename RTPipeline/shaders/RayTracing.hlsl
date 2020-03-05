@@ -10,20 +10,10 @@ struct PointLight
 	float4 Color;
 	float Intensity;
 	float Attenuation;
-	float2 Padding; // Pad to 16 bytes
+	float radius;
+	float Padding; 
 }; // Total:                              16 * 3 = 48 bytes
-StructuredBuffer<PointLight> PointLights : register(t5);
-struct SpotLight
-{
-	float4 PositionWS;
-	float4 DirectionWS;
-	float4 Color;
-	float Intensity;
-	float SpotAngle;
-	float Attenuation;
-	float Padding;
-}; // Total:                              16 * 4 = 64 bytes
-StructuredBuffer<SpotLight> SpotLights : register(t6);
+ConstantBuffer<PointLight> pointLight : register(b0);
 struct Camera
 {
 	float4 PositionWS;
@@ -31,20 +21,14 @@ struct Camera
 	float fov;
 	float3 padding;
 }; // Total:                              16 * 6 = 96 bytes
-ConstantBuffer<Camera> CameraCB : register(b0);
-struct LightProperties
-{
-	uint NumPointLights;
-	uint NumSpotLights;
-	float2 Padding;
-}; // Total:                              16 * 1 = 16 bytes
-ConstantBuffer<LightProperties>LightPropertiesCB : register(b1);
+ConstantBuffer<Camera> CameraCB : register(b1);
 struct FrameIndex
 {
 	uint FrameIndex;
 	float3 Padding;
 }; // Total:                              16 * 1 = 16 bytes
 ConstantBuffer<FrameIndex> FrameIndexCB : register(b2);
+
 struct RayPayload
 {
 	bool hit;
@@ -141,51 +125,9 @@ float3 DoPbrPointLight(PointLight light, float3 N, float3 V, float3 P, float3 al
 	//return ( specular) * radiance * NdotL;
 	//return radiance * NdotL;
 }
-float3 DoPbrSpotLight(SpotLight light, float3 N, float3 V, float3 P, float3 albedo, float roughness, float metallic)
-{
-	const float PI = 3.14159265359;
-	float3 F0 = float3(0.04, 0.04, 0.04);
-	F0 = lerp(F0, albedo, metallic);
-	
-	float3 L = normalize(light.PositionWS.xyz - P);
-	float3 H = normalize(V + L);
-	float distance = length(light.PositionWS.xyz - P);
-	float spotIntensity = DoSpotCone(light.DirectionWS.xyz, L, light.SpotAngle);
-	float attenuation = DoAttenuation(light.Attenuation, distance);
-	float3 radiance = light.Color.xyz * attenuation * spotIntensity;
-
-    // Cook-Torrance BRDF
-	float NDF = DistributionGGX(N, H, roughness);
-	float G = GeometrySmith(N, V, L, roughness);
-	float3 F = fresnelSchlick(clamp(dot(N, V), 0.0, 1.0), F0);
-           
-	float3 nominator = NDF * G * F;
-	float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
-	float3 specular = nominator / max(denominator, 0.001); // prevent divide by zero for NdotV=0.0 or NdotL=0.0
-        
-     // kS is equal to Fresnel
-	float3 kS = F;
-    // for energy conservation, the diffuse and specular light can't
-    // be above 1.0 (unless the surface emits light); to preserve this
-    // relationship the diffuse component (kD) should equal 1.0 - kS.
-	float3 kD = float3(1.0,1.0,1.0) - kS;
-    // multiply kD by the inverse metalness such that only non-metals 
-    // have diffuse lighting, or a linear blend if partly metal (pure metals
-    // have no diffuse light).
-	kD *= 1.0 - metallic;
-
-    // scale light by NdotL
-	float NdotL = max(dot(N, L), 0.0);
-
-    // add to outgoing radiance Lo
-	return (kD * albedo / PI + specular) * radiance * NdotL;
-	//return (kD * albedo / PI ) * radiance * NdotL;
-	//return (specular) * radiance * NdotL;
-	//return radiance * NdotL;
-}
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
-//////////////////////////////////////////////////// Random Utility from svgf paper
+//////////////////////////////////////////////////// Random from svgf paper
 unsigned int initRand(unsigned int val0, unsigned int val1, unsigned int backoff = 16)
 {
 	unsigned int v0 = val0, v1 = val1, s0 = 0;
@@ -207,7 +149,7 @@ uint nextRandomRange(inout uint state, uint lower, uint upper) // [lower, upper]
 {
 	return lower + uint(float(upper - lower + 1) * nextRand(state));
 }
-//////////////////////////////////////////////////// Random Utility
+//////////////////////////////////////////////////// Random
 
 //////////////////////////////////////////////////// A low-discrepancy sequence: Hammersley Sequence
 // ref: https://learnopengl.com/PBR/IBL/Specular-IBL
@@ -279,58 +221,37 @@ void rayGen()
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
 
-	// shadow and lighting
-	float3 sampleDestRadius = 1.0f;
+	//// shadow and lighting
 	RayDesc ray;
 	ray.TMin = 0.0f;
 	RayPayload shadowPayload;
-	uint i;
 	float3 Lo = 0;
-	for (i = 0; i < LightPropertiesCB.NumPointLights; ++i)
+
+	//// area Point Light
+	// low discrep sampling
+	float bias = 1e-2f;
+	float3 P_biased = P + N * bias;
+	float3 dest = pointLight.PositionWS.xyz;
+	float3 distan = distance(P_biased, dest);
+	float3 dir = (dest - P_biased) / distan;
+	float3 sampleDestRadius = pointLight.radius;
+	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+	// ray setup
+	ray.Origin = P_biased;
+	ray.Direction = distributedDir;
+	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+	shadowPayload.hit = false;
+	// ray tracing
+	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+	if (shadowPayload.hit == false)
 	{
-		// area Point Light
-		float bias = 1e-2f;
-		float3 P_biased = P + N * bias;
-		float3 dest = PointLights[i].PositionWS.xyz;
-		float3 distan = distance(P_biased, dest);
-		float3 dir = (dest - P_biased) / distan;
-		
-		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
-		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
-		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
-		ray.Origin = P_biased;
-		ray.Direction = distributedDir;
-		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
-		shadowPayload.hit = false;
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-		if (shadowPayload.hit == false)
-		{
-			//Lo += DoPbrPointLight(PointLights[i], N, V, P, albedo, roughness, metallic);
-			Lo += 1.0f;
-		}
+		Lo += 1.0f;
+		//Lo += DoPbrPointLight(PointLight, N, V, P, albedo, roughness, metallic);
 	}
-	//for (i = 0; i < LightPropertiesCB.NumSpotLights; ++i)
-	//{
-	//	// area Point Light
-	//	float bias = 0.01f;
-	//	float3 P_biased = P + N * bias;
-	//	float3 dest = SpotLights[i].PositionWS.xyz;
-	//	float3 distan = distance(P_biased, dest);
-	//	float3 dir = (dest - P_biased) / distan;
-	//	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
-	//	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
-	//	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
-	//	ray.Origin = P_biased;
-	//	ray.Direction = distributedDir;
-	//	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
-	//	shadowPayload.hit = false;
-	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
-	//	if (shadowPayload.hit == false)
-	//	{
-	//		Lo += DoPbrSpotLight(SpotLights[i], N, V, P, albedo, roughness, metallic);
-	//	}
-	//}
-	
+
+	// output
 	float3 color = Lo;
 	gOutput[launchIndex.xy] = float4(color, 1);
 }

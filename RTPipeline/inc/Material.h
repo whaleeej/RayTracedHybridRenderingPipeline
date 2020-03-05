@@ -94,4 +94,5 @@ struct Material
     static const Material RedRubber;
     static const Material WhiteRubber;
     static const Material YellowRubber;
+	static const Material EmissiveWhite;
 };

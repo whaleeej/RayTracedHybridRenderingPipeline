@@ -286,3 +286,12 @@ const Material Material::YellowRubber =
     { 0.7f, 0.7f, 0.04f, 1.0f },
     10.0f
 };
+
+const Material Material::EmissiveWhite =
+{
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.1f, 0.1f, 0.1f, 1.0f },
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	128.0f
+};

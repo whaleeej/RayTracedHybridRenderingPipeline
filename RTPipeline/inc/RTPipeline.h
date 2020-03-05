@@ -120,13 +120,6 @@ private:
 		}
 		void Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool);
 	};
-	// Light
-	struct LightPropertiesCB
-	{
-		uint32_t NumPointLights;
-		uint32_t NumSpotLights;
-		float padding[2];
-	};
 	//Camera
 	struct CameraRTCB
 	{
@@ -151,10 +144,8 @@ private:
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
 	std::map<TextureIndex, Texture> texturePool;
 	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
-	int numPointLights = 1;
-	int numSpotLights = 1;
-	std::vector<PointLight> m_PointLights;
-	std::vector<SpotLight> m_SpotLights;
+	PointLight m_PointLight;
+	GameObjectIndex lightObjectIndex;
 
 	/////////////////////////////////////////////// Camera controller
 	Camera m_Camera;
@@ -230,9 +221,7 @@ private:
 	void createShaderResourcesAndSrvUavheap();
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
 	std::shared_ptr< Texture > mpOutputTexture;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightSB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTSpotLightSB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTLightPropertiesCB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpFrameIndexCB;
 

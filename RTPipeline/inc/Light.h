@@ -40,6 +40,7 @@ struct PointLight
         , Color( 1.0f, 1.0f, 1.0f, 1.0f )
         , Intensity( 1.0f )
         , Attenuation( 0.0f )
+		, Radius(1.0f)
     {}
 
     DirectX::XMFLOAT4    PositionWS; // Light position in world space.
@@ -48,7 +49,8 @@ struct PointLight
     //----------------------------------- (16 byte boundary)
     float       Intensity;
     float       Attenuation;
-    float       Padding[2];             // Pad to 16 bytes.
+	float		  Radius;
+    float       Padding[1];             // Pad to 16 bytes.
     //----------------------------------- (16 byte boundary)
     // Total:                              16 * 3 = 64 bytes
 };
