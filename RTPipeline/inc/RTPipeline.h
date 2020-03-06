@@ -34,6 +34,9 @@ protected:
     virtual void OnResize(ResizeEventArgs& e) override; 
 
 private:
+	void updateBuffer();
+
+private:
 	// Transform
 	struct MatCB
 	{
@@ -196,11 +199,13 @@ private:
 	RootSignature m_DeferredRootSignature;
 	RootSignature m_PostTemporalRootSignature;
 	RootSignature m_PostATrousRootSignature;
+	RootSignature m_PostLightingRootSignature;
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalPipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostATrousPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;

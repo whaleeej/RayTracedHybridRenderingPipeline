@@ -25,6 +25,7 @@ set( PIXEL_SHADER_FILES
     shaders/Deferred_PS.hlsl
     shaders/PostATrous_PS.hlsl
     shaders/PostTemporal_PS.hlsl
+    shaders/PostLighting_PS.hlsl
 )
 
 set( RT_SHADER_FILES

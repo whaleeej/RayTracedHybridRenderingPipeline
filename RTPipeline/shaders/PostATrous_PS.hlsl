@@ -146,5 +146,5 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	ATrousFilter(texCoord.x, texCoord.y, float2(resx, resy), LevelLastCB.level, sigma_c, sigma_n, sigma_x, varGauss_blur);
-	return float4(color_out.Load(int3(texCoord, 0)).xxx, 1.0f);
+	return float4(0,0,0, 1.0f);
 }

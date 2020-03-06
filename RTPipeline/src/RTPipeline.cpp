@@ -44,9 +44,10 @@ enum RootParameters
     NumRootParameters
 };
 
-// Builds a look-at (world) matrix from a point, up and direction vectors.
-
 static bool g_AllowFullscreenToggle = true;
+static uint64_t frameCount = 0;
+static uint64_t totalFrameCount = 0;
+static double totalTime = 0.0;
 
 XMMATRIX XM_CALLCONV LookAtMatrix(FXMVECTOR Position, FXMVECTOR Direction, FXMVECTOR Up)
 {
@@ -543,8 +544,55 @@ bool HybridPipeline::LoadContent()
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostATrousPipelineState)));
 		}
-	}
 
+		// Create the PostLighting_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(3, rootParameters);
+
+			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostLightingStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postLightingPipelineStateStream;
+
+			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
+			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
+			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
+				sizeof(postLightingPipelineStateStream), & postLightingPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
+		}
+	}
 	return true;
 }
 
@@ -573,13 +621,10 @@ void HybridPipeline::UnloadContent()
 
 void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 {
-    static uint64_t frameCount = 0;
-	static uint64_t totalFrameCount = 0;
-    static double totalTime = 0.0;
-
     super::OnUpdate(e);
 
-	{// frametime
+	// frametime
+	{
 		totalTime += e.ElapsedTime;
 		frameCount++;
 		totalFrameCount++;
@@ -597,16 +642,8 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		}
 	}
 
-	{// update the structure buffer of frameId
-		FrameIndexCB fid;
-		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
-		void* pData;
-		mpFrameIndexCB->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &fid, sizeof(FrameIndexCB));
-		mpFrameIndexCB->Unmap(0, nullptr);
-	}
-
-	{// camera
+	// camera
+	{
 		float speedMultipler = (m_Shift ? 16.0f : 4.0f);
 
 		XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
@@ -618,21 +655,10 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		m_Camera.set_Rotation(cameraRotation);
 
 		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-
-		// update the camera for rt
-		{
-			CameraRTCB mCameraCB;
-			mCameraCB.PositionWS = m_Camera.get_Translation();
-			mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-			mCameraCB.fov = m_Camera.get_FoV();
-			void* pData;
-			mpRTCameraCB->Map(0, nullptr, (void**)& pData);
-			memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
-			mpRTCameraCB->Unmap(0, nullptr);
-		}
 	}
-   
-	{ // light
+
+	// light
+	{ 
 		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 		static float lightAnimTime = 0.0f;
 		if (m_AnimateLights)
@@ -640,17 +666,17 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
 		}
 
-		// Setup the light buffers.
+		// Setup the lights.
 		const float radius = 6.0f;
 		PointLight& l = m_PointLight;
 		l.PositionWS = {
 			static_cast<float>(std::sin(lightAnimTime )) * radius,
-			15.0f,
+			9,
 			static_cast<float>(std::cos(lightAnimTime)) * radius,
 			1.0f
 		};
 		l.Color = XMFLOAT4(Colors::White);
-		l.Intensity = 1.0f;
+		l.Intensity = 2.0f;
 		l.Attenuation = 0.01f;
 		l.Radius = 1.0f;
 
@@ -659,17 +685,10 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			gameObjectPool[lightObjectIndex]->Translate(XMMatrixTranslation(l.PositionWS.x, l.PositionWS.y, l.PositionWS.z));
 			gameObjectPool[lightObjectIndex]->Scale(XMMatrixScaling(l.Radius, l.Radius, l.Radius));
 		}
-
-		// update the light for rt
-		{ 
-			void* pData;
-			mpRTPointLightCB->Map(0, nullptr, (void**)& pData);
-			memcpy(pData, &(m_PointLight), sizeof(PointLight));
-			mpRTPointLightCB->Unmap(0, nullptr);
-		}
-
-		
 	}
+
+	// update buffer for gpu
+	updateBuffer();
 }
 
 void HybridPipeline::OnRender(RenderEventArgs& e)
@@ -771,6 +790,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->Draw(3);
 	}
 	
+	Texture color_out_final;
 	// Perform ATrous Iteration
 	{
 		commandList->SetViewport(m_Viewport);
@@ -790,6 +810,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			uint32_t pingPangSrvUavOffset = ppSrvUavOffset;
 			Texture color_in = (level==1)? col_acc : color_inout[level % 2];
 			Texture color_out = color_inout[(level + 1) % 2];
+			color_out_final = color_out;
 			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
 			Texture variance_out = variance_inout[(level + 1) % 2];
 			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -798,14 +819,34 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			commandList->SetGraphics32BitConstants(1, level);
 			commandList->Draw(3);
-			if (level == ATrous_Level_Max) {
-				commandList->CopyResource(col_acc_prev, color_out);
-			}
 		}
+	}
+
+	{
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_PostLightingPipelineState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_PostLightingRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, color_out_final, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		CameraRTCB mCameraCB;
+		mCameraCB.PositionWS = m_Camera.get_Translation();
+		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+		mCameraCB.fov = m_Camera.get_FoV();
+		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
+		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
+		commandList->Draw(3);
 	}
 
 	// prev buffer cache
 	{
+		commandList->CopyResource(col_acc_prev, color_out_final);
 		viewProjectMatrix_prev = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
 		commandList->CopyResource(gPosition_prev, gPosition);
 		commandList->CopyResource(gAlbedoMetallic_prev, gAlbedoMetallic);
@@ -1281,6 +1322,7 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 	mpRTCameraCB = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
 	mpFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 
+	//****************************Descriptor heap
 	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = 6;
@@ -1351,6 +1393,40 @@ void HybridPipeline::createShaderTable()
 
 	// Unmap
 	mpShaderTable->Unmap(0, nullptr);
+}
+
+////////////////////////////////////////////////////////////////////// internal update
+void HybridPipeline::updateBuffer()
+{
+	// update the structure buffer of frameId
+	{
+		FrameIndexCB fid;
+		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
+		void* pData;
+		mpFrameIndexCB->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &fid, sizeof(FrameIndexCB));
+		mpFrameIndexCB->Unmap(0, nullptr);
+	}
+
+	// update the camera for rt
+	{
+		CameraRTCB mCameraCB;
+		mCameraCB.PositionWS = m_Camera.get_Translation();
+		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+		mCameraCB.fov = m_Camera.get_FoV();
+		void* pData;
+		mpRTCameraCB->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
+		mpRTCameraCB->Unmap(0, nullptr);
+	}
+
+	// update the light for rt
+	{
+		void* pData;
+		mpRTPointLightCB->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &(m_PointLight), sizeof(PointLight));
+		mpRTPointLightCB->Unmap(0, nullptr);
+	}
 }
 
 void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
