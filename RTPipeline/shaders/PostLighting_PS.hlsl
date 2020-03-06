@@ -3,7 +3,6 @@ Texture2D<float4> GAlbedoMetallic : register(t1);
 Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSample : register(t4);
-
 struct PointLight
 {
 	float4 PositionWS;
