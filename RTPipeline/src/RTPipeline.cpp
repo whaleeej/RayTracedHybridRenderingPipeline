@@ -376,7 +376,9 @@ bool HybridPipeline::LoadContent()
 	{ 
 		createAccelerationStructures();
 		createRtPipelineState();
-		createShaderResourcesAndSrvUavheap();
+		createShaderResources();
+		createSrvUavHeap();
+		//createSamplerHeap();
 		createShaderTable();
 	}
 
@@ -724,8 +726,9 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 	// Let's raytrace
 	{ 
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
+		//commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, mpSamplerHeap.Get());
 
-		commandList->TransitionBarrier(*mpOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->TransitionBarrier(*mpRtOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -743,13 +746,26 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		size_t missOffset = 1 * mShaderTableEntrySize;
 		raytraceDesc.MissShaderTable.StartAddress = mpShaderTable->GetGPUVirtualAddress() + missOffset;
 		raytraceDesc.MissShaderTable.StrideInBytes = mShaderTableEntrySize;
-		raytraceDesc.MissShaderTable.SizeInBytes = mShaderTableEntrySize;   // Only a s single miss-entry
+		raytraceDesc.MissShaderTable.SizeInBytes = mShaderTableEntrySize * 2;   // Only two
+
+		int objectToRT = 0;
+		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		{
+			// 特殊处理剔除光源不加入光追
+			std::string objIndex = it->first;
+			if (objIndex.find("light") != std::string::npos) {
+				continue;
+			}
+			objectToRT++;
+			commandList->TransitionBarrier(meshPool[it->second->mesh]->getVertexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(meshPool[it->second->mesh]->getIndexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		}
 
 		// Hit is the third entry in the shader-table
-		size_t hitOffset = 2 * mShaderTableEntrySize;
+		size_t hitOffset = 3 * mShaderTableEntrySize;
 		raytraceDesc.HitGroupTable.StartAddress = mpShaderTable->GetGPUVirtualAddress() + hitOffset;
 		raytraceDesc.HitGroupTable.StrideInBytes = mShaderTableEntrySize;
-		raytraceDesc.HitGroupTable.SizeInBytes = mShaderTableEntrySize;
+		raytraceDesc.HitGroupTable.SizeInBytes = mShaderTableEntrySize * ( 2* objectToRT);
 
 		// Bind the empty root signature
 		commandList->SetComputeRootSignature(mpEmptyRootSig);
@@ -782,7 +798,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -1020,24 +1036,6 @@ void HybridPipeline::createAccelerationStructures()
 	auto pDevice = Application::Get().GetDevice();
 	auto commandQueue = Application::Get().GetCommandQueue();
 	auto commandList = commandQueue->GetCommandList();
-
-	//{ // mpVertexBuffer // 临时生成的三角形
-	//	float vertices[][3] =
-	//	{
-	//		{0, 1.73205f,  0},
-	//		{1.0f,  0, 0},
-	//		{-1.0f, 0, 0},
-	//	};
-	//	// For simplicity, we create the vertex buffer on the upload heap, but that's not required
-	//	mpVertexBuffer = createBuffer(pDevice, sizeof(vertices), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-	//	uint8_t* pData;
-	//	mpVertexBuffer->Map(0, nullptr, (void**)& pData);
-	//	memcpy(pData, vertices, sizeof(vertices));
-	//	mpVertexBuffer->Unmap(0, nullptr);
-	//	// 成员变量持有，全局记录持久资源的状态
-	//	ResourceStateTracker::AddGlobalResourceState(mpVertexBuffer.Get(), D3D12_RESOURCE_STATE_GENERIC_READ);
-	//	NAME_D3D12_OBJECT(mpVertexBuffer);
-	//}
 	
 	std::vector<AccelerationStructureBuffers> bottomLevelBuffers;
 	mpBottomLevelASes.resize(meshPool.size()); 
@@ -1078,8 +1076,10 @@ void HybridPipeline::createAccelerationStructures()
 		pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
-		bottomLevelBuffers[blasSeqCount].pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
-		bottomLevelBuffers[blasSeqCount].pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
+		bottomLevelBuffers[blasSeqCount].pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, 
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
+		bottomLevelBuffers[blasSeqCount].pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, 
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
 		// 成员变量持有，全局记录持久资源的状态
 		ASBuffer asBuffer;
 		mpBottomLevelASes[blasSeqCount] = bottomLevelBuffers[blasSeqCount].pResult;
@@ -1194,66 +1194,84 @@ void HybridPipeline::createRtPipelineState()
 	//  1 for the global root signature
 	auto mpDevice = Application::Get().GetDevice();
 
-	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 13> subobjects;
 	uint32_t index = 0;
 
 	// Compile the shader
 	auto pDxilLib = compileLibrary(L"RTPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
-	const WCHAR* entryPoints[] = { kRayGenShader, kMissShader ,kClosestHitShader };
+	const WCHAR* entryPoints[] = { kRayGenShader, kShadowMissShader ,kShadwoClosestHitShader, kSecondaryMissShader , kSecondaryClosestHitShader };
 	DxilLibrary dxilLib = DxilLibrary(pDxilLib, entryPoints, arraysize(entryPoints));
 	subobjects[index++] = dxilLib.stateSubobject; // 0 Library
 
-	//HitProgram hitProgram(kAnyHitShader, nullptr, kHitGroup);
-	HitProgram hitProgram(0, kClosestHitShader, kHitGroup);
-	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
+	HitProgram shadowHitProgram(0, kShadwoClosestHitShader, kShadowHitGroup);
+	subobjects[index++] = shadowHitProgram.subObject; // 1 shadow Hit Group
+
+	HitProgram secondaryHitProgram(0, kSecondaryClosestHitShader, kSecondaryHitGroup);
+	subobjects[index++] = secondaryHitProgram.subObject; // 2 secondary Hit Group
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,3,0).desc);
-	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,0, nullptr,3,0,0).desc);
+	subobjects[index] = rgsRootSignature.subobject; // 3 RayGen Root Sig
 
-	uint32_t rgsRootIndex = index++; // 2
+	uint32_t rgsRootIndex = index++; // 3
 	ExportAssociation rgsRootAssociation(&kRayGenShader, 1, &(subobjects[rgsRootIndex]));
-	subobjects[index++] = rgsRootAssociation.subobject; // 3 Associate Root Sig to RGS
+	subobjects[index++] = rgsRootAssociation.subobject; // 4 Associate Root Sig to RGS
+
+	// Create the secondary root-signature and association
+	CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc(
+		0,
+		D3D12_FILTER_ANISOTROPIC,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+		0, 16, D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
+		0.0f, D3D12_FLOAT32_MAX, D3D12_SHADER_VISIBILITY_ALL, 1);
+	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 6, 1, &static_sampler_desc ,3,0,1).desc);
+	subobjects[index] = secondaryRootSignature.subobject;// 5 Secondary chs sig
+
+	uint32_t secondaryRootIndex = index++;//5
+	ExportAssociation secondaryRootAssociation(&kSecondaryClosestHitShader, 1, &(subobjects[secondaryRootIndex]));
+	subobjects[index++] = secondaryRootAssociation.subobject;//6 Associate secondary sig to secondarychs
 
 	// Create the miss- and hit-programs root-signature and association
 	D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
 	emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 	LocalRootSignature hitMissRootSignature(mpDevice, emptyDesc);
-	subobjects[index] = hitMissRootSignature.subobject; // 4 Root Sig to be shared between Miss and CHS
+	subobjects[index] = hitMissRootSignature.subobject; // 7 Root Sig to be shared between Miss and shadowCHS
 
-	uint32_t hitMissRootIndex = index++; // 4
-	const WCHAR* missHitExportName[] = { kMissShader, kClosestHitShader };
+	uint32_t hitMissRootIndex = index++; // 7
+	const WCHAR* missHitExportName[] = { kShadowMissShader, kShadwoClosestHitShader, kSecondaryMissShader };
 	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
-	subobjects[index++] = missHitRootAssociation.subobject; // 5 Associate Root Sig to Miss and CHS
+	subobjects[index++] = missHitRootAssociation.subobject; // 8 Associate Root Sig to Miss and CHS
 
 	// Bind the payload size to the programs
-	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 3);
-	subobjects[index] = shaderConfig.subobject; // 6 Shader Config
+	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 4);
+	subobjects[index] = shaderConfig.subobject; // 9 Shader Config
 
-	uint32_t shaderConfigIndex = index++; // 6
-	const WCHAR* shaderExports[] = { kMissShader, kClosestHitShader, kRayGenShader };
+	uint32_t shaderConfigIndex = index++; // 9 
+	const WCHAR* shaderExports[] = {kRayGenShader, kShadowMissShader, kSecondaryMissShader, kShadwoClosestHitShader, kSecondaryClosestHitShader};
 	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
-	subobjects[index++] = configAssociation.subobject; // 7 Associate Shader Config to Miss, CHS, RGS
+	subobjects[index++] = configAssociation.subobject; // 10 Associate Shader Config to Miss, shadowCHS, shadowRGS, secondaryCHS, secondaryRGS
 
 	// Create the pipeline config
 	PipelineConfig config(1);
-	subobjects[index++] = config.subobject; // 8
+	subobjects[index++] = config.subobject; // 11 configuration 
 
 	// Create the global root signature and store the empty signature
 	GlobalRootSignature root(mpDevice, {});
 	mpEmptyRootSig = root.pRootSig;
-	subobjects[index++] = root.subobject; // 9
+	subobjects[index++] = root.subobject; // 12
 
 	// Create the state
 	D3D12_STATE_OBJECT_DESC desc;
-	desc.NumSubobjects = index; // 10
+	desc.NumSubobjects = index; // 13
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
 	ThrowIfFailed(mpDevice->CreateStateObject(&desc, IID_PPV_ARGS(&mpPipelineState)));
 }
 
-RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int cbv_num, int c32_num)
+RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int sampler_num, const D3D12_STATIC_SAMPLER_DESC* pStaticSamplers, int cbv_num, int c32_num, int space)
 {
 	// Create the root-signature 
 	//******Layout*********/
@@ -1261,57 +1279,99 @@ RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, 
 	/////////////// |---------------range for UAV---------------| |-------------------range for SRV-------------------|
 	// Param[1-n] = 
 	RootSignatureDesc desc;
-	desc.range.resize(2);
-	// UAV: gOutput 
-	desc.range[0].BaseShaderRegister = 0;
-	desc.range[0].NumDescriptors = uav_num;
-	desc.range[0].RegisterSpace = 0;
-	desc.range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	desc.range[0].OffsetInDescriptorsFromTableStart = 0;
+	int range_size = 0;
+	if (uav_num > 0) range_size++;
+	if (srv_num > 0) range_size++;
 
-	// SRV: gRtScene GBuffer(1-5)
-	desc.range[1].BaseShaderRegister = 0;
-	desc.range[1].NumDescriptors = srv_num;
-	desc.range[1].RegisterSpace = 0;
-	desc.range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	desc.range[1].OffsetInDescriptorsFromTableStart = uav_num;
-
-	desc.rootParams.resize(1+ cbv_num + c32_num);
-
-	desc.rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	desc.rootParams[0].DescriptorTable.NumDescriptorRanges = 2;
-	desc.rootParams[0].DescriptorTable.pDescriptorRanges = desc.range.data();
-
-	for (int i = 1; i <= cbv_num; i++) {
-		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		desc.rootParams[i].Descriptor.RegisterSpace = 0;
-		desc.rootParams[i].Descriptor.ShaderRegister = i-1;
+	desc.range.resize(range_size);
+	int range_counter = 0;
+	// UAV
+	if (uav_num > 0) {
+		desc.range[range_counter].BaseShaderRegister = 0;
+		desc.range[range_counter].NumDescriptors = uav_num;
+		desc.range[range_counter].RegisterSpace = space;
+		desc.range[range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		desc.range[range_counter].OffsetInDescriptorsFromTableStart = 0;
+		range_counter++;
+	}
+	// SRV
+	if (srv_num > 0) {
+		desc.range[range_counter].BaseShaderRegister = 0;
+		desc.range[range_counter].NumDescriptors = srv_num;
+		desc.range[range_counter].RegisterSpace = space;
+		desc.range[range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		desc.range[range_counter].OffsetInDescriptorsFromTableStart = uav_num;
+		range_counter++;
 	}
 
-	for (int i = cbv_num+1; i <= cbv_num + c32_num; i++) {
+	//// Sampler
+	//RootSignatureDesc sampleDesc;
+	//int sample_range_size = 0;
+	//if (sampler_num > 0) sample_range_size++;
+	//sampleDesc.range.resize(sample_range_size);
+	//int sample_range_counter = 0;
+	//if (sample_range_size > 0) {
+	//	sampleDesc.range[sample_range_counter].BaseShaderRegister = 0;
+	//	sampleDesc.range[sample_range_counter].NumDescriptors = sampler_num;
+	//	sampleDesc.range[sample_range_counter].RegisterSpace = space;
+	//	sampleDesc.range[sample_range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+	//	sampleDesc.range[sample_range_counter].OffsetInDescriptorsFromTableStart = 0;
+	//	sample_range_counter++;
+	//}
+	
+	int descriptor_table_counter = 0;
+	if (range_counter > 0) descriptor_table_counter++;
+	//if (sample_range_counter > 0) descriptor_table_counter++;
+
+	int i = 0;
+	desc.rootParams.resize(descriptor_table_counter + cbv_num + c32_num );
+	{
+		
+		if (range_counter > 0) {
+			desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			desc.rootParams[i].DescriptorTable.NumDescriptorRanges = range_size;
+			desc.rootParams[i].DescriptorTable.pDescriptorRanges = desc.range.data();
+			i++;
+		}
+		//if (sample_range_counter > 0) {
+		//	desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		//	desc.rootParams[i].DescriptorTable.NumDescriptorRanges = sample_range_size;
+		//	desc.rootParams[i].DescriptorTable.pDescriptorRanges = sampleDesc.range.data();
+		//	i++;
+		//}
+	}
+	for (; i < cbv_num + descriptor_table_counter; i++) {
+		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		desc.rootParams[i].Descriptor.RegisterSpace = space;
+		desc.rootParams[i].Descriptor.ShaderRegister = i- descriptor_table_counter;
+	}
+	for (; i < cbv_num + c32_num + descriptor_table_counter; i++) {
 		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 		desc.rootParams[i].Constants.Num32BitValues = 1;
-		desc.rootParams[i].Constants.RegisterSpace = 0;
-		desc.rootParams[i].Constants.ShaderRegister = i - 1;
+		desc.rootParams[i].Constants.RegisterSpace = space;
+		desc.rootParams[i].Constants.ShaderRegister = i - descriptor_table_counter;
 	}
-
 	// Create the desc
-	desc.desc.NumParameters = 1 + cbv_num+ c32_num;
+	desc.desc.NumParameters = descriptor_table_counter + cbv_num+ c32_num;
 	desc.desc.pParameters = desc.rootParams.data();
 	desc.desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	if (sampler_num > 0) {
+		desc.desc.NumStaticSamplers = sampler_num;
+		desc.desc.pStaticSamplers = pStaticSamplers;
+	}
 
 	return desc;
 }
 
-void HybridPipeline::createShaderResourcesAndSrvUavheap()
+void HybridPipeline::createShaderResources()
 {
 	auto pDevice = Application::Get().GetDevice();
 	//****************************UAV Resource
 	// gOutput
-	mpOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
+	mpRtOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
 		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
-	), nullptr, TextureUsage::RenderTarget, L"mpOutputTexture");
+	), nullptr, TextureUsage::RenderTarget, L"mpRtOutputTexture");
 
 	//****************************SRV Resource
 	//gRtScene / GPosition / GAlbedo / GMetallic / GNormal / GRoughness
@@ -1320,12 +1380,71 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 	//create the constant buffer resource for cameraCB
 	mpRTPointLightCB = createBuffer(pDevice, sizeof(PointLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 	mpRTCameraCB = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
-	mpFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+	mpRTFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+
+	//****************************CBV for per object 
+	int objectToRT = 0;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+		objectToRT++;
+	}
+	mpRTMaterialCBList.resize(objectToRT);
+	mpRTPBRMaterialCBList.resize(objectToRT);
+	mpRTGameObjectIndexCBList.resize(objectToRT);
+	objectToRT = 0;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+
+		void* pData = 0;
+		// base material
+		mpRTMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(BaseMaterial), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		mpRTMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &it->second->material.base, sizeof(BaseMaterial));
+		mpRTMaterialCBList[objectToRT]->Unmap(0, nullptr);
+		// pbr material
+		mpRTPBRMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(PBRMaterial), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		mpRTPBRMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &it->second->material.pbr, sizeof(PBRMaterial));
+		mpRTPBRMaterialCBList[objectToRT]->Unmap(0, nullptr);
+		// rt go index
+		mpRTGameObjectIndexCBList[objectToRT] = createBuffer(pDevice, sizeof(ObjectIndexRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		mpRTGameObjectIndexCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
+		memcpy(pData, &it->second->gid, sizeof(float));
+		mpRTGameObjectIndexCBList[objectToRT]->Unmap(0, nullptr);
+		
+		objectToRT++;
+	}
+	
+}
+
+void HybridPipeline::createSrvUavHeap() {
+	auto pDevice = Application::Get().GetDevice();
+
+	int objectToRT = 0;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+		objectToRT++;
+	}
 
 	//****************************Descriptor heap
 	// Create the uavSrvHeap and its handle
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = 6;
+	desc.NumDescriptors = 6 + objectToRT * 6;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
@@ -1334,7 +1453,7 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 	// Create the UAV for GOutput
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavGOutputDesc = {};
 	uavGOutputDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	pDevice->CreateUnorderedAccessView(mpOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
+	pDevice->CreateUnorderedAccessView(mpRtOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
 	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// Create srv for TLAS
@@ -1352,17 +1471,107 @@ void HybridPipeline::createShaderResourcesAndSrvUavheap()
 			1, &m_GBuffer.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
+
+	objectToRT = 0;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+		auto pLobject = it->second;
+
+		UINT pDestDescriptorRangeSizes[] = { 1 };
+		//pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+		//	1,              , pDestDescriptorRangeSizes, 
+		//	D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		// indices 0
+		D3D12_SHADER_RESOURCE_VIEW_DESC indexSrvDesc = {};
+		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		indexSrvDesc.Format = meshPool[pLobject->mesh]->getIndexBuffer().GetIndexFormat();
+		indexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		indexSrvDesc.Buffer.NumElements = (UINT)meshPool[pLobject->mesh]->getIndexCount();
+		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		// vetices 1
+		D3D12_SHADER_RESOURCE_VIEW_DESC vertexSrvDesc = {};
+		vertexSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+		vertexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		vertexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		vertexSrvDesc.Buffer.FirstElement = 0;
+		vertexSrvDesc.Buffer.NumElements = meshPool[pLobject->mesh]->getVertexCount();
+		vertexSrvDesc.Buffer.StructureByteStride = sizeof(VertexPositionNormalTexture);
+		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getVertexBuffer().GetD3D12Resource().Get(), &vertexSrvDesc, uavSrvHandle);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//albedo 2
+		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+			1, &texturePool[pLobject->material.tex.AlbedoTexture].GetShaderResourceView() , pDestDescriptorRangeSizes,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//metallic 3
+		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+			1, &texturePool[pLobject->material.tex.MetallicTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//normal 4
+		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+			1, &texturePool[pLobject->material.tex.NormalTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//roughness 5
+		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
+			1, &texturePool[pLobject->material.tex.RoughnessTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		objectToRT++;
+	}
 }
+
+//void HybridPipeline::createSamplerHeap() {
+//	auto pDevice = Application::Get().GetDevice();
+//
+//	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+//	desc.NumDescriptors = 1;
+//	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+//	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+//	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSamplerHeap)));
+//	D3D12_CPU_DESCRIPTOR_HANDLE samplerHandle = mpSamplerHeap->GetCPUDescriptorHandleForHeapStart();
+//	
+//	D3D12_SAMPLER_DESC anisotropicSampler{
+//		D3D12_FILTER_ANISOTROPIC,
+//		D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+//		0, 16,
+//		D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
+//		0.0f, D3D12_FLOAT32_MAX
+//	};
+//	pDevice->CreateSampler(&anisotropicSampler, samplerHandle);
+//}
 
 void HybridPipeline::createShaderTable()
 {
 	auto mpDevice = Application::Get().GetDevice();
 
+	int objectToRT = 0;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+		objectToRT++;
+	}
+
 	// Calculate the size and create the buffer
 	mShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 	mShaderTableEntrySize += 32; // The ray-gen's descriptor table
 	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-	uint32_t shaderTableSize = mShaderTableEntrySize * 3;
+	uint32_t shaderTableSize = mShaderTableEntrySize * (3 + objectToRT *2);
 
 	// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
 	mpShaderTable = createBuffer(mpDevice, shaderTableSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
@@ -1377,20 +1586,45 @@ void HybridPipeline::createShaderTable()
 	mpPipelineState->QueryInterface(IID_PPV_ARGS(&pRtsoProps));
 
 	// Entry 0 - ray-gen program ID and descriptor data
-	memcpy(pData, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-	uint64_t heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
-	*(uint64_t*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8) = mpRTPointLightCB->GetGPUVirtualAddress();
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 +8) = mpRTCameraCB->GetGPUVirtualAddress();
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 + 8 + 8) = mpFrameIndexCB->GetGPUVirtualAddress();
+	memcpy(pData + mShaderTableEntrySize * 0, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	D3D12_GPU_VIRTUAL_ADDRESS heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*0) = heapStart;
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*1) = mpRTPointLightCB->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*2) = mpRTCameraCB->GetGPUVirtualAddress();
+	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*3) = mpRTFrameIndexCB->GetGPUVirtualAddress();
 	
-	// Entry 1 - miss program
-	memcpy(pData + mShaderTableEntrySize, pRtsoProps->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	// Entry 1 - shadow miss program
+	memcpy(pData + mShaderTableEntrySize*1, pRtsoProps->GetShaderIdentifier(kShadowMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
-	// Entry 2 - hit program
-	uint8_t* pHitEntry = pData + mShaderTableEntrySize * 2; // +2 skips the ray-gen and miss entries
-	memcpy(pHitEntry, pRtsoProps->GetShaderIdentifier(kHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	// entry 2 - secondary miss program
+	memcpy(pData + mShaderTableEntrySize*2, pRtsoProps->GetShaderIdentifier(kSecondaryMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
+	objectToRT = 0;
+	uint32_t srvuavBias = 6;
+	uint32_t srvuavPerHitSize = 6;
+	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	{
+		// 特殊处理剔除光源不加入光追
+		std::string objIndex = it->first;
+		if (objIndex.find("light") != std::string::npos) {
+			continue;
+		}
+		// Entry 3+i*2 -  shadow hit program
+		uint8_t* pHitEntry = pData + mShaderTableEntrySize * (3 + objectToRT * 2); // +2 skips the ray-gen and miss entries
+		memcpy(pHitEntry, pRtsoProps->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+		// entry 3+i*2+1 secondary hit program
+		pHitEntry = pData + mShaderTableEntrySize * (3 + objectToRT * 2 + 1); // +2 skips the ray-gen and miss entries
+		memcpy(pHitEntry, pRtsoProps->GetShaderIdentifier(kSecondaryHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		D3D12_GPU_VIRTUAL_ADDRESS heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr
+			+ mpDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * (srvuavBias + objectToRT * srvuavPerHitSize);
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 0) = heapStart;
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 1) = mpRTMaterialCBList[objectToRT]->GetGPUVirtualAddress();
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 2) = mpRTPBRMaterialCBList[objectToRT]->GetGPUVirtualAddress();
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 3) = mpRTGameObjectIndexCBList[objectToRT]->GetGPUVirtualAddress();
+
+		objectToRT++;
+	}
 	// Unmap
 	mpShaderTable->Unmap(0, nullptr);
 }
@@ -1403,9 +1637,9 @@ void HybridPipeline::updateBuffer()
 		FrameIndexCB fid;
 		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
 		void* pData;
-		mpFrameIndexCB->Map(0, nullptr, (void**)& pData);
+		mpRTFrameIndexCB->Map(0, nullptr, (void**)& pData);
 		memcpy(pData, &fid, sizeof(FrameIndexCB));
-		mpFrameIndexCB->Unmap(0, nullptr);
+		mpRTFrameIndexCB->Unmap(0, nullptr);
 	}
 
 	// update the camera for rt

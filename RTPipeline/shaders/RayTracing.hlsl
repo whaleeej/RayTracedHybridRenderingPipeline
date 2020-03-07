@@ -29,9 +29,13 @@ struct FrameIndex
 }; // Total:                              16 * 1 = 16 bytes
 ConstantBuffer<FrameIndex> FrameIndexCB : register(b2);
 
-struct RayPayload
+struct ShadowRayPayload
 {
 	bool hit;
+};
+struct SecondaryPayload
+{
+	float4 color;
 };
 
 ////////////////////////////////////////////////////// PBR workflow Cook-Torrance
@@ -193,7 +197,7 @@ void rayGen()
 	// TraceRay(gRtScene,
 	//	RAY_FLAG_CULL_BACK_FACING_TRIANGLES /*RayFlags*/, 0xFF /*InstanceInclusionMask*/,
 	//	0 /* RayContributionToHitGroupIndex*/, 0 /*MultiplierForGeometryContributionToHitGroupIndex*/, 0 /*MissShaderIndex*/, 
-	// ray, rayPayload)
+	// ray, ShadowRayPayload)
 	
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDimension = DispatchRaysDimensions();
@@ -224,7 +228,7 @@ void rayGen()
 	//// shadow and lighting
 	RayDesc ray;
 	ray.TMin = 0.0f;
-	RayPayload shadowPayload;
+	ShadowRayPayload shadowPayload;
 	float3 Lo = 0;
 
 	//// area Point Light
@@ -244,7 +248,8 @@ void rayGen()
 	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
 	shadowPayload.hit = false;
 	// ray tracing
-	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 0, 0, ray, shadowPayload);
+	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 
+	0xFF, 0, 0, 0, ray, shadowPayload);
 	if (shadowPayload.hit == false)
 	{
 		Lo += 1.0f;
@@ -257,13 +262,65 @@ void rayGen()
 }
 
 [shader("miss")]
-void miss(inout RayPayload payload)
+void shadowMiss(inout ShadowRayPayload payload)
 {
 	payload.hit = false;
 }
 
 [shader("closesthit")]
-void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void shadowChs(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	payload.hit = true;
 }
+
+//////////////////////////////////////////////////// for reflection chs
+ByteAddressBuffer Indices : register(t0, space1);
+struct Vertex
+{
+	float3 position;
+	float3 normal;
+	float2 textureCoordinate;
+};
+StructuredBuffer<Vertex> Vertices : register(t1, space1);
+Texture2D AlbedoTexture : register(t2, space1);
+Texture2D MetallicTexture : register(t3, space1);
+Texture2D NormalTexture : register(t4, space1);
+Texture2D RoughnessTexture : register(t5, space1);
+struct Material
+{
+	float4 Emissive;
+	float4 Ambient;
+	float4 Diffuse;
+	float4 Specular;
+	float SpecularPower;
+	float3 Padding;
+}; // Total:                              16 * 5 = 80 bytes
+ConstantBuffer<Material> MaterialCB : register(b0, space1);
+struct PBRMaterial
+{
+	float Metallic;
+	float Roughness;
+	float2 Padding;
+}; // Totoal: 4*2 +8 = 16 bytes
+ConstantBuffer<PBRMaterial> PBRMaterialCB : register(b1, space1);
+struct ObjectIndex
+{
+	float index;
+	float3 padding;
+};
+ConstantBuffer<ObjectIndex> GameObjectIndex : register(b2, space1);
+SamplerState AnisotropicSampler : register(s0, space1);
+
+
+[shader("miss")]
+void secondaryMiss(inout SecondaryPayload payload)
+{
+	payload.color = float4(0, 0, 0, 0);
+}
+
+[shader("closesthit")]
+void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	payload.color = float4(0, 0, 0, 0);
+}
+

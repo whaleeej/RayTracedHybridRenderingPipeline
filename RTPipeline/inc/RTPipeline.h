@@ -142,6 +142,11 @@ private:
 		uint32_t FrameIndex;
 		float padding[3];
 	};
+	// ObjectIndex
+	struct ObjectIndexRTCB {
+		float index;
+		float padding[3];
+	};
 
 	/////////////////////////////////////////////// Container
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
@@ -219,25 +224,33 @@ private:
 	uint64_t mTlasSize = 0;
 
 	void createRtPipelineState();
-	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int cbv_num, int c32_num);
+	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int sampler_num, const D3D12_STATIC_SAMPLER_DESC* pStaticSamplers, int cbv_num, int c32_num, int space=0);
 	Microsoft::WRL::ComPtr < ID3D12StateObject > mpPipelineState;
 	Microsoft::WRL::ComPtr < ID3D12RootSignature > mpEmptyRootSig;
 
-	void createShaderResourcesAndSrvUavheap();
+	void createShaderResources();
+	void createSrvUavHeap();
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	std::shared_ptr< Texture > mpOutputTexture;
+	std::shared_ptr< Texture > mpRtOutputTexture;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpFrameIndexCB;
+	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTFrameIndexCB;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTMaterialCBList;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTPBRMaterialCBList;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTGameObjectIndexCBList;
 
 	void createShaderTable();
 	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;
 	uint32_t mShaderTableEntrySize = 0;
 
-	/*|-RayGen-|-RayMiss-|-......-|-AnyHitShader-|-ChosetHitShader-|-......-|*/
+	/*|-rayGen-|-shadowMiss-|-secondaryMiss-|-......-|-shadowChs-|-secondaryChs-|-......-|*/
 	const WCHAR* kRayGenShader = L"rayGen";
-	const WCHAR* kMissShader = L"miss";
-	const WCHAR* kAnyHitShader = L"ahs";
-	const WCHAR* kClosestHitShader = L"chs";
-	const WCHAR* kHitGroup = L"HitGroup";
+
+	const WCHAR* kShadowMissShader = L"shadowMiss";
+	const WCHAR* kShadwoClosestHitShader = L"shadowChs";
+	const WCHAR* kShadowHitGroup = L"ShadowHitGroup";
+
+	const WCHAR* kSecondaryMissShader = L"secondaryMiss";
+	const WCHAR* kSecondaryClosestHitShader = L"secondaryChs";
+	const WCHAR* kSecondaryHitGroup = L"SecondaryHitGroup";
 };
