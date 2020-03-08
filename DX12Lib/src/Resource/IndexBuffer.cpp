@@ -21,6 +21,10 @@ void IndexBuffer::CreateViews(size_t numElements, size_t elementSize)
     m_NumIndicies = numElements;
     m_IndexFormat = (elementSize == 2) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 
+	if (numElements % 3 != 0) {
+		numElements -= numElements % 3;
+	}
+
     m_IndexBufferView.BufferLocation = m_d3d12Resource->GetGPUVirtualAddress();
     m_IndexBufferView.SizeInBytes = static_cast<UINT>(numElements * elementSize);
     m_IndexBufferView.Format = m_IndexFormat;

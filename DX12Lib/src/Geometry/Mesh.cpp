@@ -391,6 +391,10 @@ void Mesh::Initialize(CommandList& commandList, VertexCollection& vertices, Inde
     if (!rhcoords)
         ReverseWinding(indices, vertices);
 
+	if (indices.size() % 2 != 0) {
+		indices.push_back(static_cast<uint16_t>(0));
+	}
+
     commandList.CopyVertexBuffer(m_VertexBuffer, vertices);
     commandList.CopyIndexBuffer(m_IndexBuffer, indices);
 
