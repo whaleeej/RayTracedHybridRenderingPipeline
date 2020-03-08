@@ -220,16 +220,6 @@ void rayGen()
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
-	RayDesc raySecondary;
-	raySecondary.TMin = 0.0f;
-	raySecondary.Origin = P;
-	raySecondary.Direction = reflect(V, N);
-	raySecondary.TMax = 10000.0f;
-	SecondaryPayload secondaryPayload;
-	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-	
-	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), FrameIndexCB.FrameIndex, 16);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
 	float rnd1 = lowDiscrepSeq.x;
@@ -239,7 +229,7 @@ void rayGen()
 	RayDesc ray;
 	ray.TMin = 0.0f;
 	ShadowRayPayload shadowPayload;
-	float3 Lo = 0;
+	float Lo = 0;
 
 	//// area Point Light
 	// low discrep sampling
@@ -263,12 +253,21 @@ void rayGen()
 	if (shadowPayload.hit == false)
 	{
 		Lo += 1.0f;
-		//Lo += DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic);
 	}
-
+	
+	
+	// reflection
+	RayDesc raySecondary;
+	raySecondary.TMin = 0.1f;
+	raySecondary.Origin = P;
+	raySecondary.Direction = reflect(-V, N);
+	raySecondary.TMax = 10000.0f;
+	SecondaryPayload secondaryPayload;
+	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+	
 	// output
-	float3 color = Lo;
-	gOutput[launchIndex.xy] = float4(color, 1);
+	gOutput[launchIndex.xy] = float4(Lo, secondaryPayload.color.xyz);
 }
 
 [shader("miss")]
@@ -414,7 +413,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	float3 triangleNormal = HitAttribute3(vertexNormals, attribs);
 	float2 triangleTexCoord = HitAttribute2(vertexTexCoord, attribs);
 
-	float4 col = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0);
+	float4 col = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0) * MaterialCB.Diffuse;
 	payload.color = float4(col);
 }
 

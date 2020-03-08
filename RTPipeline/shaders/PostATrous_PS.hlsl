@@ -121,12 +121,12 @@ void ATrousFilter(float x, float y, float2 res, int level,
         // update color and variance
 		if (weights_sum > 10e-6)
 		{
-			color_out[p.xy] = float4(color_sum / weights_sum, 0, 0, 0);
+			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).yzw);
 			variance_out[p.xy] = float4(variance_sum / weights_squared_sum, 0, 0, 0);
 		}
 		else
 		{
-			color_out[p.xy] = float4(color_sum / weights_sum, 0, 0, 0);
+			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).yzw);
 			variance_out[p.xy] = variance_in.Load(p);
 		}
 	}

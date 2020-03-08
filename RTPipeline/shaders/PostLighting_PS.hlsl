@@ -135,6 +135,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 emissive = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	float gid = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).w;
 	float visibility = GSample.Load(int3(texCoord.x, texCoord.y, 0)).x;
+	float3 reflectivity = GSample.Load(int3(texCoord.x, texCoord.y, 0)).yzw;
 	
 	float3 P = position;
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
@@ -145,7 +146,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 		return float4(emissive, 1.0f);
 	}
 	
-	float3 color = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
-	color = LinearToSRGB(simpleToneMapping(color));
+	float3 color = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility) + 0.02*metallic*albedo*reflectivity;
+	color = LinearToSRGB(/*simpleToneMapping*/(color));
 	return float4(color, 0);
 }

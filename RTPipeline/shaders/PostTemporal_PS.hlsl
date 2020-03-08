@@ -57,6 +57,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 {
 	int N = his_length_prev.Load(int3(x, y, 0)).x;
 	float sample = rt_input.Load(int3(x, y, 0)).x;
+	float3 sampleRef = rt_input.Load(int3(x, y, 0)).yzw;
 	
 	if (N > 0 && gPosition.Load(int3(x, y, 0)).w != 0.0)
 	{
@@ -157,7 +158,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 			// incresase history length
 			his_length[int2(x, y)] = float4((int) prevHistoryLength + 1, 0, 0, 0);
 			// color accumulation 
-			col_acc[int2(x, y)] = float4(sample * color_alpha + prevColor * (1.0f - color_alpha), 0, 0, 0);
+			col_acc[int2(x, y)] = float4(sample * color_alpha + prevColor * (1.0f - color_alpha), sampleRef);
 			// moment accumulation
 			float first_moment = moment_alpha * prevMoments.x + (1.0f - moment_alpha) * sample;
 			float second_moment = moment_alpha * prevMoments.y + (1.0f - moment_alpha) * sample * sample;
@@ -170,7 +171,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 	}
 	
 	his_length[int2(x, y)] = float4(1.0, 0.0, 0.0, 0.0);
-	col_acc[int2(x, y)] = float4(sample, 0, 0, 0);
+	col_acc[int2(x, y)] = float4(sample, sampleRef);
 	moment_acc[int2(x, y)] = float4(sample, sample * sample, 0.0, 0.0);
 	return 100.0f;
 }
