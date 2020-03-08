@@ -1152,7 +1152,7 @@ void HybridPipeline::createAccelerationStructures()
 
 			// Initialize the instance desc. We only have a single instance
 			pInstanceDesc[tlasGoCount].InstanceID = tlasGoCount;                            // This value will be exposed to the shader via InstanceID()
-			pInstanceDesc[tlasGoCount].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			pInstanceDesc[tlasGoCount].InstanceContributionToHitGroupIndex = 2* tlasGoCount;   // This is the offset inside the shader-table. 
 			pInstanceDesc[tlasGoCount].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			XMMATRIX m = XMMatrixTranspose(it->second->transform.ComputeModel());
 			memcpy(pInstanceDesc[tlasGoCount].Transform, m.r, sizeof(pInstanceDesc[tlasGoCount].Transform));
@@ -1491,10 +1491,10 @@ void HybridPipeline::createSrvUavHeap() {
 		// indices 0
 		D3D12_SHADER_RESOURCE_VIEW_DESC indexSrvDesc = {};
 		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		indexSrvDesc.Format = meshPool[pLobject->mesh]->getIndexBuffer().GetIndexFormat();
+		indexSrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 		indexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		indexSrvDesc.Buffer.NumElements = (UINT)meshPool[pLobject->mesh]->getIndexCount();
-		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		indexSrvDesc.Buffer.NumElements = (UINT)((meshPool[pLobject->mesh]->getIndexCount()+1)/2);
+		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		// vetices 1
@@ -1531,26 +1531,6 @@ void HybridPipeline::createSrvUavHeap() {
 		objectToRT++;
 	}
 }
-
-//void HybridPipeline::createSamplerHeap() {
-//	auto pDevice = Application::Get().GetDevice();
-//
-//	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-//	desc.NumDescriptors = 1;
-//	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-//	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-//	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSamplerHeap)));
-//	D3D12_CPU_DESCRIPTOR_HANDLE samplerHandle = mpSamplerHeap->GetCPUDescriptorHandleForHeapStart();
-//	
-//	D3D12_SAMPLER_DESC anisotropicSampler{
-//		D3D12_FILTER_ANISOTROPIC,
-//		D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-//		0, 16,
-//		D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
-//		0.0f, D3D12_FLOAT32_MAX
-//	};
-//	pDevice->CreateSampler(&anisotropicSampler, samplerHandle);
-//}
 
 void HybridPipeline::createShaderTable()
 {
