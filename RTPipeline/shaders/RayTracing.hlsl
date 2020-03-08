@@ -220,6 +220,16 @@ void rayGen()
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
+	RayDesc raySecondary;
+	raySecondary.TMin = 0.0f;
+	raySecondary.Origin = P;
+	raySecondary.Direction = reflect(V, N);
+	raySecondary.TMax = 10000.0f;
+	SecondaryPayload secondaryPayload;
+	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+	
+	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), FrameIndexCB.FrameIndex, 16);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
 	float rnd1 = lowDiscrepSeq.x;
@@ -236,9 +246,9 @@ void rayGen()
 	float bias = 1e-2f;
 	float3 P_biased = P + N * bias;
 	float3 dest = pointLight.PositionWS.xyz;
-	float3 distan = distance(P_biased, dest);
+	float distan = distance(P_biased, dest);
 	float3 dir = (dest - P_biased) / distan;
-	float3 sampleDestRadius = pointLight.radius;
+	float sampleDestRadius = pointLight.radius;
 	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
 	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
 	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
@@ -309,7 +319,8 @@ struct ObjectIndex
 	float3 padding;
 };
 ConstantBuffer<ObjectIndex> GameObjectIndex : register(b2, space1);
-SamplerState AnisotropicSampler : register(s0, space1);
+
+SamplerState AnisotropicSampler : register(s0);
 
 float3 HitWorldPosition()
 {
@@ -400,10 +411,10 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
     // Compute the triangle's normal.
     // This is redundant and done for illustration purposes 
     // as all the per-vertex normals are the same and match triangle's normal in this sample. 
-	float3 triangleNormal = HitAttribute(vertexNormals, attribs);
-	float2 triangleTexCoord = HitAttribute(vertexTexCoord, attribs);
+	float3 triangleNormal = HitAttribute3(vertexNormals, attribs);
+	float2 triangleTexCoord = HitAttribute2(vertexTexCoord, attribs);
 
-	//payload.color = color;
-	payload.color = float4(triangleNormal, 0);
+	float4 col = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0);
+	payload.color = float4(col);
 }
 

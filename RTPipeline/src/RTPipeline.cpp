@@ -757,6 +757,10 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 				continue;
 			}
 			objectToRT++;
+			commandList->TransitionBarrier(texturePool[it->second->material.tex.AlbedoTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(texturePool[it->second->material.tex.MetallicTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(texturePool[it->second->material.tex.NormalTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(texturePool[it->second->material.tex.RoughnessTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			commandList->TransitionBarrier(meshPool[it->second->mesh]->getVertexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			commandList->TransitionBarrier(meshPool[it->second->mesh]->getIndexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
@@ -1209,8 +1213,10 @@ void HybridPipeline::createRtPipelineState()
 	HitProgram secondaryHitProgram(0, kSecondaryClosestHitShader, kSecondaryHitGroup);
 	subobjects[index++] = secondaryHitProgram.subObject; // 2 secondary Hit Group
 
+	CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc(0);
+
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,0, nullptr,3,0,0).desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,1, &static_sampler_desc,3,0,0).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 3 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 3
@@ -1218,14 +1224,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = rgsRootAssociation.subobject; // 4 Associate Root Sig to RGS
 
 	// Create the secondary root-signature and association
-	CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc(
-		0,
-		D3D12_FILTER_ANISOTROPIC,
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-		0, 16, D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
-		0.0f, D3D12_FLOAT32_MAX, D3D12_SHADER_VISIBILITY_ALL, 1);
+
 	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 6, 1, &static_sampler_desc ,3,0,1).desc);
 	subobjects[index] = secondaryRootSignature.subobject;// 5 Secondary chs sig
 
@@ -1303,21 +1302,6 @@ RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, 
 		desc.range[range_counter].OffsetInDescriptorsFromTableStart = uav_num;
 		range_counter++;
 	}
-
-	//// Sampler
-	//RootSignatureDesc sampleDesc;
-	//int sample_range_size = 0;
-	//if (sampler_num > 0) sample_range_size++;
-	//sampleDesc.range.resize(sample_range_size);
-	//int sample_range_counter = 0;
-	//if (sample_range_size > 0) {
-	//	sampleDesc.range[sample_range_counter].BaseShaderRegister = 0;
-	//	sampleDesc.range[sample_range_counter].NumDescriptors = sampler_num;
-	//	sampleDesc.range[sample_range_counter].RegisterSpace = space;
-	//	sampleDesc.range[sample_range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-	//	sampleDesc.range[sample_range_counter].OffsetInDescriptorsFromTableStart = 0;
-	//	sample_range_counter++;
-	//}
 	
 	int descriptor_table_counter = 0;
 	if (range_counter > 0) descriptor_table_counter++;
