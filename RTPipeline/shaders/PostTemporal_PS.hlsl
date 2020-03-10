@@ -180,7 +180,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 float4 main( float4 Position : SV_Position ) : SV_Target0
 {
 	float col_alpha = 0.1;
-	float mom_alpha = 0.1;
+	float mom_alpha = 0.9;
 	
     int2 texCoord = ( int2 )Position.xy;
 	float resx;
@@ -189,7 +189,7 @@ float4 main( float4 Position : SV_Position ) : SV_Target0
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	float variance = backProject(texCoord.x, texCoord.y, float2(resx, resy), col_alpha, mom_alpha);
-	return float4(col_acc.Load(int3(texCoord, 0)).x, 0, 0, 1.0);
+	return float4(variance, 0, 0, 1.0);
 }
 
 // testing

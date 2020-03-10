@@ -146,7 +146,17 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 		return float4(emissive, 1.0f);
 	}
 	
-	float3 color = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility) + 0.02*metallic*albedo*reflectivity;
-	color = LinearToSRGB(/*simpleToneMapping*/(color));
+	float3 color0 = 0.005 * albedo;
+	
+	float3 color1 = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
+	
+	PointLight pLReflect;
+	pLReflect.Attenuation = 0.0;
+	pLReflect.Color = float4(reflectivity, 1);
+	pLReflect.Intensity = 1.0;
+	pLReflect.PositionWS = float4(reflect(-V, N)*2 + P, 1);
+	float3 color2 = DoPbrPointLight(pLReflect, N, V, P, albedo, roughness, metallic, 1.0);
+	
+	float3 color = LinearToSRGB((color0 + color1 + 0.02 * color2));
 	return float4(color, 0);
 }

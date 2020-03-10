@@ -135,8 +135,8 @@ void ATrousFilter(float x, float y, float2 res, int level,
 float4 main(float4 Position : SV_Position) : SV_TARGET0
 {
 	float sigma_c = 0.7;
-	float sigma_n = 0.2;
-	float sigma_x = 0.35;
+	float sigma_n = 0.35;
+	float sigma_x = 0.25;
 	float varGauss_blur = true;
 	
 	int2 texCoord = (int2) Position.xy;

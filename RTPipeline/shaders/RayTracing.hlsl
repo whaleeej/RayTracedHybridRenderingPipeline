@@ -233,7 +233,7 @@ void rayGen()
 
 	//// area Point Light
 	// low discrep sampling
-	float bias = 1e-2f;
+	float bias = 1e-4f;
 	float3 P_biased = P + N * bias;
 	float3 dest = pointLight.PositionWS.xyz;
 	float distan = distance(P_biased, dest);
@@ -414,6 +414,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	float2 triangleTexCoord = HitAttribute2(vertexTexCoord, attribs);
 
 	float4 col = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0) * MaterialCB.Diffuse;
+	
 	payload.color = float4(col);
 }
 
