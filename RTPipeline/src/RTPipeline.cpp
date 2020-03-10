@@ -217,14 +217,14 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool["Left wall"]->gid = gid++;
 		gameObjectPool["Left wall"]->mesh = "plane";
 		gameObjectPool["Left wall"]->material.base = Material::Cyan;
-		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.2f);
 		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
 		gameObjectPool["Right wall"]->gid = gid++;
 		gameObjectPool["Right wall"]->mesh = "plane";
 		gameObjectPool["Right wall"]->material.base = Material::Magenta;
-		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.2f);
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 
 		// light object

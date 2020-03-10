@@ -1,35 +1,3 @@
-RWTexture2D<float4> gOutput : register(u0);
-RaytracingAccelerationStructure gRtScene : register(t0);
-Texture2D<float4> GPosition : register(t1);
-Texture2D<float4> GAlbedoMetallic : register(t2);
-Texture2D<float4> GNormalRoughness : register(t3);
-Texture2D<float4> GExtra : register(t4);
-
-struct PointLight
-{
-	float4 PositionWS;
-	float4 Color;
-	float Intensity;
-	float Attenuation;
-	float radius;
-	float Padding; 
-}; // Total:                              16 * 3 = 48 bytes
-ConstantBuffer<PointLight> pointLight : register(b0);
-struct Camera
-{
-	float4 PositionWS;
-	float4x4 InverseViewMatrix;
-	float fov;
-	float3 padding;
-}; // Total:                              16 * 6 = 96 bytes
-ConstantBuffer<Camera> CameraCB : register(b1);
-struct FrameIndex
-{
-	uint FrameIndex;
-	float3 Padding;
-}; // Total:                              16 * 1 = 16 bytes
-ConstantBuffer<FrameIndex> FrameIndexCB : register(b2);
-
 struct ShadowRayPayload
 {
 	bool hit;
@@ -38,6 +6,37 @@ struct SecondaryPayload
 {
 	float4 color;
 };
+
+//**********************************************************************************************************************//
+//**************************************************for raygen shadow*************************************************//
+//**********************************************************************************************************************//
+RWTexture2D<float4> gOutput : register(u0);
+RaytracingAccelerationStructure gRtScene : register(t0);
+Texture2D<float4> GPosition : register(t1);
+Texture2D<float4> GAlbedoMetallic : register(t2);
+Texture2D<float4> GNormalRoughness : register(t3);
+Texture2D<float4> GExtra : register(t4);
+struct PointLight
+{
+	float4 PositionWS;
+	float4 Color;
+	float Intensity;
+	float Attenuation;
+	float radius;
+	float Padding; 
+}; ConstantBuffer<PointLight> pointLight : register(b0);
+struct Camera
+{
+	float4 PositionWS;
+	float4x4 InverseViewMatrix;
+	float fov;
+	float3 padding;
+}; ConstantBuffer<Camera> CameraCB : register(b1);
+struct FrameIndex
+{
+	uint FrameIndex;
+	float3 Padding;
+}; ConstantBuffer<FrameIndex> FrameIndexCB : register(b2);
 
 ////////////////////////////////////////////////////// PBR workflow Cook-Torrance
 float DoAttenuation(float attenuation, float distance)
@@ -174,6 +173,7 @@ float2 Hammersley(uint i, uint N)
 //////////////////////////////////////////////////// A low-discrepancy sequence
 
 //////////////////////////////////////////////////// Sampling method
+// from PBRT
 float3 UniformSampleCone(float2 u, float cosThetaMax)
 {
 	float cosTheta = (1.0f - u.x) + u.x * cosThetaMax;
@@ -189,6 +189,24 @@ float3 SampleTan2W(float3 H, float3 N)
 	
 	float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
 	return sampleVec;
+}
+// from https://learnopengl.com/PBR/IBL/Specular-IBL based on Disney's research on PBRT
+float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
+{
+	float PI = 3.141592653;
+	float a = roughness * roughness;
+	
+	float phi = 2.0 * PI * Xi.x;
+	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+	
+    // from spherical coordinates to cartesian coordinates
+	float3 H;
+	H.x = cos(phi) * sinTheta;
+	H.y = sin(phi) * sinTheta;
+	H.z = cosTheta;
+	
+	return normalize(SampleTan2W(H,N));
 }
 //////////////////////////////////////////////////// Sampling method
 
@@ -261,7 +279,7 @@ void rayGen()
 	RayDesc raySecondary;
 	raySecondary.TMin = 0.1f;
 	raySecondary.Origin = P;
-	raySecondary.Direction = reflect(-V, N);
+	raySecondary.Direction = ImportanceSampleGGX(float2(rnd1, rnd2), reflect(-V, N), roughness);
 	raySecondary.TMax = 10000.0f;
 	SecondaryPayload secondaryPayload;
 	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
@@ -270,7 +288,17 @@ void rayGen()
 	// output
 	gOutput[launchIndex.xy] = float4(Lo, secondaryPayload.color.xyz);
 }
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
 
+
+
+
+
+//**********************************************************************************************************************//
+//************************************************** for shadow chs***************************************************//
+//**********************************************************************************************************************//
 [shader("miss")]
 void shadowMiss(inout ShadowRayPayload payload)
 {
@@ -282,8 +310,18 @@ void shadowChs(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAtt
 {
 	payload.hit = true;
 }
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
 
-//////////////////////////////////////////////////// for reflection chs
+
+
+
+
+
+//**********************************************************************************************************************//
+//************************************************** for reflection chs**************************************************//
+//**********************************************************************************************************************//
 RaytracingAccelerationStructure localRtScene : register(t0, space1);
 ByteAddressBuffer Indices : register(t1, space1);
 struct Vertex
@@ -291,8 +329,7 @@ struct Vertex
 	float3 position;
 	float3 normal;
 	float2 textureCoordinate;
-};
-StructuredBuffer<Vertex> Vertices : register(t2, space1);
+};StructuredBuffer<Vertex> Vertices : register(t2, space1);
 Texture2D AlbedoTexture : register(t3, space1);
 Texture2D MetallicTexture : register(t4, space1);
 Texture2D NormalTexture : register(t5, space1);
@@ -305,26 +342,21 @@ struct Material
 	float4 Specular;
 	float SpecularPower;
 	float3 Padding;
-}; // Total:                              16 * 5 = 80 bytes
-ConstantBuffer<Material> MaterialCB : register(b0, space1);
+}; ConstantBuffer<Material> MaterialCB : register(b0, space1);
 struct PBRMaterial
 {
 	float Metallic;
 	float Roughness;
 	float2 Padding;
-}; // Totoal: 4*2 +8 = 16 bytes
-ConstantBuffer<PBRMaterial> PBRMaterialCB : register(b1, space1);
+}; ConstantBuffer<PBRMaterial> PBRMaterialCB : register(b1, space1);
 struct ObjectIndex
 {
 	float index;
 	float3 padding;
 };
 ConstantBuffer<ObjectIndex> GameObjectIndex : register(b2, space1);
-
 ConstantBuffer<PointLight> localPointLight : register(b3, space1);
-
 ConstantBuffer<FrameIndex> localFrameIndexCB : register(b4, space1);
-
 SamplerState AnisotropicSampler : register(s0);
 
 float3 HitWorldPosition()
@@ -381,12 +413,6 @@ float3 getFromNormalMapping(float3 sampledNormal, float3 NormalWS, float3 vertex
 	return normalize(mul(tangentNormal, TBN)); // [-1, 1]
 }
 
-[shader("miss")]
-void secondaryMiss(inout SecondaryPayload payload)
-{
-	payload.color = float4(0, 0, 0, 0);
-}
-
 float3 HitAttribute3(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
 {
 	return vertexAttribute[0] +
@@ -437,9 +463,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
         Vertices[indices[2]].textureCoordinate 
 	};
 
-    // Compute the triangle's normal.
-    // This is redundant and done for illustration purposes 
-    // as all the per-vertex normals are the same and match triangle's normal in this sample. 
+    // Compute the triangle's normal and textureCoord
 	float3 triangleNormal = HitAttribute3(vertexNormals, attribs);
 	float2 triangleTexCoord = HitAttribute2(vertexTexCoord, attribs);
 	
@@ -454,7 +478,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	float3 N = getFromNormalMapping(normal, worldNormal, vertexPositions, vertexTexCoord, (float3x3) ObjectToWorld3x4());
 	float3 V = normalize(-WorldRayDirection());
 	
-	
+	// direct lighting
 	uint seed = initRand((triangleTexCoord.x * 200 + (triangleTexCoord.y * 200*200)), localFrameIndexCB.FrameIndex, 16);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
 	float rnd1 = lowDiscrepSeq.x;
@@ -491,3 +515,11 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	payload.color = float4(color, 1);
 }
 
+[shader("miss")]
+void secondaryMiss(inout SecondaryPayload payload)
+{
+	payload.color = float4(0, 0, 0, 0);
+}
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
+//**********************************************************************************************************************//
