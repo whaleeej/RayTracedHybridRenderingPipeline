@@ -24,7 +24,7 @@ void msgBox(const std::string& msg)
 
 void d3dTraceHR(const std::string& msg, HRESULT hr)
 {
-	char hr_msg[512];
+	char hr_msg[2048];
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, hr, 0, hr_msg, ARRAYSIZE(hr_msg), nullptr);
 
 	std::string error_msg = msg + ".\nError! " + hr_msg;

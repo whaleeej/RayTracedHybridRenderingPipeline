@@ -157,6 +157,6 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	pLReflect.PositionWS = float4(reflect(-V, N)*2 + P, 1);
 	float3 color2 = DoPbrPointLight(pLReflect, N, V, P, albedo, roughness, metallic, 1.0);
 	
-	float3 color = LinearToSRGB((color0 + color1 + 0.02 * color2));
+	float3 color = LinearToSRGB((color0 + color1 + color2));
 	return float4(color, 0);
 }

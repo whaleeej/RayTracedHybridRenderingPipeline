@@ -4,6 +4,7 @@ Texture2D<float4> GPosition : register(t1);
 Texture2D<float4> GAlbedoMetallic : register(t2);
 Texture2D<float4> GNormalRoughness : register(t3);
 Texture2D<float4> GExtra : register(t4);
+
 struct PointLight
 {
 	float4 PositionWS;
@@ -283,18 +284,19 @@ void shadowChs(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAtt
 }
 
 //////////////////////////////////////////////////// for reflection chs
-ByteAddressBuffer Indices : register(t0, space1);
+RaytracingAccelerationStructure localRtScene : register(t0, space1);
+ByteAddressBuffer Indices : register(t1, space1);
 struct Vertex
 {
 	float3 position;
 	float3 normal;
 	float2 textureCoordinate;
 };
-StructuredBuffer<Vertex> Vertices : register(t1, space1);
-Texture2D AlbedoTexture : register(t2, space1);
-Texture2D MetallicTexture : register(t3, space1);
-Texture2D NormalTexture : register(t4, space1);
-Texture2D RoughnessTexture : register(t5, space1);
+StructuredBuffer<Vertex> Vertices : register(t2, space1);
+Texture2D AlbedoTexture : register(t3, space1);
+Texture2D MetallicTexture : register(t4, space1);
+Texture2D NormalTexture : register(t5, space1);
+Texture2D RoughnessTexture : register(t6, space1);
 struct Material
 {
 	float4 Emissive;
@@ -318,6 +320,10 @@ struct ObjectIndex
 	float3 padding;
 };
 ConstantBuffer<ObjectIndex> GameObjectIndex : register(b2, space1);
+
+ConstantBuffer<PointLight> localPointLight : register(b3, space1);
+
+ConstantBuffer<FrameIndex> localFrameIndexCB : register(b4, space1);
 
 SamplerState AnisotropicSampler : register(s0);
 
@@ -358,6 +364,23 @@ uint3 Load3x16BitIndices(uint offsetBytes)
 	return indices;
 }
 
+float3 getFromNormalMapping(float3 sampledNormal, float3 NormalWS, float3 vertexPosition[3], float2 vertexUV[3], float3x3 R)
+{
+	float3 tangentNormal = sampledNormal.xyz * 2.0 - 1.0; // [-1, 1]
+	
+	float3 deltaXYZ_1 = mul(R, vertexPosition[1]) - mul(R, vertexPosition[0]);
+	float3 deltaXYZ_2 = mul(R, vertexPosition[2]) - mul(R, vertexPosition[0]);
+	float2 deltaUV_1 = vertexUV[1] - vertexUV[0];
+	float2 deltaUV_2 = vertexUV[2] - vertexUV[0];
+	
+	float3 N = normalize(NormalWS);
+	float3 T = normalize(deltaUV_2.y * deltaXYZ_1 - deltaUV_1.y * deltaXYZ_2);
+	float3 B = normalize(cross(N, T));
+	float3x3 TBN = float3x3(T, B, N);
+	
+	return normalize(mul(tangentNormal, TBN)); // [-1, 1]
+}
+
 [shader("miss")]
 void secondaryMiss(inout SecondaryPayload payload)
 {
@@ -393,6 +416,13 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	const uint3 indices = Load3x16BitIndices(baseIndex);
 
     // Retrieve corresponding vertex normals for the triangle vertices.
+	float3 vertexPositions[3] =
+	{
+		Vertices[indices[0]].position,
+        Vertices[indices[1]].position,
+        Vertices[indices[2]].position 
+	};
+	
 	float3 vertexNormals[3] =
 	{
 		Vertices[indices[0]].normal,
@@ -412,9 +442,52 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
     // as all the per-vertex normals are the same and match triangle's normal in this sample. 
 	float3 triangleNormal = HitAttribute3(vertexNormals, attribs);
 	float2 triangleTexCoord = HitAttribute2(vertexTexCoord, attribs);
-
-	float4 col = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0) * MaterialCB.Diffuse;
 	
-	payload.color = float4(col);
+	float3 worldNormal = normalize(mul((float3x3) ObjectToWorld3x4(), (triangleNormal)));
+
+	float3 albedo = AlbedoTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0).xyz * MaterialCB.Diffuse.xyz;
+	float metallic =  MetallicTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0).x * PBRMaterialCB.Metallic;
+	float3 normal = NormalTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0).xyz;
+	float roughness = RoughnessTexture.SampleLevel(AnisotropicSampler, triangleTexCoord, 0).x * PBRMaterialCB.Roughness;
+	
+	float3 P = hitPosition;
+	float3 N = getFromNormalMapping(normal, worldNormal, vertexPositions, vertexTexCoord, (float3x3) ObjectToWorld3x4());
+	float3 V = normalize(-WorldRayDirection());
+	
+	
+	uint seed = initRand((triangleTexCoord.x * 200 + (triangleTexCoord.y * 200*200)), localFrameIndexCB.FrameIndex, 16);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+	float rnd1 = lowDiscrepSeq.x;
+	float rnd2 = lowDiscrepSeq.y;
+	//// shadow and lighting
+	RayDesc ray;
+	ray.TMin = 0.0f;
+	ShadowRayPayload shadowPayload;
+	//// area Point Light
+	// low discrep sampling
+	float bias = 1e-4f;
+	float3 P_biased = P + N * bias;
+	float3 dest = localPointLight.PositionWS.xyz;
+	float distan = distance(P_biased, dest);
+	float3 dir = (dest - P_biased) / distan;
+	float sampleDestRadius = localPointLight.radius;
+	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+	// ray setup
+	ray.Origin = P_biased;
+	ray.Direction = distributedDir;
+	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+	shadowPayload.hit = false;
+	//shadow ray tracing
+	TraceRay(localRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+	0xFF, 0, 0, 0, ray, shadowPayload);
+	float3 color = 0;
+	if (shadowPayload.hit == false)
+	{
+		color +=DoPbrPointLight(localPointLight, N, V, P, albedo, roughness, metallic);
+	}
+	
+	payload.color = float4(color, 1);
 }
 

@@ -1225,7 +1225,7 @@ void HybridPipeline::createRtPipelineState()
 
 	// Create the secondary root-signature and association
 
-	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 6, 1, &static_sampler_desc ,3,0,1).desc);
+	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 7, 1, &static_sampler_desc ,5,0,1).desc);
 	subobjects[index] = secondaryRootSignature.subobject;// 5 Secondary chs sig
 
 	uint32_t secondaryRootIndex = index++;//5
@@ -1253,7 +1253,7 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = configAssociation.subobject; // 10 Associate Shader Config to Miss, shadowCHS, shadowRGS, secondaryCHS, secondaryRGS
 
 	// Create the pipeline config
-	PipelineConfig config(1);
+	PipelineConfig config(4);
 	subobjects[index++] = config.subobject; // 11 configuration 
 
 	// Create the global root signature and store the empty signature
@@ -1426,9 +1426,12 @@ void HybridPipeline::createSrvUavHeap() {
 	}
 
 	//****************************Descriptor heap
+
 	// Create the uavSrvHeap and its handle
+	uint32_t srvuavBias = 6;
+	uint32_t srvuavPerHitSize = 7;
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = 6 + objectToRT * 6;
+	desc.NumDescriptors = srvuavBias + objectToRT * srvuavPerHitSize;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
@@ -1473,6 +1476,10 @@ void HybridPipeline::createSrvUavHeap() {
 		//uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		// indices 0
+		pDevice->CreateShaderResourceView(nullptr, &srvTLASDesc, uavSrvHandle);
+		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		// indices 1
 		D3D12_SHADER_RESOURCE_VIEW_DESC indexSrvDesc = {};
 		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		indexSrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -1481,7 +1488,7 @@ void HybridPipeline::createSrvUavHeap() {
 		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		// vetices 1
+		// vetices 2
 		D3D12_SHADER_RESOURCE_VIEW_DESC vertexSrvDesc = {};
 		vertexSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
 		vertexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -1491,22 +1498,22 @@ void HybridPipeline::createSrvUavHeap() {
 		vertexSrvDesc.Buffer.StructureByteStride = sizeof(VertexPositionNormalTexture);
 		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getVertexBuffer().GetD3D12Resource().Get(), &vertexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//albedo 2
+		//albedo 3
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
 			1, &texturePool[pLobject->material.tex.AlbedoTexture].GetShaderResourceView() , pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//metallic 3
+		//metallic 4
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
 			1, &texturePool[pLobject->material.tex.MetallicTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//normal 4
+		//normal 5
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
 			1, &texturePool[pLobject->material.tex.NormalTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//roughness 5
+		//roughness 6
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
 			1, &texturePool[pLobject->material.tex.RoughnessTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1533,8 +1540,8 @@ void HybridPipeline::createShaderTable()
 
 	// Calculate the size and create the buffer
 	mShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	mShaderTableEntrySize += 32; // The ray-gen's descriptor table
-	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+	mShaderTableEntrySize += 48; // The ray-gen's descriptor table
+	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 	uint32_t shaderTableSize = mShaderTableEntrySize * (3 + objectToRT *2);
 
 	// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
@@ -1565,7 +1572,7 @@ void HybridPipeline::createShaderTable()
 
 	objectToRT = 0;
 	uint32_t srvuavBias = 6;
-	uint32_t srvuavPerHitSize = 6;
+	uint32_t srvuavPerHitSize = 7;
 	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
@@ -1586,6 +1593,8 @@ void HybridPipeline::createShaderTable()
 		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 1) = mpRTMaterialCBList[objectToRT]->GetGPUVirtualAddress();
 		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 2) = mpRTPBRMaterialCBList[objectToRT]->GetGPUVirtualAddress();
 		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 3) = mpRTGameObjectIndexCBList[objectToRT]->GetGPUVirtualAddress();
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 4) = mpRTPointLightCB->GetGPUVirtualAddress();
+		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 5) = mpRTFrameIndexCB->GetGPUVirtualAddress();
 
 		objectToRT++;
 	}

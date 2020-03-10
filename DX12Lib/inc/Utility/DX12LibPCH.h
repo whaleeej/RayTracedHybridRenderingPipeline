@@ -50,6 +50,9 @@ using namespace DirectX;
 #include <array>
 #include <fstream>
 #include <sstream>
+#include <locale>
+#include <codecvt>
+#include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
 // Helper functions
