@@ -10,7 +10,7 @@ struct SecondaryPayload
 //**********************************************************************************************************************//
 //**************************************************for raygen shadow*************************************************//
 //**********************************************************************************************************************//
-RWTexture2D<float4> gOutput : register(u0);
+RWTexture2D<float4> shadowReflect : register(u0);
 RaytracingAccelerationStructure gRtScene : register(t0);
 Texture2D<float4> GPosition : register(t1);
 Texture2D<float4> GAlbedoMetallic : register(t2);
@@ -91,43 +91,43 @@ return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 float3 DoPbrPointLight(PointLight light, float3 N, float3 V, float3 P, float3 albedo, float roughness, float metallic)
 {
-const float PI = 3.14159265359;
-float3 F0 = float3(0.04, 0.04, 0.04);
-F0 = lerp(F0, albedo, metallic);
-float3 L = normalize(light.PositionWS.xyz - P);
-float3 H = normalize(V + L);
-float distance = length(light.PositionWS.xyz - P);
-float attenuation = DoAttenuation(light.Attenuation, distance);
-float3 radiance = light.Color.xyz * attenuation;
+	const float PI = 3.14159265359;
+	float3 F0 = float3(0.04, 0.04, 0.04);
+	F0 = lerp(F0, albedo, metallic);
+	float3 L = normalize(light.PositionWS.xyz - P);
+	float3 H = normalize(V + L);
+	float distance = length(light.PositionWS.xyz - P);
+	float attenuation = DoAttenuation(light.Attenuation, distance);
+	float3 radiance = light.Color.xyz * attenuation;
 
-// Cook-Torrance BRDF
-float NDF = DistributionGGX(N, H, roughness);
-float G = GeometrySmith(N, V, L, roughness);
-float3 F = fresnelSchlick(clamp(dot(N, V), 0.0, 1.0), F0);
+	// Cook-Torrance BRDF
+	float NDF = DistributionGGX(N, H, roughness);
+	float G = GeometrySmith(N, V, L, roughness);
+	float3 F = fresnelSchlick(clamp(dot(N, V), 0.0, 1.0), F0);
 	
-float3 nominator = NDF * G * F;
-float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
-float3 specular = nominator / max(denominator, 0.001); // prevent divide by zero for NdotV=0.0 or NdotL=0.0
+	float3 nominator = NDF * G * F;
+	float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+	float3 specular = nominator / max(denominator, 0.001); // prevent divide by zero for NdotV=0.0 or NdotL=0.0
         
-// kS is equal to Fresnel
-float3 kS = F;
-// for energy conservation, the diffuse and specular light can't
-// be above 1.0 (unless the surface emits light); to preserve this
-// relationship the diffuse component (kD) should equal 1.0 - kS.
-float3 kD = float3(1.0, 1.0, 1.0) - kS;
-// multiply kD by the inverse metalness such that only non-metals 
-// have diffuse lighting, or a linear blend if partly metal (pure metals
-// have no diffuse light).
-kD *= 1.0 - metallic;
+	// kS is equal to Fresnel
+	float3 kS = F;
+	// for energy conservation, the diffuse and specular light can't
+	// be above 1.0 (unless the surface emits light); to preserve this
+	// relationship the diffuse component (kD) should equal 1.0 - kS.
+	float3 kD = float3(1.0, 1.0, 1.0) - kS;
+	// multiply kD by the inverse metalness such that only non-metals 
+	// have diffuse lighting, or a linear blend if partly metal (pure metals
+	// have no diffuse light).
+	kD *= 1.0 - metallic;
 
-// scale light by NdotL
-float NdotL = max(dot(N, L), 0.0);
+	// scale light by NdotL
+	float NdotL = max(dot(N, L), 0.0);
 
-// add to outgoing radiance Lo
-return (kD * albedo / PI + specular) * radiance * NdotL;
-//return (kD * albedo / PI ) * radiance * NdotL;
-//return ( specular) * radiance * NdotL;
-//return radiance * NdotL;
+	// add to outgoing radiance Lo
+	return (kD * albedo / PI + specular) * radiance * NdotL;
+	//return (kD * albedo / PI ) * radiance * NdotL;
+	//return ( specular) * radiance * NdotL;
+	//return radiance * NdotL;
 }
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
@@ -208,6 +208,17 @@ float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
 	
 	return normalize(SampleTan2W(H,N));
 }
+float ImportanceSamplePdf(float roughness, float cosTheta)
+{
+	float PI = 3.1415926536;
+	float a = roughness * roughness;
+	float a_sq = a * a;
+	float sinThera = sqrt(1 - cosTheta * cosTheta);
+	float demon = ((1 - a_sq) * cosTheta * cosTheta - 1);
+	float demon_sq_pi = demon * demon * 2 * PI;
+	float pdf = (2 * a_sq * sinThera * cosTheta) / demon_sq_pi;
+	return pdf;
+}
 //////////////////////////////////////////////////// Sampling method
 
 [shader("raygeneration")]
@@ -223,7 +234,7 @@ void rayGen()
 	float hit = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
 	if (hit == 0)
 	{
-		gOutput[launchIndex.xy] = float4(0, 0, 0, 1);
+		shadowReflect[launchIndex.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 	float3 position = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
@@ -274,19 +285,27 @@ void rayGen()
 		Lo += 1.0f;
 	}
 	
-	
 	// reflection
+	float3 H = ImportanceSampleGGX(float2(rnd1, rnd2), N, roughness); // importance sample the half vector
 	RayDesc raySecondary;
-	raySecondary.TMin = 0.1f;
+	raySecondary.TMin = 0.01f;
 	raySecondary.Origin = P;
-	raySecondary.Direction = ImportanceSampleGGX(float2(rnd1, rnd2), reflect(-V, N), roughness);
+	raySecondary.Direction = reflect(-V, H);
 	raySecondary.TMax = 10000.0f;
 	SecondaryPayload secondaryPayload;
-	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+	secondaryPayload.color = float4(0, 0, 0, 1);
+	if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
+	{
+		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+		// rescale the reflected radiance by inverse pdf for monte carlo method estimation
+		float pdf = ImportanceSamplePdf(roughness, dot(N, H));
+		secondaryPayload.color = secondaryPayload.color / pdf;
+		//secondaryPayload.color = secondaryPayload.color;
+	}
 	
 	// output
-	gOutput[launchIndex.xy] = float4(Lo, secondaryPayload.color.xyz);
+	shadowReflect[launchIndex.xy] = float4(Lo, secondaryPayload.color.xyz);
 }
 //**********************************************************************************************************************//
 //**********************************************************************************************************************//
