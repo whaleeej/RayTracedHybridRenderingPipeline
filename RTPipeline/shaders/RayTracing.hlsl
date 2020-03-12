@@ -10,7 +10,8 @@ struct SecondaryPayload
 //**********************************************************************************************************************//
 //**************************************************for raygen shadow*************************************************//
 //**********************************************************************************************************************//
-RWTexture2D<float4> shadowReflect : register(u0);
+RWTexture2D<float4> shadowOutput : register(u0);
+RWTexture2D<float4> reflectOutput : register(u1);
 RaytracingAccelerationStructure gRtScene : register(t0);
 Texture2D<float4> GPosition : register(t1);
 Texture2D<float4> GAlbedoMetallic : register(t2);
@@ -234,7 +235,7 @@ void rayGen()
 	float hit = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).w;
 	if (hit == 0)
 	{
-		shadowReflect[launchIndex.xy] = float4(0, 0, 0, 1);
+		shadowOutput[launchIndex.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 	float3 position = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
@@ -301,11 +302,11 @@ void rayGen()
 		// rescale the reflected radiance by inverse pdf for monte carlo method estimation
 		float pdf = ImportanceSamplePdf(roughness, dot(N, H));
 		secondaryPayload.color = secondaryPayload.color / pdf;
-		//secondaryPayload.color = secondaryPayload.color;
 	}
 	
 	// output
-	shadowReflect[launchIndex.xy] = float4(Lo, secondaryPayload.color.xyz);
+	reflectOutput[launchIndex.xy] = float4(secondaryPayload.color.xyz, dot(raySecondary.Direction, N));
+	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
 }
 //**********************************************************************************************************************//
 //**********************************************************************************************************************//

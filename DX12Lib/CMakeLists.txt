@@ -50,6 +50,9 @@ target_include_directories( DX12Lib
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
 )
 
+add_compile_definitions(_DISABLE_EXTENDED_ALIGNED_STORAGE)
+add_compile_definitions(_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
+
 target_link_libraries( DX12Lib 
 	PUBLIC DirectXTex
     PUBLIC d3d12.lib

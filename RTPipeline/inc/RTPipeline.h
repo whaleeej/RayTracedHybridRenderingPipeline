@@ -231,7 +231,8 @@ private:
 	void createShaderResources();
 	void createSrvUavHeap();
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	std::shared_ptr< Texture > mpRtOutputTexture;
+	std::shared_ptr< Texture > mpRtShadowOutputTexture;
+	std::shared_ptr< Texture > mpRtReflectOutputTexture;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTFrameIndexCB;

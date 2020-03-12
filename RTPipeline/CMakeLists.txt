@@ -63,6 +63,9 @@ set_source_files_properties( ${RT_SHADER_FILES}
         HEADER_FILE_ONLY TRUE
 )
 
+add_compile_definitions(_DISABLE_EXTENDED_ALIGNED_STORAGE)
+add_compile_definitions(_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
+
 add_executable( RTPipeline WIN32
     ${HEADER_FILES} 
     ${SRC_FILES}

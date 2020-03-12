@@ -550,7 +550,7 @@ bool HybridPipeline::LoadContent()
 		// Create the PostLighting_PS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0)
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
 			};
 
 			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
@@ -728,7 +728,8 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
 		//commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, mpSamplerHeap.Get());
 
-		commandList->TransitionBarrier(*mpRtOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->TransitionBarrier(*mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->TransitionBarrier(*mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -802,7 +803,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -855,6 +856,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, color_out_final, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		CameraRTCB mCameraCB;
 		mCameraCB.PositionWS = m_Camera.get_Translation();
 		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
@@ -1216,7 +1218,7 @@ void HybridPipeline::createRtPipelineState()
 	CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc(0);
 
 	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(1,5,1, &static_sampler_desc,3,0,0).desc);
+	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(2,5,1, &static_sampler_desc,3,0,0).desc);
 	subobjects[index] = rgsRootSignature.subobject; // 3 RayGen Root Sig
 
 	uint32_t rgsRootIndex = index++; // 3
@@ -1352,10 +1354,14 @@ void HybridPipeline::createShaderResources()
 	auto pDevice = Application::Get().GetDevice();
 	//****************************UAV Resource
 	// gOutput
-	mpRtOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
+	mpRtShadowOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
 		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
-	), nullptr, TextureUsage::RenderTarget, L"mpRtOutputTexture");
+	), nullptr, TextureUsage::RenderTarget, L"mpRtShadowOutputTexture");
+	mpRtReflectOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
+		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height, 1, 0, 1, 0,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0
+	), nullptr, TextureUsage::RenderTarget, L"mpRtReflectOutputTexture");
 
 	//****************************SRV Resource
 	//gRtScene / GPosition / GAlbedo / GMetallic / GNormal / GRoughness
@@ -1428,7 +1434,7 @@ void HybridPipeline::createSrvUavHeap() {
 	//****************************Descriptor heap
 
 	// Create the uavSrvHeap and its handle
-	uint32_t srvuavBias = 6;
+	uint32_t srvuavBias = 7;
 	uint32_t srvuavPerHitSize = 7;
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = srvuavBias + objectToRT * srvuavPerHitSize;
@@ -1437,10 +1443,14 @@ void HybridPipeline::createSrvUavHeap() {
 	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
 	D3D12_CPU_DESCRIPTOR_HANDLE uavSrvHandle = mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
-	// Create the UAV for GOutput
+	// Create the UAV for GShadowOutput
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavGOutputDesc = {};
 	uavGOutputDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	pDevice->CreateUnorderedAccessView(mpRtOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
+	pDevice->CreateUnorderedAccessView(mpRtShadowOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// Create the UAV for GReflectOutput
+	pDevice->CreateUnorderedAccessView(mpRtReflectOutputTexture->GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
 	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// Create srv for TLAS
@@ -1571,7 +1581,7 @@ void HybridPipeline::createShaderTable()
 	memcpy(pData + mShaderTableEntrySize*2, pRtsoProps->GetShaderIdentifier(kSecondaryMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
 	objectToRT = 0;
-	uint32_t srvuavBias = 6;
+	uint32_t srvuavBias = 7;
 	uint32_t srvuavPerHitSize = 7;
 	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
 	{
