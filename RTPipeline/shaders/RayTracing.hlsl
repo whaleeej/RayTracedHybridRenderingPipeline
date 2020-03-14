@@ -294,19 +294,19 @@ void rayGen()
 	raySecondary.Direction = reflect(-V, H);
 	raySecondary.TMax = 10000.0f;
 	SecondaryPayload secondaryPayload;
-	secondaryPayload.color = float4(0, 0, 0, 1);
+	secondaryPayload.color = float4(0, 0, 0, 0);
+	float pdf = 1;
 	if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
 	{
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		// rescale the reflected radiance by inverse pdf for monte carlo method estimation
-		float pdf = ImportanceSamplePdf(roughness, dot(N, H));
-		secondaryPayload.color = secondaryPayload.color / pdf;
+		pdf= ImportanceSamplePdf(roughness, dot(N, H));
+		secondaryPayload.color = secondaryPayload.color;
 	}
 	
 	// output
-	reflectOutput[launchIndex.xy] = float4(secondaryPayload.color.xyz, dot(raySecondary.Direction, N));
-	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
+	reflectOutput[launchIndex.xy] = float4(secondaryPayload.color.xyz, pdf);
+	shadowOutput[launchIndex.xy] = float4(Lo, raySecondary.Direction);
 }
 //**********************************************************************************************************************//
 //**********************************************************************************************************************//
@@ -526,7 +526,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	//shadow ray tracing
 	TraceRay(localRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
 	0xFF, 0, 0, 0, ray, shadowPayload);
-	float3 color = 0;
+	float3 color = 0.000;
 	if (shadowPayload.hit == false)
 	{
 		color +=DoPbrPointLight(localPointLight, N, V, P, albedo, roughness, metallic);

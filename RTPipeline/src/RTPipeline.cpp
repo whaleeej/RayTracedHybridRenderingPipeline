@@ -188,43 +188,43 @@ bool HybridPipeline::LoadContent()
 		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
 		gameObjectPool["Floor plane"]->gid = gid++;
 		gameObjectPool["Floor plane"]->mesh = "plane";
-		gameObjectPool["Floor plane"]->material.base = Material::Red;
-		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Floor plane"]->material.base = Material::White;
+		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
 		gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
 		gameObjectPool["Back wall"]->gid = gid++;
 		gameObjectPool["Back wall"]->mesh = "plane";
-		gameObjectPool["Back wall"]->material.base = Material::Green;
-		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Back wall"]->material.base = Material::Turquoise;
+		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 0.1f);
 		gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
 		gameObjectPool["Ceiling plane"]->gid = gid++;
 		gameObjectPool["Ceiling plane"]->mesh = "plane";
-		gameObjectPool["Ceiling plane"]->material.base = Material::Blue;
-		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Ceiling plane"]->material.base = Material::White;
+		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
 		gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
 		gameObjectPool["Front wall"]->gid = gid++;
 		gameObjectPool["Front wall"]->mesh = "plane";
-		gameObjectPool["Front wall"]->material.base = Material::Yellow;
-		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 1.0f);
+		gameObjectPool["Front wall"]->material.base = Material::Copper;
+		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 0.7f);
 		gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
 		gameObjectPool["Left wall"]->gid = gid++;
 		gameObjectPool["Left wall"]->mesh = "plane";
-		gameObjectPool["Left wall"]->material.base = Material::Cyan;
-		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.2f);
+		gameObjectPool["Left wall"]->material.base = Material::Jade;
+		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.3f);
 		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
 		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
 		gameObjectPool["Right wall"]->gid = gid++;
 		gameObjectPool["Right wall"]->mesh = "plane";
-		gameObjectPool["Right wall"]->material.base = Material::Magenta;
-		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.2f);
+		gameObjectPool["Right wall"]->material.base = Material::Ruby;
+		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.6f);
 		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 
 		// light object
@@ -312,6 +312,9 @@ bool HybridPipeline::LoadContent()
 		gExtra = Texture(colorDesc, &colorClearValue,
 			TextureUsage::RenderTarget,
 			L"gExtra: ObjectId Texture");
+		g_indirectOutput = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gExtra: ObjectId Texture");
 
 		// Create a depth buffer for the Deferred render target.
 		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
@@ -334,6 +337,8 @@ bool HybridPipeline::LoadContent()
 		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
 		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
 
+		m_resampledIndirectBuffer.AttachTexture(AttachmentPoint::Color0, g_indirectOutput);
+
 		// uav creation
 		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
@@ -346,8 +351,8 @@ bool HybridPipeline::LoadContent()
 		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
 		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
 		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
-		
-		
+		radiance_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc");
+
 		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
 		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
@@ -370,6 +375,7 @@ bool HybridPipeline::LoadContent()
 		col_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc_prev");
 		moment_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc_prev");
 		his_length_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"his_length_prev");
+		radiance_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc_prev");
 	}
 
 	/////////////////////////////////// RT Gen
@@ -594,6 +600,101 @@ bool HybridPipeline::LoadContent()
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
 		}
+
+		// Create the PostSpatial_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostSpatialResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSpatialResample_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostSpatialResampleStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postSpatialResampleStateStream;
+
+			postSpatialResampleStateStream.pRootSignature = m_PostSpatialResampleRootSignature.GetRootSignature().Get();
+			postSpatialResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postSpatialResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postSpatialResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postSpatialResampleStateStream.Rasterizer = rasterizerDesc;
+			postSpatialResampleStateStream.RTVFormats = m_resampledIndirectBuffer.GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postSpatialResampleStateStreamDesc = {
+				sizeof(postSpatialResampleStateStream), & postSpatialResampleStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postSpatialResampleStateStreamDesc, IID_PPV_ARGS(&m_PostSpatialResampleState)));
+		}
+
+		// Create the PostTemporalResample_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 11, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostTemporalResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporalResample_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostTemporalResampleStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postTemporalResampleStateStream;
+
+			postTemporalResampleStateStream.pRootSignature = m_PostTemporalResampleRootSignature.GetRootSignature().Get();
+			postTemporalResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postTemporalResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postTemporalResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postTemporalResampleStateStream.Rasterizer = rasterizerDesc;
+			postTemporalResampleStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postTemporalResampleStateStreamDesc = {
+				sizeof(postTemporalResampleStateStream), &postTemporalResampleStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postTemporalResampleStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalResampleState)));
+		}
 	}
 	return true;
 }
@@ -701,6 +802,11 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandList = commandQueue->GetCommandList();
 	
 	FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+	CameraRTCB mCameraCB;
+	mCameraCB.PositionWS = m_Camera.get_Translation();
+	mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+	mCameraCB.fov = m_Camera.get_FoV();
 
 	// Rasterizing Pipe, G-Buffer-Gen
 	{
@@ -843,6 +949,57 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		}
 	}
 
+	// perform post spatial resample 
+	{
+		{
+			commandList->ClearTexture(m_resampledIndirectBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
+		}
+
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_resampledIndirectBuffer);
+		commandList->SetPipelineState(m_PostSpatialResampleState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_PostSpatialResampleRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetGraphicsDynamicConstantBuffer(1, mCameraCB);
+		commandList->Draw(3);
+	}
+
+	// perform postTemporalResample
+	{
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
+		commandList->SetPipelineState(m_PostTemporalResampleState);
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->SetGraphicsRootSignature(m_PostTemporalResampleRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, radiance_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, g_indirectOutput, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, radiance_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetGraphicsDynamicConstantBuffer(1, viewProjectMatrix_prev);
+		commandList->Draw(3);
+	}
+
+
+	// post lighting
 	{
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
@@ -856,15 +1013,13 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, color_out_final, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		CameraRTCB mCameraCB;
-		mCameraCB.PositionWS = m_Camera.get_Translation();
-		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-		mCameraCB.fov = m_Camera.get_FoV();
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, radiance_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
 		commandList->Draw(3);
 	}
+
+
 
 	// prev buffer cache
 	{
@@ -876,6 +1031,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->CopyResource(gExtra_prev, gExtra);	
 		commandList->CopyResource(moment_acc_prev, moment_acc);
 		commandList->CopyResource(his_length_prev, his_length);
+		commandList->CopyResource(radiance_acc_prev, radiance_acc);
 	}
 
     commandQueue->ExecuteCommandList(commandList);

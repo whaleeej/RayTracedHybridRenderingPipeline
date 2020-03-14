@@ -200,16 +200,28 @@ private:
 
 	uint32_t ATrous_Level_Max = 3;
 
+	// Post SpatialResample
+	RenderTarget m_resampledIndirectBuffer;
+	Texture g_indirectOutput;
+
+	// Post Temporal Resample
+	Texture radiance_acc;
+	Texture radiance_acc_prev;
+
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
 	RootSignature m_PostTemporalRootSignature;
 	RootSignature m_PostATrousRootSignature;
+	RootSignature m_PostSpatialResampleRootSignature;
+	RootSignature m_PostTemporalResampleRootSignature;
 	RootSignature m_PostLightingRootSignature;
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalPipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostATrousPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSpatialResampleState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalResampleState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;
 
 	D3D12_VIEWPORT m_Viewport;
