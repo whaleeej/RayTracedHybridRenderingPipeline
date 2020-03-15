@@ -123,8 +123,7 @@ float3 spatialResample(float x, float y, float2 res)
 	float roughness = gNormalRoughness.Load(int3(x, y, 0)).w;
 	float metallic     = gAlbedoMetallic.Load(int3(x, y, 0)).w;
 	
-	int radius = lerp(1, 5, roughness * roughness);
-	
+	int radius = lerp(1, 3, roughness * roughness);
 	float3 result_sum = 0;
 	float weight_sum = 0;
 	int gaus_count = 0;

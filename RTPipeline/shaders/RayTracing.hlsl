@@ -400,6 +400,12 @@ ConstantBuffer<PointLight> localPointLight : register(b3, space1);
 ConstantBuffer<FrameIndex> localFrameIndexCB : register(b4, space1);
 SamplerState AnisotropicSampler : register(s0);
 
+float3 LinearToSRGB(float3 x)
+{
+    // This is exactly the sRGB curve
+	return x < 0.0031308 ? 12.92 * x : 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055;
+}
+
 float3 HitWorldPosition()
 {
 	return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();

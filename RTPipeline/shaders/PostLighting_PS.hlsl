@@ -161,5 +161,5 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	//return float4(color, 1);
 	
 	// test
-	return float4(LinearToSRGB(/*simpleToneMapping*/(reflectivity)), 0);
+	return float4(LinearToSRGB( /*simpleToneMapping*/(reflectivity)), 0);
 }
