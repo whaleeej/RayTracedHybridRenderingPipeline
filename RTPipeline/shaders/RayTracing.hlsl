@@ -209,6 +209,21 @@ float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
 	
 	return normalize(SampleTan2W(H,N));
 }
+float3 UniformSample(float2 Xi, float3 N)
+{
+	float PI = 3.141592653;
+
+	float phi = 2.0 * PI * Xi.x;
+	float theta = 0.5 * PI * Xi.y;
+	
+    // from spherical coordinates to cartesian coordinates
+	float3 R;
+	R.x = cos(phi) * sin(theta);
+	R.y = sin(phi) * sin(theta);
+	R.z =  cos(theta);
+	
+	return normalize(SampleTan2W(R, N));
+}
 float ImportanceSamplePdf(float roughness, float cosTheta)
 {
 	float PI = 3.1415926536;
@@ -301,7 +316,13 @@ void rayGen()
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
 		pdf= ImportanceSamplePdf(roughness, dot(N, H));
-		secondaryPayload.color = secondaryPayload.color;
+	}
+	else
+	{
+		raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
+		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+		pdf = 1.0f;
 	}
 	
 	// output
