@@ -43,6 +43,24 @@ enum RootParameters
     Textures,            // Texture2D DiffuseTextures : register( t0-tN );
     NumRootParameters
 };
+static const D3D12_HEAP_PROPERTIES kUploadHeapProps =
+{
+	D3D12_HEAP_TYPE_UPLOAD,
+	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+	D3D12_MEMORY_POOL_UNKNOWN,
+	0,
+	0,
+};
+
+static const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
+{
+	D3D12_HEAP_TYPE_DEFAULT,
+	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+	D3D12_MEMORY_POOL_UNKNOWN,
+	0,
+	0
+};
+
 
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -106,279 +124,11 @@ HybridPipeline::~HybridPipeline()
 
 bool HybridPipeline::LoadContent()
 {
-	auto device = Application::Get().GetDevice();
-	/////////////////////////////////// Resource Loading
-	{ 
-		auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
-		auto commandList = commandQueue->GetCommandList();
-
-		// Create a Cube mesh
-		meshPool.emplace("cube", Mesh::CreateCube(*commandList));
-		meshPool.emplace("sphere", Mesh::CreateSphere(*commandList));
-		meshPool.emplace("cone", Mesh::CreateCone(*commandList));
-		meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
-		meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
-
-		// load PBR textures
-		texturePool.emplace("default_albedo", Texture());
-		commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
-		texturePool.emplace("default_metallic", Texture());
-		commandList->LoadTextureFromFile(texturePool["default_metallic"], L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
-		texturePool.emplace("default_normal", Texture());
-		commandList->LoadTextureFromFile(texturePool["default_normal"], L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
-		texturePool.emplace("default_roughness", Texture());
-		commandList->LoadTextureFromFile(texturePool["default_roughness"], L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
-		//// rusted iron
-		texturePool.emplace("rusted_iron_albedo", Texture());
-		commandList->LoadTextureFromFile(texturePool["rusted_iron_albedo"], L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
-		texturePool.emplace("rusted_iron_metallic", Texture());
-		commandList->LoadTextureFromFile(texturePool["rusted_iron_metallic"], L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
-		texturePool.emplace("rusted_iron_normal", Texture());
-		commandList->LoadTextureFromFile(texturePool["rusted_iron_normal"], L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
-		texturePool.emplace("rusted_iron_roughness", Texture());
-		commandList->LoadTextureFromFile(texturePool["rusted_iron_roughness"], L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
-		//// grid metal
-		texturePool.emplace("grid_metal_albedo", Texture());
-		commandList->LoadTextureFromFile(texturePool["grid_metal_albedo"], L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
-		texturePool.emplace("grid_metal_metallic", Texture());
-		commandList->LoadTextureFromFile(texturePool["grid_metal_metallic"], L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
-		texturePool.emplace("grid_metal_normal", Texture());
-		commandList->LoadTextureFromFile(texturePool["grid_metal_normal"], L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
-		texturePool.emplace("grid_metal_roughness", Texture());
-		commandList->LoadTextureFromFile(texturePool["grid_metal_roughness"], L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
-		//// metal
-		texturePool.emplace("metal_albedo", Texture());
-		commandList->LoadTextureFromFile(texturePool["metal_albedo"], L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
-		texturePool.emplace("metal_metallic", Texture());
-		commandList->LoadTextureFromFile(texturePool["metal_metallic"], L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
-		texturePool.emplace("metal_normal", Texture());
-		commandList->LoadTextureFromFile(texturePool["metal_normal"], L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
-		texturePool.emplace("metal_roughness", Texture());
-		commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
-
-		auto fenceValue = commandQueue->ExecuteCommandList(commandList);
-		commandQueue->WaitForFenceValue(fenceValue);
-	}
-
-	/////////////////////////////////// GameObject Gen
-	{
-		float gid = 0.0f;
-
-		gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
-		gameObjectPool["sphere"]->gid = gid++;
-		gameObjectPool["sphere"]->mesh = "sphere";
-		gameObjectPool["sphere"]->material.base = Material::White;
-		gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
-
-		gameObjectPool.emplace("cube", std::make_shared<GameObject>());
-		gameObjectPool["cube"]->gid = gid++;
-		gameObjectPool["cube"]->mesh = "cube";
-		gameObjectPool["cube"]->material.base = Material::White;
-		gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
-
-		gameObjectPool.emplace("torus", std::make_shared<GameObject>());
-		gameObjectPool["torus"]->gid = gid++;
-		gameObjectPool["torus"]->mesh = "torus";
-		gameObjectPool["torus"]->material.base = Material::White;
-		gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
-
-		gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
-		gameObjectPool["Floor plane"]->gid = gid++;
-		gameObjectPool["Floor plane"]->mesh = "plane";
-		gameObjectPool["Floor plane"]->material.base = Material::White;
-		gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
-		gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
-
-		gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
-		gameObjectPool["Back wall"]->gid = gid++;
-		gameObjectPool["Back wall"]->mesh = "plane";
-		gameObjectPool["Back wall"]->material.base = Material::Turquoise;
-		gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 0.1f);
-		gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
-
-		gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
-		gameObjectPool["Ceiling plane"]->gid = gid++;
-		gameObjectPool["Ceiling plane"]->mesh = "plane";
-		gameObjectPool["Ceiling plane"]->material.base = Material::White;
-		gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
-		gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
-
-		gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
-		gameObjectPool["Front wall"]->gid = gid++;
-		gameObjectPool["Front wall"]->mesh = "plane";
-		gameObjectPool["Front wall"]->material.base = Material::Copper;
-		gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 0.7f);
-		gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
-
-		gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
-		gameObjectPool["Left wall"]->gid = gid++;
-		gameObjectPool["Left wall"]->mesh = "plane";
-		gameObjectPool["Left wall"]->material.base = Material::Jade;
-		gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.3f);
-		gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
-
-		gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
-		gameObjectPool["Right wall"]->gid = gid++;
-		gameObjectPool["Right wall"]->mesh = "plane";
-		gameObjectPool["Right wall"]->material.base = Material::Ruby;
-		gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.6f);
-		gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
-
-		// light object
-		lightObjectIndex = "sphere light";
-		gameObjectPool.emplace(lightObjectIndex, std::make_shared<GameObject>());//7
-		gameObjectPool[lightObjectIndex]->gid = gid++;
-		gameObjectPool[lightObjectIndex]->mesh = "sphere";
-		gameObjectPool[lightObjectIndex]->material.base = Material::EmissiveWhite;
-		gameObjectPool[lightObjectIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool[lightObjectIndex]->material.tex = TextureMaterial("default");
-	}
-    
-	/////////////////////////////////// Initial the transform
-	{ 
-		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
-		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
-
-		gameObjectPool["cube"]->Translate(XMMatrixTranslation(-4.0f, 3.0f, -2.0f));
-		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["cube"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
-
-		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -6.0f));
-		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
-
-		float scalePlane = 20.0f;
-		float translateOffset = scalePlane / 2.0f;
-
-		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
-		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-
-		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
-		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
-	}
-
-	/////////////////////////////////// BackScreen RT Creation and other intermediate textures
-	{
-		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
-
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
-
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 1,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		D3D12_CLEAR_VALUE colorClearValue;
-		colorClearValue.Format = colorDesc.Format;
-		colorClearValue.Color[0] = 0.0f;
-		colorClearValue.Color[1] = 0.0f;
-		colorClearValue.Color[2] = 0.0f;
-		colorClearValue.Color[3] = 1.0f;
-
-		gPosition = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gPosition+HitTexture");
-		gAlbedoMetallic = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gAlbedoMetallic Texture");
-		gNormalRoughness = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gNormalRoughness Texture");
-		gExtra = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gExtra: ObjectId Texture");
-		g_indirectOutput = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gExtra: ObjectId Texture");
-
-		// Create a depth buffer for the Deferred render target.
-		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
-			m_Width, m_Height,
-			1, 1,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-		D3D12_CLEAR_VALUE depthClearValue;
-		depthClearValue.Format = depthDesc.Format;
-		depthClearValue.DepthStencil = { 1.0f, 0 };
-
-		Texture depthTexture = Texture(depthDesc, &depthClearValue,
-			TextureUsage::Depth,
-			L"Depth Render Target");
-
-		// Attach the HDR texture to the HDR render target.
-		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
-		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
-
-		m_resampledIndirectBuffer.AttachTexture(AttachmentPoint::Color0, g_indirectOutput);
-
-		// uav creation
-		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 1,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
-		moment_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc");
-		his_length = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"his_length");
-		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
-		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
-		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
-		radiance_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc");
-
-		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
-		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 1,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS| D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		variance_inout[1] = Texture(uavRtDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
-		m_VarianceBuffer.AttachTexture(AttachmentPoint::Color0, variance_inout[1]);
-
-		// srv creation
-		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 1,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_NONE);
-		gPosition_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gPosition_prev");
-		gAlbedoMetallic_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gAlbedoMetallic_prev");
-		gNormalRoughness_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gNormalRoughness_prev");
-		gExtra_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gExtra_prev");
-		col_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc_prev");
-		moment_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc_prev");
-		his_length_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"his_length_prev");
-		radiance_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc_prev");
-	}
-
-	/////////////////////////////////// RT Gen
+	loadResource();
+	loadGameObject();
+	transformGameObject();
+	loadDXResource();
+	loadPipeline();
 	{ 
 		createAccelerationStructures();
 		createRtPipelineState();
@@ -386,315 +136,6 @@ bool HybridPipeline::LoadContent()
 		createSrvUavHeap();
 		//createSamplerHeap();
 		createShaderTable();
-	}
-
-	/////////////////////////////////// Root Signature
-	{ 
-		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-		{
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-		}
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
-
-		// Create a root signature for the Deferred Shadings pipeline.
-		{
-			// Load the Deferred shaders.
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_PS.cso", &ps));
-
-			// Allow input layout and deny unnecessary access to certain pipeline stages.
-			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[RootParameters::NumRootParameters];
-			rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
-			rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::PBRMaterialCB].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::GameObjectIndex].InitAsConstants(1,2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::Textures].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-			//CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
-			CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(RootParameters::NumRootParameters, rootParameters, 1, &anisotropicSampler, rootSignatureFlags);
-
-			m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			// Setup the Deferred pipeline state.
-			struct DeferredPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-				CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-			} deferredPipelineStateStream;
-
-			deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
-			deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
-			deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
-			deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
-			deferredPipelineStateStream.SampleDesc = sampleDesc;
-
-			D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
-				sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
-		}
-
-		// Create the PostTempral_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0) };
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(2, rootParameters);
-
-			m_PostTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			// Create the PostProcessing PSO
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporal_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostProcessingPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postProcessingPipelineStateStream;
-
-			postProcessingPipelineStateStream.pRootSignature = m_PostTemporalRootSignature.GetRootSignature().Get();
-			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postProcessingPipelineStateStream.RTVFormats = m_VarianceBuffer.GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
-				sizeof(PostProcessingPipelineStateStream), & postProcessingPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalPipelineState)));
-		}
-
-		// Create the PostATrous_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0) 
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstants(4,0,0, D3D12_SHADER_VISIBILITY_PIXEL);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(2, rootParameters);
-
-			m_PostATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostATrous_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostATrousPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postATrousPipelineStateStream;
-
-			postATrousPipelineStateStream.pRootSignature = m_PostATrousRootSignature.GetRootSignature().Get();
-			postATrousPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postATrousPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postATrousPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postATrousPipelineStateStream.Rasterizer = rasterizerDesc;
-			postATrousPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
-				sizeof(PostATrousPipelineStateStream), & postATrousPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostATrousPipelineState)));
-		}
-
-		// Create the PostLighting_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(3, rootParameters);
-
-			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostLightingStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postLightingPipelineStateStream;
-
-			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
-			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
-				sizeof(postLightingPipelineStateStream), & postLightingPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
-		}
-
-		// Create the PostSpatial_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(2, rootParameters);
-
-			m_PostSpatialResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSpatialResample_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostSpatialResampleStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postSpatialResampleStateStream;
-
-			postSpatialResampleStateStream.pRootSignature = m_PostSpatialResampleRootSignature.GetRootSignature().Get();
-			postSpatialResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postSpatialResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postSpatialResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postSpatialResampleStateStream.Rasterizer = rasterizerDesc;
-			postSpatialResampleStateStream.RTVFormats = m_resampledIndirectBuffer.GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postSpatialResampleStateStreamDesc = {
-				sizeof(postSpatialResampleStateStream), & postSpatialResampleStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postSpatialResampleStateStreamDesc, IID_PPV_ARGS(&m_PostSpatialResampleState)));
-		}
-
-		// Create the PostTemporalResample_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 11, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(2, rootParameters);
-
-			m_PostTemporalResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporalResample_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostTemporalResampleStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postTemporalResampleStateStream;
-
-			postTemporalResampleStateStream.pRootSignature = m_PostTemporalResampleRootSignature.GetRootSignature().Get();
-			postTemporalResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postTemporalResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postTemporalResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postTemporalResampleStateStream.Rasterizer = rasterizerDesc;
-			postTemporalResampleStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postTemporalResampleStateStreamDesc = {
-				sizeof(postTemporalResampleStateStream), &postTemporalResampleStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postTemporalResampleStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalResampleState)));
-		}
 	}
 	return true;
 }
@@ -1173,26 +614,647 @@ void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
     OutputDebugStringA(buffer);
 }
 
+////////////////////////////////////////////////////////////////////// internal update
+void HybridPipeline::loadResource() {
+	auto device = Application::Get().GetDevice();
+	/////////////////////////////////// Resource Loading
+	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
+	auto commandList = commandQueue->GetCommandList();
+
+	// Create a Cube mesh
+	meshPool.emplace("cube", Mesh::CreateCube(*commandList));
+	meshPool.emplace("sphere", Mesh::CreateSphere(*commandList));
+	meshPool.emplace("cone", Mesh::CreateCone(*commandList));
+	meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
+	meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
+
+	// load PBR textures
+	texturePool.emplace("default_albedo", Texture());
+	commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
+	texturePool.emplace("default_metallic", Texture());
+	commandList->LoadTextureFromFile(texturePool["default_metallic"], L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
+	texturePool.emplace("default_normal", Texture());
+	commandList->LoadTextureFromFile(texturePool["default_normal"], L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
+	texturePool.emplace("default_roughness", Texture());
+	commandList->LoadTextureFromFile(texturePool["default_roughness"], L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
+	//// rusted iron
+	texturePool.emplace("rusted_iron_albedo", Texture());
+	commandList->LoadTextureFromFile(texturePool["rusted_iron_albedo"], L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
+	texturePool.emplace("rusted_iron_metallic", Texture());
+	commandList->LoadTextureFromFile(texturePool["rusted_iron_metallic"], L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
+	texturePool.emplace("rusted_iron_normal", Texture());
+	commandList->LoadTextureFromFile(texturePool["rusted_iron_normal"], L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
+	texturePool.emplace("rusted_iron_roughness", Texture());
+	commandList->LoadTextureFromFile(texturePool["rusted_iron_roughness"], L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
+	//// grid metal
+	texturePool.emplace("grid_metal_albedo", Texture());
+	commandList->LoadTextureFromFile(texturePool["grid_metal_albedo"], L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
+	texturePool.emplace("grid_metal_metallic", Texture());
+	commandList->LoadTextureFromFile(texturePool["grid_metal_metallic"], L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
+	texturePool.emplace("grid_metal_normal", Texture());
+	commandList->LoadTextureFromFile(texturePool["grid_metal_normal"], L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
+	texturePool.emplace("grid_metal_roughness", Texture());
+	commandList->LoadTextureFromFile(texturePool["grid_metal_roughness"], L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
+	//// metal
+	texturePool.emplace("metal_albedo", Texture());
+	commandList->LoadTextureFromFile(texturePool["metal_albedo"], L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
+	texturePool.emplace("metal_metallic", Texture());
+	commandList->LoadTextureFromFile(texturePool["metal_metallic"], L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
+	texturePool.emplace("metal_normal", Texture());
+	commandList->LoadTextureFromFile(texturePool["metal_normal"], L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
+	texturePool.emplace("metal_roughness", Texture());
+	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
+
+	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
+	commandQueue->WaitForFenceValue(fenceValue);
+}
+void HybridPipeline::loadGameObject() {
+	auto device = Application::Get().GetDevice();
+	/////////////////////////////////// GameObject Gen
+	float gid = 0.0f;
+
+	gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
+	gameObjectPool["sphere"]->gid = gid++;
+	gameObjectPool["sphere"]->mesh = "sphere";
+	gameObjectPool["sphere"]->material.base = Material::White;
+	gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
+
+	gameObjectPool.emplace("cube", std::make_shared<GameObject>());
+	gameObjectPool["cube"]->gid = gid++;
+	gameObjectPool["cube"]->mesh = "cube";
+	gameObjectPool["cube"]->material.base = Material::White;
+	gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
+
+	gameObjectPool.emplace("torus", std::make_shared<GameObject>());
+	gameObjectPool["torus"]->gid = gid++;
+	gameObjectPool["torus"]->mesh = "torus";
+	gameObjectPool["torus"]->material.base = Material::White;
+	gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
+
+	gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
+	gameObjectPool["Floor plane"]->gid = gid++;
+	gameObjectPool["Floor plane"]->mesh = "plane";
+	gameObjectPool["Floor plane"]->material.base = Material::White;
+	gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
+	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
+
+	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+	gameObjectPool["Back wall"]->gid = gid++;
+	gameObjectPool["Back wall"]->mesh = "plane";
+	gameObjectPool["Back wall"]->material.base = Material::Turquoise;
+	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 0.1f);
+	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+
+	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+	gameObjectPool["Ceiling plane"]->gid = gid++;
+	gameObjectPool["Ceiling plane"]->mesh = "plane";
+	gameObjectPool["Ceiling plane"]->material.base = Material::White;
+	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
+	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+
+	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+	gameObjectPool["Front wall"]->gid = gid++;
+	gameObjectPool["Front wall"]->mesh = "plane";
+	gameObjectPool["Front wall"]->material.base = Material::Copper;
+	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 0.7f);
+	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+
+	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+	gameObjectPool["Left wall"]->gid = gid++;
+	gameObjectPool["Left wall"]->mesh = "plane";
+	gameObjectPool["Left wall"]->material.base = Material::Jade;
+	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.3f);
+	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+
+	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+	gameObjectPool["Right wall"]->gid = gid++;
+	gameObjectPool["Right wall"]->mesh = "plane";
+	gameObjectPool["Right wall"]->material.base = Material::Ruby;
+	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.6f);
+	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+
+	// light object
+	lightObjectIndex = "sphere light";
+	gameObjectPool.emplace(lightObjectIndex, std::make_shared<GameObject>());//7
+	gameObjectPool[lightObjectIndex]->gid = gid++;
+	gameObjectPool[lightObjectIndex]->mesh = "sphere";
+	gameObjectPool[lightObjectIndex]->material.base = Material::EmissiveWhite;
+	gameObjectPool[lightObjectIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool[lightObjectIndex]->material.tex = TextureMaterial("default");
+}
+void HybridPipeline::transformGameObject() {
+	auto device = Application::Get().GetDevice();
+
+	/////////////////////////////////// Initial the transform
+	{
+		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
+		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
+
+		gameObjectPool["cube"]->Translate(XMMatrixTranslation(-4.0f, 3.0f, -2.0f));
+		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["cube"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
+
+		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -6.0f));
+		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
+		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+
+		float scalePlane = 20.0f;
+		float translateOffset = scalePlane / 2.0f;
+
+		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
+		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
+		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
+		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+
+		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
+		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+	}
+}
+void HybridPipeline::loadDXResource() {
+	auto device = Application::Get().GetDevice();
+
+	/////////////////////////////////// BackScreen RT Creation and other intermediate textures
+	{
+		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
+
+		// Disable the multiple sampling for performance and simplicity
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
+
+		// Create an off-screen multi render target(MRT) and a depth buffer.
+		auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		D3D12_CLEAR_VALUE colorClearValue;
+		colorClearValue.Format = colorDesc.Format;
+		colorClearValue.Color[0] = 0.0f;
+		colorClearValue.Color[1] = 0.0f;
+		colorClearValue.Color[2] = 0.0f;
+		colorClearValue.Color[3] = 1.0f;
+
+		gPosition = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gPosition+HitTexture");
+		gAlbedoMetallic = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gAlbedoMetallic Texture");
+		gNormalRoughness = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gNormalRoughness Texture");
+		gExtra = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gExtra: ObjectId Texture");
+		g_indirectOutput = Texture(colorDesc, &colorClearValue,
+			TextureUsage::RenderTarget,
+			L"gExtra: ObjectId Texture");
+
+		// Create a depth buffer for the Deferred render target.
+		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+		D3D12_CLEAR_VALUE depthClearValue;
+		depthClearValue.Format = depthDesc.Format;
+		depthClearValue.DepthStencil = { 1.0f, 0 };
+
+		Texture depthTexture = Texture(depthDesc, &depthClearValue,
+			TextureUsage::Depth,
+			L"Depth Render Target");
+
+		// Attach the HDR texture to the HDR render target.
+		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
+		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
+
+		m_resampledIndirectBuffer.AttachTexture(AttachmentPoint::Color0, g_indirectOutput);
+
+		// uav creation
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
+		moment_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc");
+		his_length = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"his_length");
+		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
+		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
+		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
+		radiance_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc");
+
+		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
+		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		variance_inout[1] = Texture(uavRtDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
+		m_VarianceBuffer.AttachTexture(AttachmentPoint::Color0, variance_inout[1]);
+
+		// srv creation
+		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			m_Width, m_Height,
+			1, 1,
+			sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_NONE);
+		gPosition_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gPosition_prev");
+		gAlbedoMetallic_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gAlbedoMetallic_prev");
+		gNormalRoughness_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gNormalRoughness_prev");
+		gExtra_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gExtra_prev");
+		col_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc_prev");
+		moment_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc_prev");
+		his_length_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"his_length_prev");
+		radiance_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc_prev");
+	}
+
+}
+void HybridPipeline::loadPipeline() {
+	auto device = Application::Get().GetDevice();
+	/////////////////////////////////// Root Signature
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+		// Disable the multiple sampling for performance and simplicity
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
+
+		// Create a root signature for the Deferred Shadings pipeline.
+		{
+			// Load the Deferred shaders.
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_PS.cso", &ps));
+
+			// Allow input layout and deny unnecessary access to certain pipeline stages.
+			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[RootParameters::NumRootParameters];
+			rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
+			rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[RootParameters::PBRMaterialCB].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[RootParameters::GameObjectIndex].InitAsConstants(1, 2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[RootParameters::Textures].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+
+			//CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
+			CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(RootParameters::NumRootParameters, rootParameters, 1, &anisotropicSampler, rootSignatureFlags);
+
+			m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			// Setup the Deferred pipeline state.
+			struct DeferredPipelineStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+				CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
+			} deferredPipelineStateStream;
+
+			deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
+			deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
+			deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
+			deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
+			deferredPipelineStateStream.SampleDesc = sampleDesc;
+
+			D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
+				sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
+		}
+
+		// Create the PostTempral_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0) };
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			// Create the PostProcessing PSO
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporal_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostProcessingPipelineStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postProcessingPipelineStateStream;
+
+			postProcessingPipelineStateStream.pRootSignature = m_PostTemporalRootSignature.GetRootSignature().Get();
+			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
+			postProcessingPipelineStateStream.RTVFormats = m_VarianceBuffer.GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
+				sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalPipelineState)));
+		}
+
+		// Create the PostATrous_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstants(4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostATrous_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostATrousPipelineStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postATrousPipelineStateStream;
+
+			postATrousPipelineStateStream.pRootSignature = m_PostATrousRootSignature.GetRootSignature().Get();
+			postATrousPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postATrousPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postATrousPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postATrousPipelineStateStream.Rasterizer = rasterizerDesc;
+			postATrousPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
+				sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostATrousPipelineState)));
+		}
+
+		// Create the PostLighting_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(3, rootParameters);
+
+			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostLightingStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postLightingPipelineStateStream;
+
+			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
+			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
+			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
+				sizeof(postLightingPipelineStateStream), &postLightingPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
+		}
+
+		// Create the PostSpatial_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(1, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostSpatialResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSpatialResample_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostSpatialResampleStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postSpatialResampleStateStream;
+
+			postSpatialResampleStateStream.pRootSignature = m_PostSpatialResampleRootSignature.GetRootSignature().Get();
+			postSpatialResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postSpatialResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postSpatialResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postSpatialResampleStateStream.Rasterizer = rasterizerDesc;
+			postSpatialResampleStateStream.RTVFormats = m_resampledIndirectBuffer.GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postSpatialResampleStateStreamDesc = {
+				sizeof(postSpatialResampleStateStream), &postSpatialResampleStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postSpatialResampleStateStreamDesc, IID_PPV_ARGS(&m_PostSpatialResampleState)));
+		}
+
+		// Create the PostTemporalResample_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 11, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(2, descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(2, rootParameters);
+
+			m_PostTemporalResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporalResample_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostTemporalResampleStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postTemporalResampleStateStream;
+
+			postTemporalResampleStateStream.pRootSignature = m_PostTemporalResampleRootSignature.GetRootSignature().Get();
+			postTemporalResampleStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postTemporalResampleStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postTemporalResampleStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postTemporalResampleStateStream.Rasterizer = rasterizerDesc;
+			postTemporalResampleStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postTemporalResampleStateStreamDesc = {
+				sizeof(postTemporalResampleStateStream), &postTemporalResampleStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postTemporalResampleStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalResampleState)));
+		}
+	}
+}
+void HybridPipeline::updateBuffer()
+{
+	// update the structure buffer of frameId
+	{
+		FrameIndexCB fid;
+		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
+		void* pData;
+		mpRTFrameIndexCB->Map(0, nullptr, (void**)&pData);
+		memcpy(pData, &fid, sizeof(FrameIndexCB));
+		mpRTFrameIndexCB->Unmap(0, nullptr);
+	}
+
+	// update the camera for rt
+	{
+		CameraRTCB mCameraCB;
+		mCameraCB.PositionWS = m_Camera.get_Translation();
+		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
+		mCameraCB.fov = m_Camera.get_FoV();
+		void* pData;
+		mpRTCameraCB->Map(0, nullptr, (void**)&pData);
+		memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
+		mpRTCameraCB->Unmap(0, nullptr);
+	}
+
+	// update the light for rt
+	{
+		void* pData;
+		mpRTPointLightCB->Map(0, nullptr, (void**)&pData);
+		memcpy(pData, &(m_PointLight), sizeof(PointLight));
+		mpRTPointLightCB->Unmap(0, nullptr);
+	}
+}
+
+void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
+{
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, material.base);
+	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, material.pbr);
+	commandList.SetGraphics32BitConstants(RootParameters::GameObjectIndex, gid);
+	commandList.SetShaderResourceView(RootParameters::Textures, 0, (texturePool.find(material.tex.AlbedoTexture) != texturePool.end()) ? texturePool[material.tex.AlbedoTexture] : texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(RootParameters::Textures, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+	if (meshPool.find(mesh) != meshPool.end()) {
+		meshPool[mesh]->Draw(commandList);
+	}
+}
+
 
 ////////////////////////////////////////////////////////////////////// RT Object 
-static const D3D12_HEAP_PROPERTIES kUploadHeapProps =
-{
-	D3D12_HEAP_TYPE_UPLOAD,
-	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-	D3D12_MEMORY_POOL_UNKNOWN,
-	0,
-	0,
-};
-
-static const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
-{
-	D3D12_HEAP_TYPE_DEFAULT,
-	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-	D3D12_MEMORY_POOL_UNKNOWN,
-	0,
-	0
-};
-
 void HybridPipeline::createAccelerationStructures()
 {
 	auto pDevice = Application::Get().GetDevice();
@@ -1768,52 +1830,3 @@ void HybridPipeline::createShaderTable()
 	mpShaderTable->Unmap(0, nullptr);
 }
 
-////////////////////////////////////////////////////////////////////// internal update
-void HybridPipeline::updateBuffer()
-{
-	// update the structure buffer of frameId
-	{
-		FrameIndexCB fid;
-		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
-		void* pData;
-		mpRTFrameIndexCB->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &fid, sizeof(FrameIndexCB));
-		mpRTFrameIndexCB->Unmap(0, nullptr);
-	}
-
-	// update the camera for rt
-	{
-		CameraRTCB mCameraCB;
-		mCameraCB.PositionWS = m_Camera.get_Translation();
-		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-		mCameraCB.fov = m_Camera.get_FoV();
-		void* pData;
-		mpRTCameraCB->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
-		mpRTCameraCB->Unmap(0, nullptr);
-	}
-
-	// update the light for rt
-	{
-		void* pData;
-		mpRTPointLightCB->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &(m_PointLight), sizeof(PointLight));
-		mpRTPointLightCB->Unmap(0, nullptr);
-	}
-}
-
-void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
-{
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, material.base);
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, material.pbr);
-	commandList.SetGraphics32BitConstants(RootParameters::GameObjectIndex, gid);
-	commandList.SetShaderResourceView(RootParameters::Textures, 0, (texturePool.find(material.tex.AlbedoTexture)!=texturePool.end())?texturePool[material.tex.AlbedoTexture]: texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-	if (meshPool.find(mesh) != meshPool.end()) {
-		meshPool[mesh]->Draw(commandList);
-	}
-}

@@ -34,6 +34,11 @@ protected:
     virtual void OnResize(ResizeEventArgs& e) override; 
 
 private:
+	void loadResource();
+	void loadGameObject();
+	void transformGameObject();
+	void loadDXResource();
+	void loadPipeline();
 	void updateBuffer();
 
 private:
