@@ -335,9 +335,9 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
 		commandList->SetRenderTarget(m_VarianceBuffer);
-		commandList->SetPipelineState(m_PostTemporalPipelineState);
+		commandList->SetPipelineState(m_PostSVGFTemporalPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostTemporalRootSignature);
+		commandList->SetGraphicsRootSignature(m_PostSVGFTemporalRootSignature);
 		uint32_t ppSrvUavOffset = 0;
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -364,9 +364,9 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
 		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-		commandList->SetPipelineState(m_PostATrousPipelineState);
+		commandList->SetPipelineState(m_PostSVGFATrousPipelineState);
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostATrousRootSignature);
+		commandList->SetGraphicsRootSignature(m_PostSVGFATrousRootSignature);
 		uint32_t ppSrvUavOffset = 0;
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -979,13 +979,13 @@ void HybridPipeline::loadPipeline() {
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(2, rootParameters);
 
-			m_PostTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+			m_PostSVGFTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 			// Create the PostProcessing PSO
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporal_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFTemporal_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -1000,7 +1000,7 @@ void HybridPipeline::loadPipeline() {
 				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 			} postProcessingPipelineStateStream;
 
-			postProcessingPipelineStateStream.pRootSignature = m_PostTemporalRootSignature.GetRootSignature().Get();
+			postProcessingPipelineStateStream.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
 			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
@@ -1010,7 +1010,7 @@ void HybridPipeline::loadPipeline() {
 			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
 				sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
 			};
-			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalPipelineState)));
+			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
 		}
 
 		// Create the PostATrous_PS Root Signature
@@ -1027,12 +1027,12 @@ void HybridPipeline::loadPipeline() {
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(2, rootParameters);
 
-			m_PostATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+			m_PostSVGFATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostATrous_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFATrous_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -1047,7 +1047,7 @@ void HybridPipeline::loadPipeline() {
 				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 			} postATrousPipelineStateStream;
 
-			postATrousPipelineStateStream.pRootSignature = m_PostATrousRootSignature.GetRootSignature().Get();
+			postATrousPipelineStateStream.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
 			postATrousPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 			postATrousPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 			postATrousPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
@@ -1057,7 +1057,7 @@ void HybridPipeline::loadPipeline() {
 			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
 				sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
 			};
-			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostATrousPipelineState)));
+			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
 		}
 
 		// Create the PostLighting_PS Root Signature
@@ -1127,7 +1127,7 @@ void HybridPipeline::loadPipeline() {
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSpatialResample_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostResampleSpatial_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -1175,7 +1175,7 @@ void HybridPipeline::loadPipeline() {
 			ComPtr<ID3DBlob> vs;
 			ComPtr<ID3DBlob> ps;
 			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostTemporalResample_PS.cso", &ps));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostResampleTemporal_PS.cso", &ps));
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;

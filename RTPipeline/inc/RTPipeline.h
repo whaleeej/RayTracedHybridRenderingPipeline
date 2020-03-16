@@ -215,16 +215,16 @@ private:
 
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
-	RootSignature m_PostTemporalRootSignature;
-	RootSignature m_PostATrousRootSignature;
+	RootSignature m_PostSVGFTemporalRootSignature;
+	RootSignature m_PostSVGFATrousRootSignature;
 	RootSignature m_PostSpatialResampleRootSignature;
 	RootSignature m_PostTemporalResampleRootSignature;
 	RootSignature m_PostLightingRootSignature;
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalPipelineState;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostATrousPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSVGFTemporalPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSVGFATrousPipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSpatialResampleState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalResampleState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;
