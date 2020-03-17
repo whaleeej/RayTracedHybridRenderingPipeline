@@ -228,6 +228,17 @@ public:
     }
 
     /**
+     * Set a dynamic constant buffer data to an inline descriptor in the root
+     * signature.
+     */
+    void SetComputeDynamicConstantBuffer(uint32_t rootParameterIndex, size_t sizeInBytes, const void* bufferData);
+    template<typename T>
+    void SetComputeDynamicConstantBuffer(uint32_t rootParameterIndex, const T& data)
+    {
+        SetComputeDynamicConstantBuffer(rootParameterIndex, sizeof(T), &data);
+    }
+
+    /**
      * Set a set of 32-bit constants on the compute pipeline.
      */
     void SetCompute32BitConstants( uint32_t rootParameterIndex, uint32_t numConstants, const void* constants );

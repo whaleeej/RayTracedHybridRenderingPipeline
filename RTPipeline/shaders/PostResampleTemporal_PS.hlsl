@@ -1,3 +1,20 @@
+#define BLOCK_SIZE_X 64
+#define BLOCK_SIZE_Y 16
+
+struct ComputeShaderInput
+{
+	uint3 GroupID : SV_GroupID; // 3D index of the thread group in the dispatch.
+	uint3 GroupThreadID : SV_GroupThreadID; // 3D index of local thread ID in a thread group.
+	uint3 DispatchThreadID : SV_DispatchThreadID; // 3D index of global thread ID in the dispatch.
+	uint GroupIndex : SV_GroupIndex; // Flattened local index of the thread within a thread group.
+};
+
+#define PostResampleTemporal_RootSignature \
+    "RootFlags(0), " \
+    "DescriptorTable( SRV(t0, numDescriptors = 11)," \
+								"UAV(u0, numDescriptors = 2) )," \
+    "CBV(b0)" 
+
 RWTexture2D<float4> radiance_acc : register(u0); //uav // used x
 RWTexture2D<float4> his_length : register(u1); //uav // used x
 
@@ -15,8 +32,6 @@ Texture2D<float4> radiance_acc_prev : register(t8); //srv // used x
 Texture2D<float4> his_length_prev : register(t9); //srv // used x
 
 Texture2D<float4> radiance_input : register(t10);
-
-
 
 struct ViewProjectMatrix_prev
 {
@@ -152,17 +167,17 @@ float3 backProject(float x, float y, float2 res, float col_alpha)
 	return 100.0f;
 }
 
-
-float4 main( float4 Position : SV_Position ) : SV_Target0
+[RootSignature(PostResampleTemporal_RootSignature)]
+[numthreads(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1)]
+void main(ComputeShaderInput IN)
 {
 	float col_alpha = 0.08;
 	
-    int2 texCoord = ( int2 )Position.xy;
+	int2 texCoord = (int2) IN.DispatchThreadID.xy;
 	float resx;
 	float resy;
 	float mipLevels;
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	 backProject(texCoord.x, texCoord.y, float2(resx, resy), col_alpha);
-	return float4(0,0,0, 1.0);
 }

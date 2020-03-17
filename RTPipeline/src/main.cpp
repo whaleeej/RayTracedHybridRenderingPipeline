@@ -41,7 +41,7 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 
     Application::Create(hInstance);
     {
-        std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"RTPipeline", 1000, 1000);
+        std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"RTPipeline", 1280, 720);
         retCode = Application::Get().Run(demo);
     }
     Application::Destroy();

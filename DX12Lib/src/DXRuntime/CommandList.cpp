@@ -795,6 +795,16 @@ void CommandList::SetGraphics32BitConstants( uint32_t rootParameterIndex, uint32
     m_d3d12CommandList->SetGraphicsRoot32BitConstants( rootParameterIndex, numConstants, constants, 0 );
 }
 
+void CommandList::SetComputeDynamicConstantBuffer(uint32_t rootParameterIndex, size_t sizeInBytes, const void* bufferData)
+{
+    // Constant buffers must be 256-byte aligned.
+    auto heapAllococation = m_UploadBuffer->Allocate(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+    memcpy(heapAllococation.CPU, bufferData, sizeInBytes);
+
+    m_d3d12CommandList->SetComputeRootConstantBufferView(rootParameterIndex, heapAllococation.GPU);
+}
+
+
 void CommandList::SetCompute32BitConstants( uint32_t rootParameterIndex, uint32_t numConstants, const void* constants )
 {
     m_d3d12CommandList->SetComputeRoot32BitConstants( rootParameterIndex, numConstants, constants, 0 );
