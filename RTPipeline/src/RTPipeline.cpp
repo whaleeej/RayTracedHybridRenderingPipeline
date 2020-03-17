@@ -804,7 +804,7 @@ void HybridPipeline::loadDXResource() {
 		// Create an off-screen multi render target(MRT) and a depth buffer.
 		auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
-			1, 1,
+			1, 0,
 			sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 		D3D12_CLEAR_VALUE colorClearValue;
@@ -833,7 +833,7 @@ void HybridPipeline::loadDXResource() {
 		// Create a depth buffer for the Deferred render target.
 		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
 			m_Width, m_Height,
-			1, 1,
+			1, 0,
 			sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 		D3D12_CLEAR_VALUE depthClearValue;
@@ -856,7 +856,7 @@ void HybridPipeline::loadDXResource() {
 		// uav creation
 		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
-			1, 1,
+			1, 0,
 			sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
@@ -870,7 +870,7 @@ void HybridPipeline::loadDXResource() {
 		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
 		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
-			1, 1,
+			1, 0,
 			sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 		variance_inout[1] = Texture(uavRtDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
@@ -879,7 +879,7 @@ void HybridPipeline::loadDXResource() {
 		// srv creation
 		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			m_Width, m_Height,
-			1, 1,
+			1, 0,
 			sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_NONE);
 		gPosition_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gPosition_prev");
