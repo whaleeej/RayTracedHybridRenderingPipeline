@@ -23,16 +23,23 @@ set( VERTEX_SHADER_FILES
 
 set( PIXEL_SHADER_FILES
     shaders/Deferred_PS.hlsl
-    
     shaders/PostLighting_PS.hlsl
 )
+
 set( COMPUTE_SHADER_FILES 
+#experimental filtering
     shaders/PostResampleTemporal_CS.hlsl
     shaders/PostResampleSpatial_CS.hlsl
+# SVGF filtering: ta+Atrous
     shaders/PostSVGFTemporal_CS.hlsl
     shaders/PostSVGFATrous_CS.hlsl
+# BMFR ta+QR+ back substitution + taa
+    shaders/PostBMFR_1_TemporalNoisy_CS.hlsl
+    shaders/PostBMFR_2_QRFactorization_CS.hlsl
+    shaders/PostBMFR_3_WeightedSum_CS.hlsl
+    shaders/PostBMFR_4_TemporalFiltered_CS.hlsl
+    shaders/PostBMFR_5_TAA_CS.hlsl
 )
-
 
 set( RT_SHADER_FILES
     shaders/RayTracing.hlsl

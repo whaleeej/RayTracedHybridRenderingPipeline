@@ -24,7 +24,7 @@ Texture2D<float4> gNormalRoughness : register(t2); //srv
 Texture2D<float4> gExtra : register(t3); //srv
 
 Texture2D<float4> gPosition_prev : register(t4); //srv
-Texture2D<float4> gAlbedoMetallic_prev : register(t5); //srv
+Texture2D<float4> gAlbedoMetallic_prev : register(t5); //srv`
 Texture2D<float4> gNormalRoughness_prev : register(t6); //srv
 Texture2D<float4> gExtra_prev : register(t7); //srv
 
