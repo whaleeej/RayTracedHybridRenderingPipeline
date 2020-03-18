@@ -183,15 +183,15 @@ private:
 	Texture gAlbedoMetallic; //srv
 	Texture gNormalRoughness; //srv
 	Texture gExtra; //srv
-	
-	// Post Temporal
-	Texture col_acc; //uav
-	Texture moment_acc; //uav
-	Texture his_length; //uav
 	Texture gPosition_prev; //srv
 	Texture gAlbedoMetallic_prev; //srv
 	Texture gNormalRoughness_prev; //srv
 	Texture gExtra_prev; //srv
+
+	// Post Temporal
+	Texture col_acc; //uav
+	Texture moment_acc; //uav
+	Texture his_length; //uav
 	Texture col_acc_prev; //srv
 	Texture moment_acc_prev; //srv
 	Texture his_length_prev; //srv
