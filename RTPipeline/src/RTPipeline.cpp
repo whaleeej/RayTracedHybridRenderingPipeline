@@ -310,9 +310,10 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		
 		// pingpang interation
 		for (uint32_t level = 1; level <= ATrous_Level_Max; level++) {
+			assert(ATrous_Level_Max > 1);
 			uint32_t pingPangSrvUavOffset = ppSrvUavOffset;
 			Texture color_in = (level==1)? col_acc : color_inout[level % 2];
-			Texture color_out = color_inout[(level + 1) % 2];
+			Texture color_out = (level == ATrous_Level_Max)? col_acc : color_inout[(level + 1) % 2];
 			color_out_final = color_out;
 			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
 			Texture variance_out = variance_inout[(level + 1) % 2];
@@ -385,15 +386,25 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 	// prev buffer cache
 	{
+		auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
+			Texture tmp = t2;
+			t2 = t1;
+			t1 = tmp;
+		};
 		viewProjectMatrix_prev = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
-		commandList->CopyResource(col_acc_prev, color_out_final);
-		commandList->CopyResource(gPosition_prev, gPosition);
-		commandList->CopyResource(gAlbedoMetallic_prev, gAlbedoMetallic);
-		commandList->CopyResource(gNormalRoughness_prev, gNormalRoughness);
-		commandList->CopyResource(gExtra_prev, gExtra);	
-		commandList->CopyResource(moment_acc_prev, moment_acc);
-		commandList->CopyResource(his_length_prev, his_length);
-		commandList->CopyResource(radiance_acc_prev, radiance_acc);
+		swapCurrPrevTexture(gPosition_prev, gPosition);
+		swapCurrPrevTexture(gAlbedoMetallic_prev, gAlbedoMetallic);
+		swapCurrPrevTexture(gNormalRoughness_prev, gNormalRoughness);
+		swapCurrPrevTexture(gExtra_prev, gExtra);
+		swapCurrPrevTexture(col_acc_prev, col_acc);
+		swapCurrPrevTexture(moment_acc_prev, moment_acc);
+		swapCurrPrevTexture(his_length_prev, his_length);
+		swapCurrPrevTexture(radiance_acc_prev, radiance_acc);
+		// G Buffer re-orgnizating
+		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
+		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
 	}
 
     commandQueue->ExecuteCommandList(commandList);
@@ -719,7 +730,7 @@ void HybridPipeline::loadDXResource() {
 		// Create an off-screen multi render target(MRT) and a depth buffer.
 		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
 			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET| D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		D3D12_CLEAR_VALUE colorClearValue;
 		colorClearValue.Format = desc.Format;
 		colorClearValue.Color[0] = 0.0f;
@@ -776,10 +787,10 @@ void HybridPipeline::loadDXResource() {
 		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
 		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, createTex2D_DepthStencil(L"Depth Render Target", m_Width, m_Height));
 
-		gPosition_prev = createTex2D_ReadWrite(L"gPosition_prev", m_Width, m_Height);
-		gAlbedoMetallic_prev = createTex2D_ReadWrite(L"gAlbedoMetallic_prev", m_Width, m_Height);
-		gNormalRoughness_prev = createTex2D_ReadWrite(L"gNormalRoughness_prev", m_Width, m_Height);
-		gExtra_prev = createTex2D_ReadWrite(L"gExtra_prev", m_Width, m_Height);
+		gPosition_prev = createTex2D_RenderTarget(L"gPosition_prev", m_Width, m_Height);
+		gAlbedoMetallic_prev = createTex2D_RenderTarget(L"gAlbedoMetallic_prev", m_Width, m_Height);
+		gNormalRoughness_prev = createTex2D_RenderTarget(L"gNormalRoughness_prev", m_Width, m_Height);
+		gExtra_prev = createTex2D_RenderTarget(L"gExtra_prev", m_Width, m_Height);
 
 		col_acc = createTex2D_ReadWrite(L"col_acc", m_Width, m_Height);
 		moment_acc = createTex2D_ReadWrite(L"moment_acc", m_Width, m_Height);
