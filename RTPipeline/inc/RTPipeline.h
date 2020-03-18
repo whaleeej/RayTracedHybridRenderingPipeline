@@ -185,7 +185,6 @@ private:
 	Texture gExtra; //srv
 	
 	// Post Temporal
-	RenderTarget m_VarianceBuffer;  // = variance_inout[1];
 	Texture col_acc; //uav
 	Texture moment_acc; //uav
 	Texture his_length; //uav

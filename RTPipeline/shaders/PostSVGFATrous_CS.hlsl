@@ -1,3 +1,20 @@
+#define BLOCK_SIZE_X 8
+#define BLOCK_SIZE_Y 8
+
+struct ComputeShaderInput
+{
+	uint3 GroupID : SV_GroupID; // 3D index of the thread group in the dispatch.
+	uint3 GroupThreadID : SV_GroupThreadID; // 3D index of local thread ID in a thread group.
+	uint3 DispatchThreadID : SV_DispatchThreadID; // 3D index of global thread ID in the dispatch.
+	uint GroupIndex : SV_GroupIndex; // Flattened local index of the thread within a thread group.
+};
+
+#define Post_RootSignature \
+    "RootFlags(0), " \
+    "DescriptorTable( SRV(t0, numDescriptors = 6)," \
+								"UAV(u0, numDescriptors = 2) )," \
+    "RootConstants(b0, num32BitConstants = 4)" 
+
 Texture2D<float4> gPosition : register(t0); //srv
 Texture2D<float4> gAlbedoMetallic : register(t1); //srv
 Texture2D<float4> gNormalRoughness : register(t2); //srv
@@ -132,19 +149,20 @@ void ATrousFilter(float x, float y, float2 res, int level,
 	}
 }
 
-float4 main(float4 Position : SV_Position) : SV_TARGET0
+[RootSignature(Post_RootSignature)]
+[numthreads(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1)]
+void main(ComputeShaderInput IN)
 {
 	float sigma_c = 0.7;
 	float sigma_n = 0.35;
 	float sigma_x = 0.25;
 	float varGauss_blur = true;
 	
-	int2 texCoord = (int2) Position.xy;
+	int2 texCoord = (int2) IN.DispatchThreadID.xy;
 	float resx;
 	float resy;
 	float mipLevels;
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	ATrousFilter(texCoord.x, texCoord.y, float2(resx, resy), LevelLastCB.level, sigma_c, sigma_n, sigma_x, varGauss_blur);
-	return float4(0,0,0, 1.0f);
 }

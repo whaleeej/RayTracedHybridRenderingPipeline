@@ -1,6 +1,24 @@
+#define BLOCK_SIZE_X 8
+#define BLOCK_SIZE_Y 8
+
+struct ComputeShaderInput
+{
+	uint3 GroupID : SV_GroupID; // 3D index of the thread group in the dispatch.
+	uint3 GroupThreadID : SV_GroupThreadID; // 3D index of local thread ID in a thread group.
+	uint3 DispatchThreadID : SV_DispatchThreadID; // 3D index of global thread ID in the dispatch.
+	uint GroupIndex : SV_GroupIndex; // Flattened local index of the thread within a thread group.
+};
+
+#define Post_RootSignature \
+    "RootFlags(0), " \
+    "DescriptorTable( SRV(t0, numDescriptors = 12)," \
+								"UAV(u0, numDescriptors = 4) )," \
+    "CBV(b0)" 
+
 RWTexture2D<float4> col_acc : register(u0); //uav // used x
 RWTexture2D<float4> moment_acc : register(u1); //uav // used xy
 RWTexture2D<float4> his_length : register(u2); //uav // used x
+RWTexture2D<float4> variance_output : register(u3); //uav // used x
 
 Texture2D<float4> gPosition : register(t0); //srv
 Texture2D<float4> gAlbedoMetallic : register(t1); //srv
@@ -14,8 +32,6 @@ Texture2D<float4> gExtra_prev : register(t7); //srv
 Texture2D<float4> col_acc_prev : register(t8); //srv // used x
 Texture2D<float4> moment_acc_prev : register(t9); //srv // used xy
 Texture2D<float4> his_length_prev : register(t10); //srv // used x
-
-
 
 Texture2D<float4> rt_input : register(t11);
 
@@ -164,18 +180,19 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 	return 100.0f;
 }
 
-
-float4 main( float4 Position : SV_Position ) : SV_Target0
+[RootSignature(Post_RootSignature)]
+[numthreads(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1)]
+void main(ComputeShaderInput IN)
 {
 	float col_alpha = 0.1;
 	float mom_alpha = 0.9;
 	
-    int2 texCoord = ( int2 )Position.xy;
+	int2 texCoord = (int2) IN.DispatchThreadID.xy;
 	float resx;
 	float resy;
 	float mipLevels;
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	float variance = backProject(texCoord.x, texCoord.y, float2(resx, resy), col_alpha, mom_alpha);
-	return float4(variance, 0, 0, 1.0);
+	variance_output[texCoord] = float4(variance, 0, 0, 1.0);
 }

@@ -328,50 +328,39 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 	
 	// Perform Temporal Accumulation and Variance Estimation
 	{ 
-		{
-			commandList->ClearTexture(m_VarianceBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
-		}
-
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_VarianceBuffer);
 		commandList->SetPipelineState(m_PostSVGFTemporalPipelineState);
-		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostSVGFTemporalRootSignature);
+		commandList->SetComputeRootSignature(m_PostSVGFTemporalRootSignature);
 		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetGraphicsDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->Draw(3);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, variance_inout[1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
+		commandList->Dispatch(m_Width / 8, m_Height / 8);
 	}
 	
 	Texture color_out_final;
 	// Perform ATrous Iteration
 	{
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
 		commandList->SetPipelineState(m_PostSVGFATrousPipelineState);
-		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostSVGFATrousRootSignature);
+		commandList->SetComputeRootSignature(m_PostSVGFATrousRootSignature);
 		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		
 		// pingpang interation
 		for (uint32_t level = 1; level <= ATrous_Level_Max; level++) {
@@ -381,12 +370,12 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			color_out_final = color_out;
 			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
 			Texture variance_out = variance_inout[(level + 1) % 2];
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, variance_in, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, variance_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			commandList->SetGraphics32BitConstants(1, level);
-			commandList->Draw(3);
+			commandList->SetCompute32BitConstants(1, level);
+			commandList->Dispatch(m_Width / 8, m_Height / 8);
 		}
 	}
 
@@ -846,17 +835,9 @@ void HybridPipeline::loadDXResource() {
 		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
 		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
 		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
+		variance_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
 		radiance_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc");
 		g_indirectOutput = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"g_indirectOutput");
-
-		// variance_inout[1] is used not only for Atrous PingPang but also for Temporal variance estimation output
-		auto uavRtDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 0,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-		variance_inout[1] = Texture(uavRtDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
-		m_VarianceBuffer.AttachTexture(AttachmentPoint::Color0, variance_inout[1]);
 
 		// srv creation
 		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
@@ -949,15 +930,15 @@ void HybridPipeline::loadPipeline() {
 			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
 		}
 
-		// Create the PostTempral_PS Root Signature
+		// Create the PostSVGFTempral_CS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
 				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0) };
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4, 0) };
 
 			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
+			rootParameters[1].InitAsConstantBufferView(0, 0);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
@@ -965,30 +946,17 @@ void HybridPipeline::loadPipeline() {
 			m_PostSVGFTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 			// Create the PostProcessing PSO
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFTemporal_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+			ComPtr<ID3DBlob> cs;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFTemporal_CS.cso", &cs));
 
 			struct PostProcessingPipelineStateStream
 			{
 				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
 			} postProcessingPipelineStateStream;
 
 			postProcessingPipelineStateStream.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
-			postProcessingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postProcessingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postProcessingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postProcessingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postProcessingPipelineStateStream.RTVFormats = m_VarianceBuffer.GetRenderTargetFormats();
+			postProcessingPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
 			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
 				sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
@@ -996,7 +964,7 @@ void HybridPipeline::loadPipeline() {
 			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
 		}
 
-		// Create the PostATrous_PS Root Signature
+		// Create the PostATrous_CS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
 				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
@@ -1004,91 +972,30 @@ void HybridPipeline::loadPipeline() {
 			};
 
 			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstants(4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
+			rootParameters[1].InitAsConstants(4, 0);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
 
 			m_PostSVGFATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFATrous_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+			ComPtr<ID3DBlob> cs;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFATrous_CS.cso", &cs));
 
 			struct PostATrousPipelineStateStream
 			{
 				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
 			} postATrousPipelineStateStream;
 
 			postATrousPipelineStateStream.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
-			postATrousPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postATrousPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postATrousPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postATrousPipelineStateStream.Rasterizer = rasterizerDesc;
-			postATrousPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+			postATrousPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
 			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
 				sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
-		}
-
-		// Create the PostLighting_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostLightingStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postLightingPipelineStateStream;
-
-			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
-			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
-				sizeof(postLightingPipelineStateStream), &postLightingPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
 		}
 
 		// Create the PostSpatial_CS Root Signature
@@ -1159,6 +1066,54 @@ void HybridPipeline::loadPipeline() {
 				sizeof(postTemporalResampleStateStream), &postTemporalResampleStateStream
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postTemporalResampleStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalResampleState)));
+		}
+
+		// Create the PostLighting_PS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
+
+			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
+
+			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+
+			struct PostLightingStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+			} postLightingPipelineStateStream;
+
+			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
+			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
+			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
+				sizeof(postLightingPipelineStateStream), &postLightingPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
 		}
 	}
 }

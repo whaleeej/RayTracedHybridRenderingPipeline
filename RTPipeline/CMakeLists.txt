@@ -23,13 +23,14 @@ set( VERTEX_SHADER_FILES
 
 set( PIXEL_SHADER_FILES
     shaders/Deferred_PS.hlsl
-    shaders/PostSVGFATrous_PS.hlsl
-    shaders/PostSVGFTemporal_PS.hlsl
+    
     shaders/PostLighting_PS.hlsl
 )
 set( COMPUTE_SHADER_FILES 
     shaders/PostResampleTemporal_CS.hlsl
     shaders/PostResampleSpatial_CS.hlsl
+    shaders/PostSVGFTemporal_CS.hlsl
+    shaders/PostSVGFATrous_CS.hlsl
 )
 
 
