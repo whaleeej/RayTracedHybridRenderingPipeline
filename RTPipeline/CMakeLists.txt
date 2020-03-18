@@ -26,9 +26,12 @@ set( PIXEL_SHADER_FILES
     shaders/PostSVGFATrous_PS.hlsl
     shaders/PostSVGFTemporal_PS.hlsl
     shaders/PostLighting_PS.hlsl
-    shaders/PostResampleSpatial_PS.hlsl
-    shaders/PostResampleTemporal_PS.hlsl
 )
+set( COMPUTE_SHADER_FILES 
+    shaders/PostResampleTemporal_CS.hlsl
+    shaders/PostResampleSpatial_CS.hlsl
+)
+
 
 set( RT_SHADER_FILES
     shaders/RayTracing.hlsl
@@ -37,6 +40,7 @@ set( RT_SHADER_FILES
 set( SHADER_FILES
     ${VERTEX_SHADER_FILES}
     ${PIXEL_SHADER_FILES}
+    ${COMPUTE_SHADER_FILES}
     ${RT_SHADER_FILES}
 )
 
@@ -58,6 +62,11 @@ set_source_files_properties( ${VERTEX_SHADER_FILES}
 set_source_files_properties( ${PIXEL_SHADER_FILES}
     PROPERTIES 
         VS_SHADER_TYPE Pixel
+)
+
+set_source_files_properties( ${COMPUTE_SHADER_FILES}
+    PROPERTIES 
+        VS_SHADER_TYPE Compute
 )
 
 set_source_files_properties( ${RT_SHADER_FILES}

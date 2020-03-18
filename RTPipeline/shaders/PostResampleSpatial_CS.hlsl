@@ -1,9 +1,28 @@
+#define BLOCK_SIZE_X 8
+#define BLOCK_SIZE_Y 8
+
+struct ComputeShaderInput
+{
+	uint3 GroupID : SV_GroupID; // 3D index of the thread group in the dispatch.
+	uint3 GroupThreadID : SV_GroupThreadID; // 3D index of local thread ID in a thread group.
+	uint3 DispatchThreadID : SV_DispatchThreadID; // 3D index of global thread ID in the dispatch.
+	uint GroupIndex : SV_GroupIndex; // Flattened local index of the thread within a thread group.
+};
+
+#define Post_RootSignature \
+    "RootFlags(0), " \
+    "DescriptorTable( SRV(t0, numDescriptors = 6)," \
+								"UAV(u0, numDescriptors = 1) )," \
+    "CBV(b0)" 
+
 Texture2D<float4> gPosition : register(t0); //srv
 Texture2D<float4> gAlbedoMetallic : register(t1); //srv
 Texture2D<float4> gNormalRoughness : register(t2); //srv
 Texture2D<float4> gExtra : register(t3); //srv
 Texture2D<float4> gShadowSecondaryDir : register(t4);
 Texture2D<float4> gRadiancePdf : register(t5);
+
+RWTexture2D<float4> gIndirectOutput : register(u0); //uav // used x
 
 struct Camera
 {
@@ -151,18 +170,19 @@ float3 spatialResample(float x, float y, float2 res)
 	return result_sum/weight_sum;
 }
 
-
-float4 main(float4 Position : SV_Position) : SV_Target0
+[RootSignature(Post_RootSignature)]
+[numthreads(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1)]
+void main(ComputeShaderInput IN)
 {
 	float col_alpha = 0.1;
 	float mom_alpha = 0.9;
 	
-	int2 texCoord = (int2) Position.xy;
+	int2 texCoord = (int2) IN.DispatchThreadID.xy;
 	float resx;
 	float resy;
 	float mipLevels;
 	gPosition.GetDimensions(0, resx, resy, mipLevels);
 	
 	float3 resampled = spatialResample(texCoord.x, texCoord.y, float2(resx, resy));
-	return float4(resampled, 1.0);
+	gIndirectOutput[texCoord] = float4(resampled, 1);
 }
