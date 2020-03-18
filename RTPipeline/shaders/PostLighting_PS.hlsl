@@ -154,7 +154,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 color1 = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
 	// indirect
-	float3 color2 = 0/*reflectivity*/;
+	float3 color2 = reflectivity;
 	
 	// compact
 	float3 color = LinearToSRGB( /*simpleToneMapping*/((color0 + color1 + color2)));

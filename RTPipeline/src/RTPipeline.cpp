@@ -385,8 +385,8 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 
 	// prev buffer cache
 	{
-		commandList->CopyResource(col_acc_prev, color_out_final);
 		viewProjectMatrix_prev = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
+		commandList->CopyResource(col_acc_prev, color_out_final);
 		commandList->CopyResource(gPosition_prev, gPosition);
 		commandList->CopyResource(gAlbedoMetallic_prev, gAlbedoMetallic);
 		commandList->CopyResource(gNormalRoughness_prev, gNormalRoughness);
@@ -712,93 +712,91 @@ void HybridPipeline::transformGameObject() {
 	}
 }
 void HybridPipeline::loadDXResource() {
-	auto device = Application::Get().GetDevice();
-
-	/////////////////////////////////// BackScreen RT Creation and other intermediate textures
-	{
+	auto createTex2D_RenderTarget = [](std::wstring name, int w, int h){
 		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
-
 		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
-
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto colorDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 0,
-			sampleDesc.Count, sampleDesc.Quality,
+		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 		D3D12_CLEAR_VALUE colorClearValue;
-		colorClearValue.Format = colorDesc.Format;
+		colorClearValue.Format = desc.Format;
 		colorClearValue.Color[0] = 0.0f;
 		colorClearValue.Color[1] = 0.0f;
 		colorClearValue.Color[2] = 0.0f;
 		colorClearValue.Color[3] = 1.0f;
-
-		gPosition = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gPosition+HitTexture");
-		gAlbedoMetallic = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gAlbedoMetallic Texture");
-		gNormalRoughness = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gNormalRoughness Texture");
-		gExtra = Texture(colorDesc, &colorClearValue,
-			TextureUsage::RenderTarget,
-			L"gExtra: ObjectId Texture");
-
-		// Create a depth buffer for the Deferred render target.
+		return Texture(desc, &colorClearValue,
+			TextureUsage::RenderTarget, name);
+	};
+	auto createTex2D_DepthStencil = [](std::wstring name, int w, int h) {
+		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
+		// Disable the multiple sampling for performance and simplicity
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
+		// Create an off-screen multi render target(MRT) and a depth buffer.
 		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
-			m_Width, m_Height,
-			1, 0,
-			sampleDesc.Count, sampleDesc.Quality,
+			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
 			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 		D3D12_CLEAR_VALUE depthClearValue;
 		depthClearValue.Format = depthDesc.Format;
 		depthClearValue.DepthStencil = { 1.0f, 0 };
+		return Texture(depthDesc, &depthClearValue,
+			TextureUsage::Depth, name);
+	};
+	auto createTex2D_ReadOnly = [](std::wstring name, int w, int h) {
+		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		// Disable the multiple sampling for performance and simplicity
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
+		// Create an off-screen multi render target(MRT) and a depth buffer.
+		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_NONE);
+		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
+	};
+	auto createTex2D_ReadWrite = [](std::wstring name, int w, int h) {
+		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		// Disable the multiple sampling for performance and simplicity
+		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
+		// Create an off-screen multi render target(MRT) and a depth buffer.
+		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
+			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
+	};
 
-		Texture depthTexture = Texture(depthDesc, &depthClearValue,
-			TextureUsage::Depth,
-			L"Depth Render Target");
-
+	{
+		gPosition = createTex2D_RenderTarget(L"gPosition+HitTexture", m_Width, m_Height);
+		gAlbedoMetallic = createTex2D_RenderTarget(L"gAlbedoMetallic Texture", m_Width, m_Height);
+		gNormalRoughness = createTex2D_RenderTarget(L"gNormalRoughness Texture", m_Width, m_Height);
+		gExtra = createTex2D_RenderTarget(L"gExtra: ObjectId Texture", m_Width, m_Height);
 		// Attach the HDR texture to the HDR render target.
 		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
 		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
 		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
 		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
-		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, depthTexture);
+		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, createTex2D_DepthStencil(L"Depth Render Target", m_Width, m_Height));
 
-		// uav creation
-		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 0,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		col_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc");
-		moment_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc");
-		his_length = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"his_length");
-		color_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[0]");
-		color_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"color_inout[1]");
-		variance_inout[0] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[0]");
-		variance_inout[1] = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"variance_inout[1]");
-		radiance_acc = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc");
-		g_indirectOutput = Texture(uavDesc, 0, TextureUsage::IntermediateBuffer, L"g_indirectOutput");
+		gPosition_prev = createTex2D_ReadWrite(L"gPosition_prev", m_Width, m_Height);
+		gAlbedoMetallic_prev = createTex2D_ReadWrite(L"gAlbedoMetallic_prev", m_Width, m_Height);
+		gNormalRoughness_prev = createTex2D_ReadWrite(L"gNormalRoughness_prev", m_Width, m_Height);
+		gExtra_prev = createTex2D_ReadWrite(L"gExtra_prev", m_Width, m_Height);
 
-		// srv creation
-		auto srvDesc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			m_Width, m_Height,
-			1, 0,
-			sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_NONE);
-		gPosition_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gPosition_prev");
-		gAlbedoMetallic_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gAlbedoMetallic_prev");
-		gNormalRoughness_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gNormalRoughness_prev");
-		gExtra_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"gExtra_prev");
-		col_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"col_acc_prev");
-		moment_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"moment_acc_prev");
-		his_length_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"his_length_prev");
-		radiance_acc_prev = Texture(srvDesc, 0, TextureUsage::IntermediateBuffer, L"radiance_acc_prev");
+		col_acc = createTex2D_ReadWrite(L"col_acc", m_Width, m_Height);
+		moment_acc = createTex2D_ReadWrite(L"moment_acc", m_Width, m_Height);
+		his_length = createTex2D_ReadWrite(L"his_length", m_Width, m_Height);
+		col_acc_prev = createTex2D_ReadWrite(L"col_acc_prev", m_Width, m_Height);
+		moment_acc_prev = createTex2D_ReadWrite(L"moment_acc_prev", m_Width, m_Height);
+		his_length_prev = createTex2D_ReadWrite(L"his_length_prev", m_Width, m_Height);
+
+		color_inout[0] = createTex2D_ReadWrite(L"color_inout[0]", m_Width, m_Height);
+		color_inout[1] = createTex2D_ReadWrite(L"color_inout[1]", m_Width, m_Height);
+		variance_inout[0] = createTex2D_ReadWrite(L"variance_inout[0]", m_Width, m_Height);
+		variance_inout[1] = createTex2D_ReadWrite(L"variance_inout[1]", m_Width, m_Height);
+
+		g_indirectOutput = createTex2D_ReadWrite(L"g_indirectOutput", m_Width, m_Height);
+
+		radiance_acc = createTex2D_ReadWrite(L"radiance_acc", m_Width, m_Height);
+		radiance_acc_prev = createTex2D_ReadWrite(L"radiance_acc_prev", m_Width, m_Height);
 	}
 
 }
@@ -1469,11 +1467,11 @@ void HybridPipeline::createShaderResources()
 	mpRtShadowOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
 		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
-	), nullptr, TextureUsage::RenderTarget, L"mpRtShadowOutputTexture");
+	), nullptr, TextureUsage::IntermediateBuffer, L"mpRtShadowOutputTexture");
 	mpRtReflectOutputTexture = std::make_shared<Texture>(CD3DX12_RESOURCE_DESC::Tex2D(
 		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height, 1, 0, 1, 0,
 		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0
-	), nullptr, TextureUsage::RenderTarget, L"mpRtReflectOutputTexture");
+	), nullptr, TextureUsage::IntermediateBuffer, L"mpRtReflectOutputTexture");
 
 	//****************************SRV Resource
 	//gRtScene / GPosition / GAlbedo / GMetallic / GNormal / GRoughness
