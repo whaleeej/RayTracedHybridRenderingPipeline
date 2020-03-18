@@ -202,7 +202,7 @@ private:
 	Texture color_inout[2];
 	Texture variance_inout[2];
 
-	uint32_t ATrous_Level_Max = 3;
+	uint32_t ATrous_Level_Max = 2;
 
 	// Post SpatialResample
 	Texture g_indirectOutput;

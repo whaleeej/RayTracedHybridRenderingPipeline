@@ -21,7 +21,6 @@ using namespace Microsoft::WRL;
 
 using namespace DirectX;
 
-#include <algorithm> // For std::min and std::max.
 #if defined(min)
 #undef min
 #endif
@@ -30,63 +29,10 @@ using namespace DirectX;
 #undef max
 #endif
 
-
-// An enum for root signature parameters.
-// I'm not using scoped enums to avoid the explicit cast that would be required
-// to use these as root indices in the root signature.
-enum RootParameters
-{
-    MatricesCB,         // ConstantBuffer<Mat> MatCB : register(b0);
-    MaterialCB,         // ConstantBuffer<Material> MaterialCB : register( b0, space1 );
-	PBRMaterialCB,  // ConstantBuffer<PBRMaterial> PBRMaterialCB: register(b1, space1);
-	GameObjectIndex, //// ConstantBuffer<float> GameObjectIndex: register(b2, space1);
-    Textures,            // Texture2D DiffuseTextures : register( t0-tN );
-    NumRootParameters
-};
-static const D3D12_HEAP_PROPERTIES kUploadHeapProps =
-{
-	D3D12_HEAP_TYPE_UPLOAD,
-	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-	D3D12_MEMORY_POOL_UNKNOWN,
-	0,
-	0,
-};
-
-static const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
-{
-	D3D12_HEAP_TYPE_DEFAULT,
-	D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-	D3D12_MEMORY_POOL_UNKNOWN,
-	0,
-	0
-};
-
-
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
 static uint64_t totalFrameCount = 0;
 static double totalTime = 0.0;
-
-XMMATRIX XM_CALLCONV LookAtMatrix(FXMVECTOR Position, FXMVECTOR Direction, FXMVECTOR Up)
-{
-    assert(!XMVector3Equal(Direction, XMVectorZero()));
-    assert(!XMVector3IsInfinite(Direction));
-    assert(!XMVector3Equal(Up, XMVectorZero()));
-    assert(!XMVector3IsInfinite(Up));
-
-    XMVECTOR R2 = XMVector3Normalize(Direction);
-
-    XMVECTOR R0 = XMVector3Cross(Up, R2);
-    R0 = XMVector3Normalize(R0);
-
-    XMVECTOR R1 = XMVector3Cross(R2, R0);
-
-    XMMATRIX M(R0, R1, R2, Position);
-
-    return M;
-}
-
-
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
@@ -102,8 +48,8 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Yaw(0)
     , m_AnimateLights(false)
     , m_Shift(false)
-    , m_Width(0)
-    , m_Height(0)
+	, m_Width(0)
+	, m_Height(0)
 {
 
     XMVECTOR cameraPos = XMVectorSet(0, 10, -35 , 1);
@@ -887,12 +833,12 @@ void HybridPipeline::loadPipeline() {
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
 				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0) };
 
-			CD3DX12_ROOT_PARAMETER1 rootParameters[RootParameters::NumRootParameters];
-			rootParameters[RootParameters::MatricesCB].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
-			rootParameters[RootParameters::MaterialCB].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::PBRMaterialCB].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::GameObjectIndex].InitAsConstants(1, 2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[RootParameters::Textures].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+			CD3DX12_ROOT_PARAMETER1 rootParameters[5];
+			rootParameters[0].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
+			rootParameters[1].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[2].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[3].InitAsConstants(1, 2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[4].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
 			//CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
 			CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
@@ -1152,14 +1098,14 @@ void HybridPipeline::updateBuffer()
 
 void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
 {
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MatricesCB, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::MaterialCB, material.base);
-	commandList.SetGraphicsDynamicConstantBuffer(RootParameters::PBRMaterialCB, material.pbr);
-	commandList.SetGraphics32BitConstants(RootParameters::GameObjectIndex, gid);
-	commandList.SetShaderResourceView(RootParameters::Textures, 0, (texturePool.find(material.tex.AlbedoTexture) != texturePool.end()) ? texturePool[material.tex.AlbedoTexture] : texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(RootParameters::Textures, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetGraphicsDynamicConstantBuffer(0, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
+	commandList.SetGraphicsDynamicConstantBuffer(1, material.base);
+	commandList.SetGraphicsDynamicConstantBuffer(2, material.pbr);
+	commandList.SetGraphics32BitConstants(3, gid);
+	commandList.SetShaderResourceView(4, 0, (texturePool.find(material.tex.AlbedoTexture) != texturePool.end()) ? texturePool[material.tex.AlbedoTexture] : texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(4, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(4, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	commandList.SetShaderResourceView(4, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 	if (meshPool.find(mesh) != meshPool.end()) {
 		meshPool[mesh]->Draw(commandList);
@@ -1169,6 +1115,24 @@ void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, 
 ////////////////////////////////////////////////////////////////////// RT Object 
 void HybridPipeline::createAccelerationStructures()
 {
+	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
+	{
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0,
+	};
+
+	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
+	{
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0
+	};
+
 	auto pDevice = Application::Get().GetDevice();
 	auto commandQueue = Application::Get().GetCommandQueue();
 	auto commandList = commandQueue->GetCommandList();
@@ -1481,6 +1445,24 @@ RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, 
 
 void HybridPipeline::createShaderResources()
 {
+	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
+	{
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0,
+	};
+
+	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
+	{
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0
+	};
+
 	auto pDevice = Application::Get().GetDevice();
 	//****************************UAV Resource
 	// gOutput
@@ -1665,6 +1647,24 @@ void HybridPipeline::createSrvUavHeap() {
 
 void HybridPipeline::createShaderTable()
 {
+	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
+	{
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0,
+	};
+
+	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
+	{
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		0,
+		0
+	};
+
 	auto mpDevice = Application::Get().GetDevice();
 
 	int objectToRT = 0;

@@ -134,7 +134,7 @@ protected:
 
 private:
     std::wstring m_Name;
+    bool m_vSync;
     int m_Width;
     int m_Height;
-    bool m_vSync;
 };
