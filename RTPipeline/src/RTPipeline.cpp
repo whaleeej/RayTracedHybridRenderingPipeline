@@ -294,7 +294,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, variance_inout[1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->Dispatch(m_Width / 8, m_Height / 8);
+		commandList->Dispatch(m_Width / local_width, m_Height / local_height);
 	}
 	
 	// Perform ATrous Iteration
@@ -320,7 +320,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			commandList->SetCompute32BitConstants(1, level);
-			commandList->Dispatch(m_Width / 8, m_Height / 8);
+			commandList->Dispatch(m_Width / local_width, m_Height / local_height);
 		}
 	}
 
@@ -337,7 +337,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, g_indirectOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	//	commandList->SetComputeDynamicConstantBuffer(1, mCameraCB);
-	//	commandList->Dispatch(m_Width / 8, m_Height / 8);
+	//	commandList->Dispatch(m_Width / local_width, m_Height / local_height);
 	//}
 
 	//// perform postTemporalResample
@@ -359,7 +359,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, radiance_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	//	commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-	//	commandList->Dispatch(m_Width/8, m_Height/8);
+	//	commandList->Dispatch(m_Width / local_width, m_Height / local_height);
 	//}
 
 	// post lighting

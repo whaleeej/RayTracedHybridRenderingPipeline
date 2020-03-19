@@ -188,7 +188,7 @@ private:
 	Texture gNormalRoughness_prev; //srv
 	Texture gExtra_prev; //srv
 
-	// Post Temporal
+	// SVGF Post Temporal
 	Texture col_acc; //uav
 	Texture moment_acc; //uav
 	Texture his_length; //uav
@@ -198,7 +198,7 @@ private:
 
 	XMMATRIX viewProjectMatrix_prev;
 
-	// PostATrous
+	// SVGF PostATrous
 	Texture color_inout[2];
 	Texture variance_inout[2];
 
@@ -210,6 +210,9 @@ private:
 	// Post Temporal Resample
 	Texture radiance_acc;
 	Texture radiance_acc_prev;
+
+	// BMFR_1_TemporalNoisy
+
 
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
@@ -234,6 +237,8 @@ private:
 	D3D12_RECT m_ScissorRect;
 	int m_Width;
 	int m_Height;
+	int local_width=8;
+	int local_height=8;
 
 	/////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
