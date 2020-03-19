@@ -14,6 +14,34 @@
 #include <DirectXMath.h>
 #include <Material.h>
 
+// temporal define for workset dim
+#define LOCAL_WIDTH 8
+#define LOCAL_HEIGHT 8
+#define BLOCK_EDGE_LENGTH 32
+#define BLOCK_PIXELS BLOCK_EDGE_LENGTH*BLOCK_EDGE_LENGTH
+#define BLOCK_EDGE_HALF (BLOCK_EDGE_LENGTH / 2)
+#define WORKSET_WIDTH (BLOCK_EDGE_LENGTH * ((m_Width + BLOCK_EDGE_LENGTH - 1) / BLOCK_EDGE_LENGTH))
+#define WORKSET_HEIGHT (BLOCK_EDGE_LENGTH *  ((m_Height + BLOCK_EDGE_LENGTH - 1) / BLOCK_EDGE_LENGTH))
+#define WORKSET_WITH_MARGINS_WIDTH (WORKSET_WIDTH + BLOCK_EDGE_LENGTH)
+#define WORKSET_WITH_MARGINS_HEIGHT (WORKSET_HEIGHT + BLOCK_EDGE_LENGTH)
+#define OUTPUT_SIZE (WORKSET_WIDTH * WORKSET_HEIGHT)
+#define LOCAL_SIZE 256
+#define FITTER_GLOBAL (LOCAL_SIZE * ((WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH) * (WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH)))
+// feature buffer define
+#define BUFFER_COUNT 13
+#define NOT_SCALED_FEATURE_BUFFERS \
+"1.f,"\
+"normal.x,"\
+"normal.y,"\
+"normal.z,"
+#define SCALED_FEATURE_BUFFERS \
+"world_position.x,"\
+"world_position.y,"\
+"world_position.z,"\
+"world_position.x*world_position.x,"\
+"world_position.y*world_position.y,"\
+"world_position.z*world_position.z"
+
 class HybridPipeline : public Game
 {
 public:
@@ -212,7 +240,13 @@ private:
 	Texture radiance_acc_prev;
 
 	// BMFR_1_TemporalNoisy
-
+	Texture noisy_curr;
+	Texture noisy_prev;
+	Texture spp_curr;
+	Texture spp_prev;
+	Texture pixel_reproject;
+	Texture pixel_accept;
+	Texture A_LQS_matrix;
 
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
@@ -233,12 +267,15 @@ private:
 	RootSignature m_PostLightingRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;
 
+	RootSignature m_PostBMFRTemporalNoisyRootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRTemporalNoisyPipelineState;
+
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;
 	int m_Width;
 	int m_Height;
-	int local_width=8;
-	int local_height=8;
+	int local_width= LOCAL_WIDTH;
+	int local_height= LOCAL_HEIGHT;
 
 	/////////////////////////////////////////////// RT Object 
 	void createAccelerationStructures();
@@ -253,9 +290,10 @@ private:
 
 	void createShaderResources();
 	void createSrvUavHeap();
+	void updateSrvUavHeap();
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	std::shared_ptr< Texture > mpRtShadowOutputTexture;
-	std::shared_ptr< Texture > mpRtReflectOutputTexture;
+	Texture mRtShadowOutputTexture;
+	Texture mRtReflectOutputTexture;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
 	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTFrameIndexCB;

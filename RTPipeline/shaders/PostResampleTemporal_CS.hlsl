@@ -1,5 +1,5 @@
-#define BLOCK_SIZE_X 8
-#define BLOCK_SIZE_Y 8
+#define LOCAL_WIDTH 8
+#define LOCAL_HEIGHT 8
 
 struct ComputeShaderInput
 {
@@ -168,7 +168,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha)
 }
 
 [RootSignature(PostResampleTemporal_RootSignature)]
-[numthreads(BLOCK_SIZE_X, BLOCK_SIZE_Y, 1)]
+[numthreads(LOCAL_WIDTH, LOCAL_HEIGHT, 1)]
 void main(ComputeShaderInput IN)
 {
 	float col_alpha = 0.08;

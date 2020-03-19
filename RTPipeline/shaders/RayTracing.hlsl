@@ -251,6 +251,7 @@ void rayGen()
 	if (hit == 0)
 	{
 		shadowOutput[launchIndex.xy] = float4(0, 0, 0, 1);
+		reflectOutput[launchIndex.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 	float3 position = GPosition.Load(int3(launchIndex.x, launchIndex.y, 0)).xyz;
