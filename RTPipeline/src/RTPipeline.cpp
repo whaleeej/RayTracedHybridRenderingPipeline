@@ -721,8 +721,8 @@ void HybridPipeline::transformGameObject() {
 	}
 }
 void HybridPipeline::loadDXResource() {
-	auto createTex2D_RenderTarget = [](std::wstring name, int w, int h){
-		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	auto createTex2D_RenderTarget = [](std::wstring name, int w, int h, DXGI_FORMAT format= DXGI_FORMAT_R32G32B32A32_FLOAT){
+		DXGI_FORMAT HDRFormat = format;
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 		// Create an off-screen multi render target(MRT) and a depth buffer.
@@ -738,8 +738,8 @@ void HybridPipeline::loadDXResource() {
 		return Texture(desc, &colorClearValue,
 			TextureUsage::RenderTarget, name);
 	};
-	auto createTex2D_DepthStencil = [](std::wstring name, int w, int h) {
-		DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT;
+	auto createTex2D_DepthStencil = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT) {
+		DXGI_FORMAT depthBufferFormat = format;
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 		// Create an off-screen multi render target(MRT) and a depth buffer.
@@ -752,8 +752,8 @@ void HybridPipeline::loadDXResource() {
 		return Texture(depthDesc, &depthClearValue,
 			TextureUsage::Depth, name);
 	};
-	auto createTex2D_ReadOnly = [](std::wstring name, int w, int h) {
-		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	auto createTex2D_ReadOnly = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT) {
+		DXGI_FORMAT HDRFormat = format;
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 		// Create an off-screen multi render target(MRT) and a depth buffer.
@@ -762,8 +762,8 @@ void HybridPipeline::loadDXResource() {
 			D3D12_RESOURCE_FLAG_NONE);
 		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
 	};
-	auto createTex2D_ReadWrite = [](std::wstring name, int w, int h) {
-		DXGI_FORMAT HDRFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	auto createTex2D_ReadWrite = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT) {
+		DXGI_FORMAT HDRFormat = format;
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 		// Create an off-screen multi render target(MRT) and a depth buffer.
