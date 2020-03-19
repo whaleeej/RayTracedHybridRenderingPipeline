@@ -22,6 +22,7 @@ Texture2D<float4> gExtra : register(t3); //srv
 
 Texture2D<float4> color_in : register(t4); // only x
 Texture2D<float4> variance_in : register(t5); // only x
+
 RWTexture2D<float4> color_out : register(u0); // only x
 RWTexture2D<float4> variance_out : register(u1);// only x
 

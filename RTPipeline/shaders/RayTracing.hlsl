@@ -32,12 +32,12 @@ struct Camera
 	float4x4 InverseViewMatrix;
 	float fov;
 	float3 padding;
-}; ConstantBuffer<Camera> CameraCB : register(b1);
+}; ConstantBuffer<Camera>cameraCB : register(b1);
 struct FrameIndex
 {
 	uint FrameIndex;
 	float3 Padding;
-}; ConstantBuffer<FrameIndex> FrameIndexCB : register(b2);
+}; ConstantBuffer<FrameIndex> frameIndexCB : register(b2);
 
 ////////////////////////////////////////////////////// PBR workflow Cook-Torrance
 float DoAttenuation(float attenuation, float distance)
@@ -263,10 +263,10 @@ void rayGen()
 	
 	// Lighting is performed in world space.
 	float3 P = position;
-	float3 V = normalize(CameraCB.PositionWS.xyz - position);
+	float3 V = normalize(cameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
-	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), FrameIndexCB.FrameIndex, 16);
+	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), frameIndexCB.FrameIndex, 16);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;

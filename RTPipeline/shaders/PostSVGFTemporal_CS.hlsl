@@ -15,11 +15,6 @@ struct ComputeShaderInput
 								"UAV(u0, numDescriptors = 4) )," \
     "CBV(b0)" 
 
-RWTexture2D<float4> col_acc : register(u0); //uav // used x
-RWTexture2D<float4> moment_acc : register(u1); //uav // used xy
-RWTexture2D<float4> his_length : register(u2); //uav // used x
-RWTexture2D<float4> variance_output : register(u3); //uav // used x
-
 Texture2D<float4> gPosition : register(t0); //srv
 Texture2D<float4> gAlbedoMetallic : register(t1); //srv
 Texture2D<float4> gNormalRoughness : register(t2); //srv
@@ -34,6 +29,11 @@ Texture2D<float4> moment_acc_prev : register(t9); //srv // used xy
 Texture2D<float4> his_length_prev : register(t10); //srv // used x
 
 Texture2D<float4> rt_input : register(t11);
+
+RWTexture2D<float4> col_acc : register(u0); //uav // used x
+RWTexture2D<float4> moment_acc : register(u1); //uav // used xy
+RWTexture2D<float4> his_length : register(u2); //uav // used x
+RWTexture2D<float4> variance_output : register(u3); //uav // used x
 
 struct ViewProjectMatrix_prev
 {
