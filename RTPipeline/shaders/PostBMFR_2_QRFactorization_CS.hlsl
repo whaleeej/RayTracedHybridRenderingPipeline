@@ -62,29 +62,29 @@ struct ComputeShaderInput
 
 #define Post_RootSignature \
     "RootFlags(0), " \
-    "DescriptorTable( SRV(t0, numDescriptors = 1)," \
-								"UAV(u0, numDescriptors = 1) )," \
-    "CBV(b0)" 
+    "DescriptorTable( UAV(u0, numDescriptors = 3) )," \
+    "RootConstants(b0, num32BitConstants = 4)" 
 
 
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, BUFFER_COUNT-3)
-RWTexture3D<float3> weights : register(u1); 
+RWTexture3D<float3> weights : register(u0); 
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, 6)
-RWTexture3D<float2> mins_maxs : register(u2);
+RWTexture3D<float2> mins_maxs : register(u1);
 // (WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGH, BUFFER_COUNT)
-RWTexture3D<float> tmp_data : register(u3);
+RWTexture3D<float> tmp_data : register(u2);
 
 struct FrameIndex
 {
 	uint FrameIndex;
 	float3 Padding;
 };
-ConstantBuffer<FrameIndex> frameIndexCB : register(b1);
+ConstantBuffer<FrameIndex> frameIndexCB : register(b0);
 
 
 groupshared float sum_vec[LOCAL_SIZE];
 groupshared float u_vec[BLOCK_PIXELS];
-groupshared float3 r_mat[BUFFER_COUNT - 2];
+groupshared float3 r_mat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)];
+groupshared float3 divider;
 
 // Random generator from here http://asgerhoedt.dk/?p=323
 static inline float random(unsigned int a)
@@ -98,7 +98,6 @@ static inline float random(unsigned int a)
 
 	return float(a) / float(0xffffffff);
 }
-
 static inline float add_random(
       const float value,
       const int id,
@@ -110,8 +109,24 @@ static inline float add_random(
       feature_buffer * BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH +
       frame_number * BUFFER_COUNT * BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) - 0.5f);
 }
+static inline float3 load_r_mat(
+       inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
+       const int x,
+       const int y)
+{
+	return Rmat[R_ACCESS];
+}
+
+static inline void store_r_mat(
+      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
+      const int x,
+      const int y,
+      const float3 value)
+{
+	Rmat[R_ACCESS] = value;
+}
 static inline void store_r_mat_broadcast(
-      inout float3 Rmat[],
+      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
       const int x,
       const int y,
       const float value)
@@ -119,20 +134,22 @@ static inline void store_r_mat_broadcast(
 	Rmat[R_ACCESS] = value;
 }
 static inline void store_r_mat_channel(
-      inout float3 Rmat[],
+      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
       const int x,
       const int y,
       const int channel,
       const float value)
 {
+	float3 tmp = Rmat[R_ACCESS];
 	if (channel == 0)
-		Rmat[R_ACCESS].x = value;
+		tmp.x = value;
 	else if (channel == 1)
-		Rmat[R_ACCESS].y = value;
+		tmp.y = value;
 	else // channel == 2
-		Rmat[R_ACCESS].z = value;
+		tmp.z = value;
+	Rmat[R_ACCESS] = tmp;
 }
-static inline void parallel_reduction_sum(out float result, inout float sum_vec[], int id)
+static inline void parallel_reduction_sum(out float result, inout float sum_vec[LOCAL_SIZE], int id)
 {
 	if (id < 64)
 		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
@@ -148,7 +165,8 @@ static inline void parallel_reduction_sum(out float result, inout float sum_vec[
 	}
 	DeviceMemoryBarrierWithGroupSync();
 }
-static inline void parallel_reduction_min(out float result, inout float sum_vec[], int id) {
+static inline void parallel_reduction_min(out float result, inout float sum_vec[LOCAL_SIZE], int id)
+{
 	if(id < 64)
       sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), 
 		sum_vec[id + 128]), sum_vec[id + 192]);
@@ -164,7 +182,7 @@ static inline void parallel_reduction_min(out float result, inout float sum_vec[
 	}
 	DeviceMemoryBarrierWithGroupSync();
 }
-static inline void parallel_reduction_max(out float result, inout float sum_vec[], int id)
+static inline void parallel_reduction_max(out float result, inout float sum_vec[LOCAL_SIZE], int id)
 {
    if(id < 64)
       sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),
@@ -303,23 +321,20 @@ void main(ComputeShaderInput IN)
 				const int index = id + sub_vector * LOCAL_SIZE;
 				if (index >= col_limited)
 				{
-
-					float tmp = LOAD(tmp_data, IN_ACCESS);
-
+					float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
 					// Add noise on the first time values are loaded
 					// (does not add noise to constant buffer and noisy image data)
 					if (col == 0 && feature_buffer < buffers - 3)
 					{
-						tmp = add_random(tmp, id, sub_vector, feature_buffer, frame_number);
+						tmp = add_random(tmp, id, sub_vector, feature_buffer, frameIndexCB.FrameIndex);
 					}
-
 					tmp_data_private_cache[sub_vector] = tmp;
 					tmp_sum_value += tmp * u_vec[index];
 				}
 			}
 			sum_vec[id] = tmp_sum_value;
-			barrier(CLK_LOCAL_MEM_FENCE);
-			parallel_reduction_sum( & dot, sum_vec, col_limited);
+			DeviceMemoryBarrierWithGroupSync();
+			parallel_reduction_sum( dot, sum_vec, id);
 
 			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
 			{
@@ -328,10 +343,50 @@ void main(ComputeShaderInput IN)
 				{
 					float store_value = tmp_data_private_cache[sub_vector];
 					store_value -= 2 * u_vec[index] * dot / u_length_squared;
-					STORE(tmp_data, IN_ACCESS, store_value);
+					tmp_data[IN_ACCESS]=store_value;
 				}
 			}
-			barrier(CLK_GLOBAL_MEM_FENCE);
+			DeviceMemoryBarrierWithGroupSync();
 		}	
+	}
+	
+	// Back substitution
+	for (int i = R_EDGE - 2; i >= 0; i--)
+	{
+		// divider
+		if (id == 0)
+			divider = load_r_mat(r_mat, i, i);
+		DeviceMemoryBarrierWithGroupSync();
+		// scale with divider
+		if (id < R_EDGE)
+		{
+			float3 value = load_r_mat(r_mat, id, i);
+			store_r_mat(r_mat, id, i, value / divider);
+		}
+		DeviceMemoryBarrierWithGroupSync();
+		 //Optimization proposal: parallel reduction to calculate Xn
+		if (id == 0)
+			for (int j = i + 1; j < R_EDGE - 1; j++)
+			{
+				float3 value = load_r_mat(r_mat, R_EDGE - 1, i);
+				float3 value2 = load_r_mat(r_mat, j, i);
+				store_r_mat(r_mat, R_EDGE - 1, i, value - value2);
+			}
+		DeviceMemoryBarrierWithGroupSync();
+		// scale R with Xn
+		if (id < R_EDGE)
+		{
+			float3 value = load_r_mat(r_mat, i, id);
+			float3 value2 = load_r_mat(r_mat, R_EDGE - 1, i);
+			store_r_mat(r_mat, i, id, value * value2);
+		}
+		DeviceMemoryBarrierWithGroupSync();
+	}
+	
+	// Store weights
+	if (id < buffers - 3) {
+		int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
+		float3 weight = load_r_mat(r_mat, R_EDGE - 1, id);
+		weights[index] = weight;
 	}
 }

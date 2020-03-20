@@ -250,6 +250,10 @@ private:
 	Texture pixel_accept;
 	Texture A_LQS_matrix;
 
+	// BMFR_2_QRFactorization
+	Texture lqs_weights;
+	Texture feature_scale_minmax;
+
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
@@ -271,6 +275,10 @@ private:
 
 	RootSignature m_PostBMFRTemporalNoisyRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRTemporalNoisyPipelineState;
+
+	RootSignature m_PostBMFRQRFactorizationRootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRQRFactorizationPipelineState;
+
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;

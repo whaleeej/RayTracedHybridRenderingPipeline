@@ -849,6 +849,8 @@ void HybridPipeline::loadDXResource() {
 		pixel_reproject = createTex2D_ReadWrite(L"pixel_reproject", m_Width, m_Height, DXGI_FORMAT_R32G32_FLOAT);
 		pixel_accept = createTex2D_ReadWrite(L"pixel_accept", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
 		A_LQS_matrix = createTex3D_ReadWrite(L"A_LQS_matrix", WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGHT, BUFFER_COUNT, DXGI_FORMAT_R32_FLOAT);
+		lqs_weights = createTex3D_ReadWrite(L"lqs_weights", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, BUFFER_COUNT - 3, DXGI_FORMAT_R32G32B32_FLOAT);
+		feature_scale_minmax = createTex3D_ReadWrite(L"feature_scale_minmax", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, 6, DXGI_FORMAT_R32G32_FLOAT);
 	}
 
 }
@@ -1027,6 +1029,39 @@ void HybridPipeline::loadPipeline() {
 				sizeof(PostBMFRTemporalNoisyPipelineStateStream), & postBMFRTemporalNoisyPipelineStateStream
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalNoisyPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
+		}
+
+		// Create the PostBMFRQRFactorization_CS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
+			rootParameters[1].InitAsConstants(4, 1);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
+
+			m_PostBMFRQRFactorizationRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> cs;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_2_QRFactorization_CS.cso", &cs));
+
+			struct PostBMFRQRFactorizationPipelineStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+			} postBMFRQRFactorizationPipelineStateStream;
+
+			postBMFRQRFactorizationPipelineStateStream.pRootSignature = m_PostBMFRQRFactorizationRootSignature.GetRootSignature().Get();
+			postBMFRQRFactorizationPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRQRFactorizationPipelineStateStreamDesc = {
+				sizeof(PostBMFRQRFactorizationPipelineStateStream), &postBMFRQRFactorizationPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postBMFRQRFactorizationPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRQRFactorizationPipelineState)));
 		}
 
 		// Create the PostSpatial_CS Root Signature
