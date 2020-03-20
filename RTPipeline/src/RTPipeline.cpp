@@ -848,7 +848,7 @@ void HybridPipeline::loadDXResource() {
 		spp_prev = createTex2D_ReadWrite(L"spp_prev", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
 		pixel_reproject = createTex2D_ReadWrite(L"pixel_reproject", m_Width, m_Height, DXGI_FORMAT_R32G32_FLOAT);
 		pixel_accept = createTex2D_ReadWrite(L"pixel_accept", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
-		A_LQS_matrix = createTex3D_ReadWrite(L"A_LQS_matrix", WORKSET_WITH_MARGINS_WIDTH, BUFFER_COUNT, WORKSET_WITH_MARGINS_HEIGHT, DXGI_FORMAT_R32_FLOAT);
+		A_LQS_matrix = createTex3D_ReadWrite(L"A_LQS_matrix", WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGHT, BUFFER_COUNT, DXGI_FORMAT_R32_FLOAT);
 	}
 
 }

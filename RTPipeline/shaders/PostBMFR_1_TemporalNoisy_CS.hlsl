@@ -16,6 +16,8 @@
 #define FITTER_GLOBAL (LOCAL_SIZE * ((WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH) * (WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH)))
 // feature buffer define
 #define BUFFER_COUNT 13
+#define FEATURES_NOT_SCALED 4
+#define FEATURES_SCALED 6
 #define NOT_SCALED_FEATURE_BUFFERS \
 1.f,\
 normal.x,\
@@ -245,9 +247,8 @@ void main(ComputeShaderInput IN)
 		//int y_in_block = gid.y % BLOCK_EDGE_LENGTH;
 		//int x_block = gid.x / BLOCK_EDGE_LENGTH;
 		//int y_block = gid.y / BLOCK_EDGE_LENGTH;
-		uint3 location_in_data = uint3(gid.x,
-			feature_num,
-			gid.y
+		uint3 location_in_data = uint3(gid.x, gid.y,
+			feature_num
 		);
 
 		float storeValue = features[feature_num];
