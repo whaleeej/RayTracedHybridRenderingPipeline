@@ -160,8 +160,8 @@ void main(ComputeShaderInput IN)
 		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
 		float ndcx = clip_position.x / clip_position.w * 0.5 + 0.5;
 		float ndcy = -clip_position.y / clip_position.w * 0.5 + 0.5;
-		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.49;
-		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.49;
+		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.495;
+		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.495;
 		int2 prev_frame_pixel = int2(floor(prev_frame_pixel_f.x), floor(prev_frame_pixel_f.y));
 		
 		// These are needed for  the bilinear sampling
@@ -194,7 +194,7 @@ void main(ComputeShaderInput IN)
 				total_weight += weights[i];
 			}
 		}
-		if (total_weight>0.01)
+		if (total_weight>0.00)
 		{
 			sample_spp /= total_weight;
 			previous_color /= total_weight;
@@ -219,10 +219,18 @@ void main(ComputeShaderInput IN)
 			new_spp = uint(sample_spp) + 1;
 		}
 	}
-	
 	// blending color
 	float3 new_color = blend_alpha * current_color + (1.f - blend_alpha) * previous_color;
-
+	// history,nosiy,reprojection,accept caching
+	if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
+      pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+	{
+		current_spp[pixel] = new_spp;
+		current_noisy[pixel] = float4(new_color, 1.0f);
+		out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
+		accept_bools[pixel] = store_accept;
+	}
+	
 	// feature buffer caching
 	float features[BUFFER_COUNT] =
 	{
@@ -247,13 +255,5 @@ void main(ComputeShaderInput IN)
 			storeValue = 0.0f;
 		tmp_data[location_in_data] = storeValue;
 	}
-	// history,nosiy,reprojection,accept caching
-	if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
-      pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
-	{
-		current_spp[pixel] = new_spp;
-		current_noisy[pixel] = float4(new_color, 1.0f);
-		out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
-		accept_bools[pixel] = store_accept;
-	}
+	
 }
