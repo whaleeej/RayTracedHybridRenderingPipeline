@@ -37,7 +37,7 @@ world_position.z*world_position.z
 #define IN_BLOCK_INDEX_X  ((256*sub_vector+id)%BLOCK_EDGE_LENGTH)
 #define IN_BLOCK_INDEX_Y  ((256*sub_vector+id)/BLOCK_EDGE_LENGTH)
 #define IN_ACCESS int3(BLOCK_INDEX_X*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_X, BLOCK_INDEX_Y*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_Y, feature_buffer)
-#define R_EDGE BUFFER_COUNT-2 
+#define R_EDGE (BUFFER_COUNT-2) 
 #define R_ACCESS (x * R_EDGE + y)
 // Here - means unused value
 // Note: "unused" values are still set to 0 so some operations can be done to
@@ -80,7 +80,7 @@ ConstantBuffer<FrameIndex> frameIndexCB : register(b0);
 // local
 groupshared float sum_vec[LOCAL_SIZE];
 groupshared float u_vec[BLOCK_PIXELS];
-groupshared float3 r_mat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)];
+groupshared float3 r_mat[R_EDGE * R_EDGE];
 groupshared float u_length_squared;
 groupshared float dot;
 groupshared float block_min;
@@ -115,8 +115,6 @@ inline float3 load_r_mat(
        const int x,
        const int y)
 {
-	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
-		return 0;
 	return r_mat[R_ACCESS];
 }
 
@@ -125,8 +123,6 @@ inline void store_r_mat(
       const int y,
       const float3 value)
 {
-	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
-		return ;
 	r_mat[R_ACCESS] = value;
 }
 inline void store_r_mat_broadcast(
@@ -134,8 +130,6 @@ inline void store_r_mat_broadcast(
       const int y,
       const float value)
 {
-	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
-		return ;
 	r_mat[R_ACCESS] = value;
 }
 inline void store_r_mat_channel(
@@ -144,8 +138,6 @@ inline void store_r_mat_channel(
       const int channel,
       const float value)
 {
-	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
-		return ;
 	float3 tmp = r_mat[R_ACCESS];
 	if (channel == 0)
 		tmp.x = value;
@@ -155,55 +147,6 @@ inline void store_r_mat_channel(
 		tmp.z = value;
 	r_mat[R_ACCESS] = tmp;
 }
-//inline void parallel_reduction_sum(out float result, int id)
-//{
-//	if (id < 64)
-//		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
-//	GroupMemoryBarrierWithGroupSync ();
-//	if (id < 8)
-//		sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] +
-//         sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
-//	GroupMemoryBarrierWithGroupSync ();
-//	if (id == 0)
-//	{
-//		result = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] +
-//         sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//}
-//inline void parallel_reduction_min(out float result, int id)
-//{
-//	if (id < 64){
-//      sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), sum_vec[id + 128]), sum_vec[id + 192]);
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//	if (id < 8){
-//      sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//	if(id == 0){
-//		result = min(min(min(min(min(min(min(sum_vec[0], sum_vec[1]), sum_vec[2]),
-//			sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//}
-//inline void parallel_reduction_max(out float result, int id)
-//{
-//	if (id < 64)
-//	{
-//      sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),sum_vec[id + 128]), sum_vec[id + 192]);
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//   if(id < 8){
-//      sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
-//	}
-//	GroupMemoryBarrierWithGroupSync ();
-//   if(id == 0){
-//      result = max(max(max(max(max(max(max(sum_vec[0], sum_vec[1]), sum_vec[2]),
-//         sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
-//   }
-//	GroupMemoryBarrierWithGroupSync ();
-//}
 inline float scale(float value, float min, float max)
 {
 	if (abs(max - min) > 1.0f)
@@ -408,48 +351,48 @@ void main(ComputeShaderInput IN)
 					tmp_data[IN_ACCESS] = store_value;
 				}
 			}
-			DeviceMemoryBarrierWithGroupSync();
+			AllMemoryBarrierWithGroupSync();
 		}
 	}
 	
-	//// Back substitution
-	//for (int i = R_EDGE - 2; i >= 0; i--)
-	//{
-	//	// divider
-	//	if (id == 0)
-	//		divider = load_r_mat(i, i);
-	//	GroupMemoryBarrierWithGroupSync();
-	//	// scale with divider
-	//	if (id < R_EDGE)
-	//	{
-	//		float3 value = load_r_mat(id, i);
-	//		store_r_mat(id, i, value / divider);
-	//	}
-	//	GroupMemoryBarrierWithGroupSync();
-	//	 //Optimization proposal: parallel reduction to calculate Xn
-	//	if (id == 0)
-	//		for (int j = i + 1; j < R_EDGE - 1; j++)
-	//		{
-	//			float3 value = load_r_mat(R_EDGE - 1, i);
-	//			float3 value2 = load_r_mat(j, i);
-	//			store_r_mat(R_EDGE - 1, i, value - value2);
-	//		}
-	//	GroupMemoryBarrierWithGroupSync();
-	//	// scale R with Xn
-	//	if (id < R_EDGE)
-	//	{
-	//		float3 value = load_r_mat(i, id);
-	//		float3 value2 = load_r_mat(R_EDGE - 1, i);
-	//		store_r_mat(i, id, value * value2);
-	//	}
-	//	GroupMemoryBarrierWithGroupSync();
-	//}
+	// Back substitution
+	for (int i = R_EDGE - 2; i >= 0; i--)
+	{
+		// divider
+		if (id == 0)
+			divider = load_r_mat(i, i);
+		GroupMemoryBarrierWithGroupSync();
+		// scale with divider
+		if (id < R_EDGE)
+		{
+			float3 value = load_r_mat(id, i);
+			store_r_mat(id, i, value / divider);
+		}
+		GroupMemoryBarrierWithGroupSync();
+		 //Optimization proposal: parallel reduction to calculate Xn
+		if (id == 0)
+			for (int j = i + 1; j < R_EDGE - 1; j++)
+			{
+				float3 value = load_r_mat(R_EDGE - 1, i);
+				float3 value2 = load_r_mat(j, i);
+				store_r_mat(R_EDGE - 1, i, value - value2);
+			}
+		GroupMemoryBarrierWithGroupSync();
+		// scale R with Xn
+		if (id < R_EDGE)
+		{
+			float3 value = load_r_mat(i, id);
+			float3 value2 = load_r_mat(R_EDGE - 1, i);
+			store_r_mat(i, id, value * value2);
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
 	
-	//// Store weights
-	//if (id < buffers - 3)
-	//{
-	//	int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
-	//	float3 weight = load_r_mat(R_EDGE - 1, id);
-	//	weights[index] = float4(weight, 1.0);
-	//}
+	// Store weights
+	if (id < buffers - 3)
+	{
+		int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
+		float3 weight = load_r_mat(R_EDGE - 1, id);
+		weights[index] = float4(weight, 1.0);
+	}
 }
