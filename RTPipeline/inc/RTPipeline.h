@@ -248,10 +248,10 @@ private:
 	Texture spp_prev;
 	Texture pixel_reproject;
 	Texture pixel_accept;
-	Texture A_LQS_matrix;
+	Texture A_LSQ_matrix;
 
 	// BMFR_2_QRFactorization
-	Texture lqs_weights;
+	Texture lsq_weights;
 	Texture feature_scale_minmax;
 
 	// Root signatures

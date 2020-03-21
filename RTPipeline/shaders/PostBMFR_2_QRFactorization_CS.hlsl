@@ -30,7 +30,7 @@ world_position.y*world_position.y,\
 world_position.z*world_position.z
 #define FEATURE_BUFFERS NOT_SCALED_FEATURE_BUFFERS SCALED_FEATURE_BUFFERS
 // locale define
-#define INFINITY 1.0f/1.0f
+#define INFINITY 1000000.000000
 #define HORIZONTAL_BLOCKS (WORKSET_WIDTH / BLOCK_EDGE_LENGTH)
 #define BLOCK_INDEX_X (group_id % (HORIZONTAL_BLOCKS + 1))
 #define BLOCK_INDEX_Y (group_id / (HORIZONTAL_BLOCKS + 1))
@@ -67,9 +67,9 @@ struct ComputeShaderInput
 
 
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, BUFFER_COUNT-3)
-RWTexture3D<float3> weights : register(u0); 
+RWTexture3D<float4> weights : register(u0); 
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, 6)
-RWTexture3D<float2> mins_maxs : register(u1);
+RWTexture3D<float4> mins_maxs : register(u1);
 // (WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGH, BUFFER_COUNT)
 RWTexture3D<float> tmp_data : register(u2);
 
@@ -110,46 +110,50 @@ static inline float add_random(
       frame_number * BUFFER_COUNT * BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) - 0.5f);
 }
 static inline float3 load_r_mat(
-       inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
        const int x,
        const int y)
 {
-	return Rmat[R_ACCESS];
+	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
+		return 0;
+	return r_mat[R_ACCESS];
 }
 
 static inline void store_r_mat(
-      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
       const int x,
       const int y,
       const float3 value)
 {
-	Rmat[R_ACCESS] = value;
+	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
+		return ;
+	r_mat[R_ACCESS] = value;
 }
 static inline void store_r_mat_broadcast(
-      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
       const int x,
       const int y,
       const float value)
 {
-	Rmat[R_ACCESS] = value;
+	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
+		return ;
+	r_mat[R_ACCESS] = value;
 }
 static inline void store_r_mat_channel(
-      inout float3 Rmat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)],
       const int x,
       const int y,
       const int channel,
       const float value)
 {
-	float3 tmp = Rmat[R_ACCESS];
+	if (R_ACCESS >= (BUFFER_COUNT - 2) * (BUFFER_COUNT - 2) || R_ACCESS < 0)
+		return ;
+	float3 tmp = r_mat[R_ACCESS];
 	if (channel == 0)
 		tmp.x = value;
 	else if (channel == 1)
 		tmp.y = value;
 	else // channel == 2
 		tmp.z = value;
-	Rmat[R_ACCESS] = tmp;
+	r_mat[R_ACCESS] = tmp;
 }
-static inline void parallel_reduction_sum(out float result, inout float sum_vec[LOCAL_SIZE], int id)
+static inline void parallel_reduction_sum(out float result, int id)
 {
 	if (id < 64)
 		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
@@ -165,7 +169,7 @@ static inline void parallel_reduction_sum(out float result, inout float sum_vec[
 	}
 	DeviceMemoryBarrierWithGroupSync();
 }
-static inline void parallel_reduction_min(out float result, inout float sum_vec[LOCAL_SIZE], int id)
+static inline void parallel_reduction_min(out float result, int id)
 {
 	if(id < 64)
       sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), 
@@ -182,7 +186,7 @@ static inline void parallel_reduction_min(out float result, inout float sum_vec[
 	}
 	DeviceMemoryBarrierWithGroupSync();
 }
-static inline void parallel_reduction_max(out float result, inout float sum_vec[LOCAL_SIZE], int id)
+static inline void parallel_reduction_max(out float result, int id)
 {
    if(id < 64)
       sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),
@@ -236,15 +240,15 @@ void main(ComputeShaderInput IN)
 		// reduce the max
 		sum_vec[id] = tmp_max;
 		DeviceMemoryBarrierWithGroupSync();
-		parallel_reduction_max(block_max, sum_vec, id);
+		parallel_reduction_max(block_max, id);
 		// reduce the min
 		sum_vec[id] = tmp_min;
 		DeviceMemoryBarrierWithGroupSync();
-		parallel_reduction_min(block_min, sum_vec, id);
+		parallel_reduction_min(block_min, id);
 		// store the min_max for the thread group
 		if (id == 0) {
 			int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, feature_buffer - FEATURES_NOT_SCALED);
-			mins_maxs[index] = float2(block_min, block_max);
+			mins_maxs[index] = float4(block_min, block_max,1,1);
 		}
 		DeviceMemoryBarrierWithGroupSync();
 		// normalization
@@ -281,7 +285,7 @@ void main(ComputeShaderInput IN)
 		// Find length of vector in A's column with reduction sum function
 		sum_vec[id] = tmp_sum_value;
 		DeviceMemoryBarrierWithGroupSync();
-		parallel_reduction_sum( vec_length, sum_vec, id);
+		parallel_reduction_sum(vec_length, id);
 		
 		float r_value;
 		if (id < col)
@@ -306,9 +310,9 @@ void main(ComputeShaderInput IN)
 		// store R matrix
 		int id_limited = min(id, buffers - 3);
 		if (col < buffers - 3)
-			store_r_mat_broadcast(r_mat, col_limited, id_limited, r_value);
+			store_r_mat_broadcast(col_limited, id_limited, r_value);
 		else
-			store_r_mat_channel(r_mat, col_limited, id_limited, col - buffers + 3, r_value);
+			store_r_mat_channel(col_limited, id_limited, col - buffers + 3, r_value);
 		DeviceMemoryBarrierWithGroupSync();
 		
 		// Transform columns of A
@@ -334,7 +338,7 @@ void main(ComputeShaderInput IN)
 			}
 			sum_vec[id] = tmp_sum_value;
 			DeviceMemoryBarrierWithGroupSync();
-			parallel_reduction_sum( dot, sum_vec, id);
+			parallel_reduction_sum(dot, id);
 
 			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
 			{
@@ -343,11 +347,11 @@ void main(ComputeShaderInput IN)
 				{
 					float store_value = tmp_data_private_cache[sub_vector];
 					store_value -= 2 * u_vec[index] * dot / u_length_squared;
-					tmp_data[IN_ACCESS]=store_value;
+					tmp_data[IN_ACCESS] = store_value;
 				}
 			}
 			DeviceMemoryBarrierWithGroupSync();
-		}	
+		}
 	}
 	
 	// Back substitution
@@ -355,38 +359,39 @@ void main(ComputeShaderInput IN)
 	{
 		// divider
 		if (id == 0)
-			divider = load_r_mat(r_mat, i, i);
+			divider = load_r_mat(i, i);
 		DeviceMemoryBarrierWithGroupSync();
 		// scale with divider
 		if (id < R_EDGE)
 		{
-			float3 value = load_r_mat(r_mat, id, i);
-			store_r_mat(r_mat, id, i, value / divider);
+			float3 value = load_r_mat(id, i);
+			store_r_mat(id, i, value / divider);
 		}
 		DeviceMemoryBarrierWithGroupSync();
 		 //Optimization proposal: parallel reduction to calculate Xn
 		if (id == 0)
 			for (int j = i + 1; j < R_EDGE - 1; j++)
 			{
-				float3 value = load_r_mat(r_mat, R_EDGE - 1, i);
-				float3 value2 = load_r_mat(r_mat, j, i);
-				store_r_mat(r_mat, R_EDGE - 1, i, value - value2);
+				float3 value = load_r_mat(R_EDGE - 1, i);
+				float3 value2 = load_r_mat(j, i);
+				store_r_mat(R_EDGE - 1, i, value - value2);
 			}
 		DeviceMemoryBarrierWithGroupSync();
 		// scale R with Xn
 		if (id < R_EDGE)
 		{
-			float3 value = load_r_mat(r_mat, i, id);
-			float3 value2 = load_r_mat(r_mat, R_EDGE - 1, i);
-			store_r_mat(r_mat, i, id, value * value2);
+			float3 value = load_r_mat(i, id);
+			float3 value2 = load_r_mat(R_EDGE - 1, i);
+			store_r_mat(i, id, value * value2);
 		}
 		DeviceMemoryBarrierWithGroupSync();
 	}
 	
 	// Store weights
-	if (id < buffers - 3) {
+	if (id < buffers - 3)
+	{
 		int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
-		float3 weight = load_r_mat(r_mat, R_EDGE - 1, id);
-		weights[index] = weight;
+		float3 weight = load_r_mat(R_EDGE - 1, id);
+		weights[index] = float4(weight, 1.0);
 	}
 }

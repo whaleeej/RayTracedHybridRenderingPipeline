@@ -4,6 +4,7 @@ Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSampleShadow : register(t4);
 Texture2D<float4> GSampleReflect : register(t5);
+Texture3D<float> A_tmp_data : register(t6);
 struct PointLight
 {
 	float4 PositionWS;
@@ -138,6 +139,11 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float visibility = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
 	float3 reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	float3 brdfLDir = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).yzw;
+	float3 Atmp = float3(
+		A_tmp_data.Load(int4(texCoord.x, texCoord.y, 7, 0)).x,
+		A_tmp_data.Load(int4(texCoord.x, texCoord.y, 8, 0)).x,
+		A_tmp_data.Load(int4(texCoord.x, texCoord.y, 9, 0)).x
+	);
 	if (hit == 0.0)
 	{
 		return float4(emissive, 1.0f);
@@ -154,7 +160,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 color1 =0 *  DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
 	// indirect
-	float3 color2 = reflectivity;
+	float3 color2 = Atmp;
 	
 	// compact
 	float3 color = LinearToSRGB( /*simpleToneMapping*/((color0 + color1 + color2)));
