@@ -63,14 +63,13 @@ struct ComputeShaderInput
     "DescriptorTable( UAV(u0, numDescriptors = 3) )," \
     "RootConstants(b0, num32BitConstants = 4)" 
 
-
+// global
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, BUFFER_COUNT-3)
 RWTexture3D<float4> weights : register(u0); 
 // (WORKSET_WITH_MARGINS_WIDTH/BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT/BLOCK_EDGE_LENGTH, 6)
 RWTexture3D<float4> mins_maxs : register(u1);
 // (WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGH, BUFFER_COUNT)
 RWTexture3D<float> tmp_data : register(u2);
-
 struct FrameIndex
 {
 	uint FrameIndex;
@@ -78,7 +77,7 @@ struct FrameIndex
 };
 ConstantBuffer<FrameIndex> frameIndexCB : register(b0);
 
-
+// local
 groupshared float sum_vec[LOCAL_SIZE];
 groupshared float u_vec[BLOCK_PIXELS];
 groupshared float3 r_mat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)];
@@ -90,7 +89,7 @@ groupshared float vec_length;
 groupshared float3 divider;
 
 // Random generator from here http://asgerhoedt.dk/?p=323
-static inline float random(unsigned int a)
+inline float random(unsigned int a)
 {
 	a = (a + 0x7ed55d16) + (a << 12);
 	a = (a ^ 0xc761c23c) ^ (a >> 19);
@@ -101,7 +100,7 @@ static inline float random(unsigned int a)
 
 	return float(a) / float(0xffffffff);
 }
-static inline float add_random(
+inline float add_random(
       const float value,
       const int id,
       const int sub_vector,
@@ -112,7 +111,7 @@ static inline float add_random(
       feature_buffer * BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH +
       frame_number * BUFFER_COUNT * BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) - 0.5f);
 }
-static inline float3 load_r_mat(
+inline float3 load_r_mat(
        const int x,
        const int y)
 {
@@ -121,7 +120,7 @@ static inline float3 load_r_mat(
 	return r_mat[R_ACCESS];
 }
 
-static inline void store_r_mat(
+inline void store_r_mat(
       const int x,
       const int y,
       const float3 value)
@@ -130,7 +129,7 @@ static inline void store_r_mat(
 		return ;
 	r_mat[R_ACCESS] = value;
 }
-static inline void store_r_mat_broadcast(
+inline void store_r_mat_broadcast(
       const int x,
       const int y,
       const float value)
@@ -139,7 +138,7 @@ static inline void store_r_mat_broadcast(
 		return ;
 	r_mat[R_ACCESS] = value;
 }
-static inline void store_r_mat_channel(
+inline void store_r_mat_channel(
       const int x,
       const int y,
       const int channel,
@@ -156,55 +155,55 @@ static inline void store_r_mat_channel(
 		tmp.z = value;
 	r_mat[R_ACCESS] = tmp;
 }
-inline void parallel_reduction_sum(out float result, int id)
-{
-	if (id < 64)
-		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
-	AllMemoryBarrierWithGroupSync ();
-	if (id < 8)
-		sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] +
-         sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
-	AllMemoryBarrierWithGroupSync ();
-	if (id == 0)
-	{
-		result = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] +
-         sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
-	}
-	AllMemoryBarrierWithGroupSync ();
-}
-inline void parallel_reduction_min(out float result, int id)
-{
-	if (id < 64){
-      sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), sum_vec[id + 128]), sum_vec[id + 192]);
-	}
-	AllMemoryBarrierWithGroupSync ();
-	if (id < 8){
-      sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
-	}
-	AllMemoryBarrierWithGroupSync ();
-	if(id == 0){
-		result = min(min(min(min(min(min(min(sum_vec[0], sum_vec[1]), sum_vec[2]),
-			sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
-	}
-	AllMemoryBarrierWithGroupSync ();
-}
-inline void parallel_reduction_max(out float result, int id)
-{
-	if (id < 64)
-	{
-      sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),sum_vec[id + 128]), sum_vec[id + 192]);
-	}
-	AllMemoryBarrierWithGroupSync ();
-   if(id < 8){
-      sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
-	}
-	AllMemoryBarrierWithGroupSync ();
-   if(id == 0){
-      result = max(max(max(max(max(max(max(sum_vec[0], sum_vec[1]), sum_vec[2]),
-         sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
-   }
-	AllMemoryBarrierWithGroupSync ();
-}
+//inline void parallel_reduction_sum(out float result, int id)
+//{
+//	if (id < 64)
+//		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
+//	GroupMemoryBarrierWithGroupSync ();
+//	if (id < 8)
+//		sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] +
+//         sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
+//	GroupMemoryBarrierWithGroupSync ();
+//	if (id == 0)
+//	{
+//		result = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] +
+//         sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//}
+//inline void parallel_reduction_min(out float result, int id)
+//{
+//	if (id < 64){
+//      sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), sum_vec[id + 128]), sum_vec[id + 192]);
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//	if (id < 8){
+//      sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//	if(id == 0){
+//		result = min(min(min(min(min(min(min(sum_vec[0], sum_vec[1]), sum_vec[2]),
+//			sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//}
+//inline void parallel_reduction_max(out float result, int id)
+//{
+//	if (id < 64)
+//	{
+//      sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),sum_vec[id + 128]), sum_vec[id + 192]);
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//   if(id < 8){
+//      sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
+//	}
+//	GroupMemoryBarrierWithGroupSync ();
+//   if(id == 0){
+//      result = max(max(max(max(max(max(max(sum_vec[0], sum_vec[1]), sum_vec[2]),
+//         sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
+//   }
+//	GroupMemoryBarrierWithGroupSync ();
+//}
 inline float scale(float value, float min, float max)
 {
 	if (abs(max - min) > 1.0f)
@@ -235,127 +234,183 @@ void main(ComputeShaderInput IN)
 		float tmp_min = INFINITY;
 		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
 		{
-			//float value = tmp_data.Load(int4(IN_ACCESS, 0));
-			float value = 2.0f;
+			float value = tmp_data.Load(int4(IN_ACCESS, 0));
 			tmp_max = max(value, tmp_max);
 			tmp_min = min(value, tmp_min);
 		}
 		// reduce the max
 		sum_vec[id] = tmp_max;
-		AllMemoryBarrierWithGroupSync ();
-		parallel_reduction_max(block_max, id);
+		GroupMemoryBarrierWithGroupSync ();
+		if (id < 64)
+		{
+			sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id + 64]), sum_vec[id + 128]), sum_vec[id + 192]);
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id < 8)
+		{
+			sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]), sum_vec[id + 48]), sum_vec[id + 56]);
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id == 0)
+		{
+			block_max = max(max(max(max(max(max(max(sum_vec[0], sum_vec[1]), sum_vec[2]),
+         sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
+		}
+		GroupMemoryBarrierWithGroupSync();
 		// reduce the min
 		sum_vec[id] = tmp_min;
-		AllMemoryBarrierWithGroupSync ();
-		parallel_reduction_min(block_min, id);
+		GroupMemoryBarrierWithGroupSync ();
+		if (id < 64)
+		{
+			sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id + 64]), sum_vec[id + 128]), sum_vec[id + 192]);
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id < 8)
+		{
+			sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]), sum_vec[id + 48]), sum_vec[id + 56]);
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id == 0)
+		{
+			block_min = min(min(min(min(min(min(min(sum_vec[0], sum_vec[1]), sum_vec[2]),
+			sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
+		}
+		GroupMemoryBarrierWithGroupSync();
 		// store the min_max for the thread group
 		if (id == 0) {
 			int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, feature_buffer - FEATURES_NOT_SCALED);
 			mins_maxs[index] = float4(block_min, block_max, 1, 1); // group_id for debug
 		}
-		AllMemoryBarrierWithGroupSync ();
+		GroupMemoryBarrierWithGroupSync ();
 		// normalization
-		//for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-		//{
-		//	float scaled_value = scale(tmp_data.Load(int4(IN_ACCESS, 0)), block_min, block_max);
-		//	tmp_data[IN_ACCESS] = scaled_value;
-		//}
+		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+		{
+			float scaled_value = scale(tmp_data.Load(int4(IN_ACCESS, 0)), block_min, block_max);
+			tmp_data[IN_ACCESS] = scaled_value;
+		}
 	}
 	
-	//// require to process all columns
-	//int limit = buffers == BLOCK_PIXELS ? buffers - 1 : buffers;
+	AllMemoryBarrierWithGroupSync();
 	
-	//// compute R
-	//for (int col = 0; col < limit; col++)
-	//{
-	//	int col_limited = min(col, buffers - 3);
-	//	// Load new column into memory
-	//	int feature_buffer = col;
-	//	float tmp_sum_value = 0.f;
-	//	for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-	//	{
-	//		float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
+	// require to process all columns
+	int limit = buffers == BLOCK_PIXELS ? buffers - 1 : buffers;
+	// compute R
+	for (int col = 0; col < limit; col++)
+	{
+		int col_limited = min(col, buffers - 3);
+		// Load new column into memory
+		int feature_buffer = col;
+		float tmp_sum_value = 0.f;
+		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector){
+			float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
 
-	//		const int index = id + sub_vector * LOCAL_SIZE;
-	//		u_vec[index] = tmp;
-	//		if (index >= col_limited + 1)
-	//		{
-	//			tmp_sum_value += tmp * tmp;
-	//		}
-	//	}
-	//	AllMemoryBarrierWithGroupSync ();
+			const int index = id + sub_vector * LOCAL_SIZE;
+			u_vec[index] = tmp;
+			if (index >= col_limited + 1)
+			{
+				tmp_sum_value += tmp * tmp;
+			}
+		}
+		GroupMemoryBarrierWithGroupSync();
 		
-	//	// Find length of vector in A's column with reduction sum function
-	//	sum_vec[id] = tmp_sum_value;
-	//	AllMemoryBarrierWithGroupSync ();
-	//	parallel_reduction_sum(vec_length, id);
+		// Find length of vector in A's column with reduction sum function
+		sum_vec[id] = tmp_sum_value;
+		GroupMemoryBarrierWithGroupSync();
+		//parallel_reduction_sum(vec_length, id);
+		if (id < 64){
+			sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id < 8){
+			sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] +sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
+		}
+		GroupMemoryBarrierWithGroupSync();
+		if (id == 0){
+			vec_length = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] + sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
+		}
+		GroupMemoryBarrierWithGroupSync();
 		
-	//	float r_value;
-	//	if (id < col)
-	//	{
- //           // Copy u_vec value
-	//		r_value = u_vec[id];
-	//	}
-	//	else if (id == col)
-	//	{
-	//		u_length_squared = vec_length; // y2^2+y3^2+...+yn^2
-	//		vec_length = sqrt(vec_length + u_vec[col_limited] * u_vec[col_limited]); // sqrt(y1^2+y2^2+y3^2+...+yn^2)
-	//		u_vec[col_limited] -= vec_length; // y1 - sqrt(y1^2+y2^2+y3^2+...+yn^2) = w1
-	//		u_length_squared += u_vec[col_limited] * u_vec[col_limited]; // 2*dot(w,y)
- //           // (u_length_squared is now updated length squared)
-	//		r_value = vec_length;
-	//	}
-	//	else if (id > col)
-	//	{
-	//		r_value = 0.0f;
-	//	}
+		float r_value;
+		if (id < col)
+		{
+            // Copy u_vec value
+			r_value = u_vec[id];
+		}
+		else if (id == col)
+		{
+			u_length_squared = vec_length; // y2^2+y3^2+...+yn^2
+			vec_length = sqrt(vec_length + u_vec[col_limited] * u_vec[col_limited]); // sqrt(y1^2+y2^2+y3^2+...+yn^2)
+			u_vec[col_limited] -= vec_length; // y1 - sqrt(y1^2+y2^2+y3^2+...+yn^2) = w1
+			u_length_squared += u_vec[col_limited] * u_vec[col_limited]; // 2*dot(w,y)
+            // (u_length_squared is now updated length squared)
+			r_value = vec_length;
+		}
+		else if (id > col)
+		{
+			r_value = 0.0f;
+		}
 		
-	//	// store R matrix
-	//	int id_limited = min(id, buffers - 3);
-	//	if (col < buffers - 3)
-	//		store_r_mat_broadcast(col_limited, id_limited, r_value);
-	//	else
-	//		store_r_mat_channel(col_limited, id_limited, col - buffers + 3, r_value);
-	//	AllMemoryBarrierWithGroupSync ();
+		// store R matrix
+		int id_limited = min(id, buffers - 3);
+		if (col < buffers - 3)
+			store_r_mat_broadcast(col_limited, id_limited, r_value);
+		else
+			store_r_mat_channel(col_limited, id_limited, col - buffers + 3, r_value);
+		GroupMemoryBarrierWithGroupSync();
 		
-	//	// Transform columns of A
-	//	for (int feature_buffer = col_limited + 1; feature_buffer < buffers; feature_buffer++)
-	//	{
-	//		float tmp_data_private_cache[(BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) / LOCAL_SIZE];
-	//		float tmp_sum_value = 0.f;
-	//		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-	//		{
-	//			const int index = id + sub_vector * LOCAL_SIZE;
-	//			if (index >= col_limited)
-	//			{
-	//				float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
-	//				// Add noise on the first time values are loaded
-	//				// (does not add noise to constant buffer and noisy image data)
-	//				if (col == 0 && feature_buffer < buffers - 3)
-	//				{
-	//					tmp = add_random(tmp, id, sub_vector, feature_buffer, frameIndexCB.FrameIndex);
-	//				}
-	//				tmp_data_private_cache[sub_vector] = tmp;
-	//				tmp_sum_value += tmp * u_vec[index];
-	//			}
-	//		}
-	//		sum_vec[id] = tmp_sum_value;
-	//		AllMemoryBarrierWithGroupSync ();
-	//		parallel_reduction_sum(dot, id);
+		// Transform columns of A
+		for (int feature_buffer = col_limited + 1; feature_buffer < buffers; feature_buffer++)
+		{
+			float tmp_data_private_cache[(BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) / LOCAL_SIZE];
+			float tmp_sum_value = 0.f;
+			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+			{
+				const int index = id + sub_vector * LOCAL_SIZE;
+				if (index >= col_limited)
+				{
+					float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
+					// Add noise on the first time values are loaded
+					// (does not add noise to constant buffer and noisy image data)
+					if (col == 0 && feature_buffer < buffers - 3)
+					{
+						tmp = add_random(tmp, id, sub_vector, feature_buffer, frameIndexCB.FrameIndex);
+					}
+					tmp_data_private_cache[sub_vector] = tmp;
+					tmp_sum_value += tmp * u_vec[index];
+				}
+			}
+			sum_vec[id] = tmp_sum_value;
+			GroupMemoryBarrierWithGroupSync();
+			//parallel_reduction_sum(dot, id);
+			if (id < 64)
+			{
+				sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
+			}
+			GroupMemoryBarrierWithGroupSync();
+			if (id < 8)
+			{
+				sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] + sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
+			}
+			GroupMemoryBarrierWithGroupSync();
+			if (id == 0)
+			{
+				dot = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] + sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
+			}
+			GroupMemoryBarrierWithGroupSync();
 
-	//		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-	//		{
-	//			const int index = id + sub_vector * LOCAL_SIZE;
-	//			if (index >= col_limited)
-	//			{
-	//				float store_value = tmp_data_private_cache[sub_vector];
-	//				store_value -= 2 * u_vec[index] * dot / u_length_squared;
-	//				tmp_data[IN_ACCESS] = store_value;
-	//			}
-	//		}
-	//		AllMemoryBarrierWithGroupSync ();
-	//	}
-	//}
+			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+			{
+				const int index = id + sub_vector * LOCAL_SIZE;
+				if (index >= col_limited)
+				{
+					float store_value = tmp_data_private_cache[sub_vector];
+					store_value -= 2 * u_vec[index] * dot / u_length_squared;
+					tmp_data[IN_ACCESS] = store_value;
+				}
+			}
+			DeviceMemoryBarrierWithGroupSync();
+		}
+	}
 	
 	//// Back substitution
 	//for (int i = R_EDGE - 2; i >= 0; i--)
@@ -363,14 +418,14 @@ void main(ComputeShaderInput IN)
 	//	// divider
 	//	if (id == 0)
 	//		divider = load_r_mat(i, i);
-	//	AllMemoryBarrierWithGroupSync ();
+	//	GroupMemoryBarrierWithGroupSync();
 	//	// scale with divider
 	//	if (id < R_EDGE)
 	//	{
 	//		float3 value = load_r_mat(id, i);
 	//		store_r_mat(id, i, value / divider);
 	//	}
-	//	AllMemoryBarrierWithGroupSync ();
+	//	GroupMemoryBarrierWithGroupSync();
 	//	 //Optimization proposal: parallel reduction to calculate Xn
 	//	if (id == 0)
 	//		for (int j = i + 1; j < R_EDGE - 1; j++)
@@ -379,7 +434,7 @@ void main(ComputeShaderInput IN)
 	//			float3 value2 = load_r_mat(j, i);
 	//			store_r_mat(R_EDGE - 1, i, value - value2);
 	//		}
-	//	AllMemoryBarrierWithGroupSync ();
+	//	GroupMemoryBarrierWithGroupSync();
 	//	// scale R with Xn
 	//	if (id < R_EDGE)
 	//	{
@@ -387,7 +442,7 @@ void main(ComputeShaderInput IN)
 	//		float3 value2 = load_r_mat(R_EDGE - 1, i);
 	//		store_r_mat(i, id, value * value2);
 	//	}
-	//	AllMemoryBarrierWithGroupSync ();
+	//	GroupMemoryBarrierWithGroupSync();
 	//}
 	
 	//// Store weights
