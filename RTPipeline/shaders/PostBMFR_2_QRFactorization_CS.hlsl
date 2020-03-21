@@ -30,15 +30,13 @@ world_position.y*world_position.y,\
 world_position.z*world_position.z
 #define FEATURE_BUFFERS NOT_SCALED_FEATURE_BUFFERS SCALED_FEATURE_BUFFERS
 // locale define
-#define INFINITY 1000000.000000
+#define INFINITY 100000.0f
 #define HORIZONTAL_BLOCKS (WORKSET_WIDTH / BLOCK_EDGE_LENGTH)
 #define BLOCK_INDEX_X (group_id % (HORIZONTAL_BLOCKS + 1))
 #define BLOCK_INDEX_Y (group_id / (HORIZONTAL_BLOCKS + 1))
 #define IN_BLOCK_INDEX_X  ((256*sub_vector+id)%BLOCK_EDGE_LENGTH)
 #define IN_BLOCK_INDEX_Y  ((256*sub_vector+id)/BLOCK_EDGE_LENGTH)
-#define IN_ACCESS int3(BLOCK_INDEX_X*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_X,\
-										BLOCK_INDEX_Y*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_Y,\
-										feature_buffer)
+#define IN_ACCESS int3(BLOCK_INDEX_X*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_X, BLOCK_INDEX_Y*BLOCK_EDGE_LENGTH+IN_BLOCK_INDEX_Y, feature_buffer)
 #define R_EDGE BUFFER_COUNT-2 
 #define R_ACCESS (x * R_EDGE + y)
 // Here - means unused value
@@ -84,6 +82,11 @@ ConstantBuffer<FrameIndex> frameIndexCB : register(b0);
 groupshared float sum_vec[LOCAL_SIZE];
 groupshared float u_vec[BLOCK_PIXELS];
 groupshared float3 r_mat[(BUFFER_COUNT - 2) * (BUFFER_COUNT - 2)];
+groupshared float u_length_squared;
+groupshared float dot;
+groupshared float block_min;
+groupshared float block_max;
+groupshared float vec_length;
 groupshared float3 divider;
 
 // Random generator from here http://asgerhoedt.dk/?p=323
@@ -153,57 +156,56 @@ static inline void store_r_mat_channel(
 		tmp.z = value;
 	r_mat[R_ACCESS] = tmp;
 }
-static inline void parallel_reduction_sum(out float result, int id)
+inline void parallel_reduction_sum(out float result, int id)
 {
 	if (id < 64)
 		sum_vec[id] += sum_vec[id + 64] + sum_vec[id + 128] + sum_vec[id + 192];
-	DeviceMemoryBarrierWithGroupSync();
+	AllMemoryBarrierWithGroupSync ();
 	if (id < 8)
 		sum_vec[id] += sum_vec[id + 8] + sum_vec[id + 16] + sum_vec[id + 24] +
          sum_vec[id + 32] + sum_vec[id + 40] + sum_vec[id + 48] + sum_vec[id + 56];
-	DeviceMemoryBarrierWithGroupSync();
+	AllMemoryBarrierWithGroupSync ();
 	if (id == 0)
 	{
 		result = sum_vec[0] + sum_vec[1] + sum_vec[2] + sum_vec[3] +
          sum_vec[4] + sum_vec[5] + sum_vec[6] + sum_vec[7];
 	}
-	DeviceMemoryBarrierWithGroupSync();
+	AllMemoryBarrierWithGroupSync ();
 }
-static inline void parallel_reduction_min(out float result, int id)
+inline void parallel_reduction_min(out float result, int id)
 {
-	if(id < 64)
-      sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), 
-		sum_vec[id + 128]), sum_vec[id + 192]);
-	DeviceMemoryBarrierWithGroupSync();
-    if(id < 8)
-      sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]),
-         sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),
-         sum_vec[id + 48]), sum_vec[id + 56]);
-	DeviceMemoryBarrierWithGroupSync();
+	if (id < 64){
+      sum_vec[id] = min(min(min(sum_vec[id], sum_vec[id+ 64]), sum_vec[id + 128]), sum_vec[id + 192]);
+	}
+	AllMemoryBarrierWithGroupSync ();
+	if (id < 8){
+      sum_vec[id] = min(min(min(min(min(min(min(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
+	}
+	AllMemoryBarrierWithGroupSync ();
 	if(id == 0){
 		result = min(min(min(min(min(min(min(sum_vec[0], sum_vec[1]), sum_vec[2]),
 			sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
 	}
-	DeviceMemoryBarrierWithGroupSync();
+	AllMemoryBarrierWithGroupSync ();
 }
-static inline void parallel_reduction_max(out float result, int id)
+inline void parallel_reduction_max(out float result, int id)
 {
-   if(id < 64)
-      sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),
-         sum_vec[id + 128]), sum_vec[id + 192]);
-	DeviceMemoryBarrierWithGroupSync();
-   if(id < 8)
-      sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]),
-         sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),
-         sum_vec[id + 48]), sum_vec[id + 56]);
-	DeviceMemoryBarrierWithGroupSync();
+	if (id < 64)
+	{
+      sum_vec[id] = max(max(max(sum_vec[id], sum_vec[id+ 64]),sum_vec[id + 128]), sum_vec[id + 192]);
+	}
+	AllMemoryBarrierWithGroupSync ();
+   if(id < 8){
+      sum_vec[id] = max(max(max(max(max(max(max(sum_vec[id], sum_vec[id + 8]), sum_vec[id + 16]), sum_vec[id + 24]), sum_vec[id + 32]), sum_vec[id + 40]),sum_vec[id + 48]), sum_vec[id + 56]);
+	}
+	AllMemoryBarrierWithGroupSync ();
    if(id == 0){
       result = max(max(max(max(max(max(max(sum_vec[0], sum_vec[1]), sum_vec[2]),
          sum_vec[3]), sum_vec[4]), sum_vec[5]), sum_vec[6]), sum_vec[7]);
    }
-	DeviceMemoryBarrierWithGroupSync();
+	AllMemoryBarrierWithGroupSync ();
 }
-static inline float scale(float value, float min, float max)
+inline float scale(float value, float min, float max)
 {
 	if (abs(max - min) > 1.0f)
 	{
@@ -219,10 +221,10 @@ void main(ComputeShaderInput IN)
 	int IMAGE_WIDTH = 960;
 	int IMAGE_HEIGHT = 960;
 	
-	float u_length_squared, dot, block_min, block_max, vec_length;
+	
 	float prod = 0.0f;
 	
-	const int group_id = IN.GroupIndex;
+	const int group_id = IN.GroupID.x;
 	const int id = IN.GroupThreadID.x;
 	const int buffers = BUFFER_COUNT;
 	
@@ -233,165 +235,166 @@ void main(ComputeShaderInput IN)
 		float tmp_min = INFINITY;
 		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
 		{
-			float value = tmp_data.Load(int4(IN_ACCESS, 0));
+			//float value = tmp_data.Load(int4(IN_ACCESS, 0));
+			float value = 2.0f;
 			tmp_max = max(value, tmp_max);
 			tmp_min = min(value, tmp_min);
 		}
 		// reduce the max
 		sum_vec[id] = tmp_max;
-		DeviceMemoryBarrierWithGroupSync();
+		AllMemoryBarrierWithGroupSync ();
 		parallel_reduction_max(block_max, id);
 		// reduce the min
 		sum_vec[id] = tmp_min;
-		DeviceMemoryBarrierWithGroupSync();
+		AllMemoryBarrierWithGroupSync ();
 		parallel_reduction_min(block_min, id);
 		// store the min_max for the thread group
 		if (id == 0) {
 			int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, feature_buffer - FEATURES_NOT_SCALED);
-			mins_maxs[index] = float4(block_min, block_max,1,1);
+			mins_maxs[index] = float4(block_min, block_max, 1, 1); // group_id for debug
 		}
-		DeviceMemoryBarrierWithGroupSync();
+		AllMemoryBarrierWithGroupSync ();
 		// normalization
-		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-		{
-			float scaled_value = scale(tmp_data.Load(int4(IN_ACCESS, 0)), block_min, block_max);
-			tmp_data[IN_ACCESS] = scaled_value;
-		}
+		//for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+		//{
+		//	float scaled_value = scale(tmp_data.Load(int4(IN_ACCESS, 0)), block_min, block_max);
+		//	tmp_data[IN_ACCESS] = scaled_value;
+		//}
 	}
 	
-	// require to process all columns
-	int limit = buffers == BLOCK_PIXELS ? buffers - 1 : buffers;
+	//// require to process all columns
+	//int limit = buffers == BLOCK_PIXELS ? buffers - 1 : buffers;
 	
-	// compute R
-	for (int col = 0; col < limit; col++)
-	{
-		int col_limited = min(col, buffers - 3);
-		// Load new column into memory
-		int feature_buffer = col;
-		float tmp_sum_value = 0.f;
-		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-		{
-			float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
+	//// compute R
+	//for (int col = 0; col < limit; col++)
+	//{
+	//	int col_limited = min(col, buffers - 3);
+	//	// Load new column into memory
+	//	int feature_buffer = col;
+	//	float tmp_sum_value = 0.f;
+	//	for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+	//	{
+	//		float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
 
-			const int index = id + sub_vector * LOCAL_SIZE;
-			u_vec[index] = tmp;
-			if (index >= col_limited + 1)
-			{
-				tmp_sum_value += tmp * tmp;
-			}
-		}
-		DeviceMemoryBarrierWithGroupSync();
+	//		const int index = id + sub_vector * LOCAL_SIZE;
+	//		u_vec[index] = tmp;
+	//		if (index >= col_limited + 1)
+	//		{
+	//			tmp_sum_value += tmp * tmp;
+	//		}
+	//	}
+	//	AllMemoryBarrierWithGroupSync ();
 		
-		// Find length of vector in A's column with reduction sum function
-		sum_vec[id] = tmp_sum_value;
-		DeviceMemoryBarrierWithGroupSync();
-		parallel_reduction_sum(vec_length, id);
+	//	// Find length of vector in A's column with reduction sum function
+	//	sum_vec[id] = tmp_sum_value;
+	//	AllMemoryBarrierWithGroupSync ();
+	//	parallel_reduction_sum(vec_length, id);
 		
-		float r_value;
-		if (id < col)
-		{
-            // Copy u_vec value
-			r_value = u_vec[id];
-		}
-		else if (id == col)
-		{
-			u_length_squared = vec_length; // y2^2+y3^2+...+yn^2
-			vec_length = sqrt(vec_length + u_vec[col_limited] * u_vec[col_limited]); // sqrt(y1^2+y2^2+y3^2+...+yn^2)
-			u_vec[col_limited] -= vec_length; // y1 - sqrt(y1^2+y2^2+y3^2+...+yn^2) = w1
-			u_length_squared += u_vec[col_limited] * u_vec[col_limited]; // 2*dot(w,y)
-            // (u_length_squared is now updated length squared)
-			r_value = vec_length;
-		}
-		else if (id > col)
-		{
-			r_value = 0.0f;
-		}
+	//	float r_value;
+	//	if (id < col)
+	//	{
+ //           // Copy u_vec value
+	//		r_value = u_vec[id];
+	//	}
+	//	else if (id == col)
+	//	{
+	//		u_length_squared = vec_length; // y2^2+y3^2+...+yn^2
+	//		vec_length = sqrt(vec_length + u_vec[col_limited] * u_vec[col_limited]); // sqrt(y1^2+y2^2+y3^2+...+yn^2)
+	//		u_vec[col_limited] -= vec_length; // y1 - sqrt(y1^2+y2^2+y3^2+...+yn^2) = w1
+	//		u_length_squared += u_vec[col_limited] * u_vec[col_limited]; // 2*dot(w,y)
+ //           // (u_length_squared is now updated length squared)
+	//		r_value = vec_length;
+	//	}
+	//	else if (id > col)
+	//	{
+	//		r_value = 0.0f;
+	//	}
 		
-		// store R matrix
-		int id_limited = min(id, buffers - 3);
-		if (col < buffers - 3)
-			store_r_mat_broadcast(col_limited, id_limited, r_value);
-		else
-			store_r_mat_channel(col_limited, id_limited, col - buffers + 3, r_value);
-		DeviceMemoryBarrierWithGroupSync();
+	//	// store R matrix
+	//	int id_limited = min(id, buffers - 3);
+	//	if (col < buffers - 3)
+	//		store_r_mat_broadcast(col_limited, id_limited, r_value);
+	//	else
+	//		store_r_mat_channel(col_limited, id_limited, col - buffers + 3, r_value);
+	//	AllMemoryBarrierWithGroupSync ();
 		
-		// Transform columns of A
-		for (int feature_buffer = col_limited + 1; feature_buffer < buffers; feature_buffer++)
-		{
-			float tmp_data_private_cache[(BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) / LOCAL_SIZE];
-			float tmp_sum_value = 0.f;
-			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-			{
-				const int index = id + sub_vector * LOCAL_SIZE;
-				if (index >= col_limited)
-				{
-					float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
-					// Add noise on the first time values are loaded
-					// (does not add noise to constant buffer and noisy image data)
-					if (col == 0 && feature_buffer < buffers - 3)
-					{
-						tmp = add_random(tmp, id, sub_vector, feature_buffer, frameIndexCB.FrameIndex);
-					}
-					tmp_data_private_cache[sub_vector] = tmp;
-					tmp_sum_value += tmp * u_vec[index];
-				}
-			}
-			sum_vec[id] = tmp_sum_value;
-			DeviceMemoryBarrierWithGroupSync();
-			parallel_reduction_sum(dot, id);
+	//	// Transform columns of A
+	//	for (int feature_buffer = col_limited + 1; feature_buffer < buffers; feature_buffer++)
+	//	{
+	//		float tmp_data_private_cache[(BLOCK_EDGE_LENGTH * BLOCK_EDGE_LENGTH) / LOCAL_SIZE];
+	//		float tmp_sum_value = 0.f;
+	//		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+	//		{
+	//			const int index = id + sub_vector * LOCAL_SIZE;
+	//			if (index >= col_limited)
+	//			{
+	//				float tmp = tmp_data.Load(int4(IN_ACCESS, 0));
+	//				// Add noise on the first time values are loaded
+	//				// (does not add noise to constant buffer and noisy image data)
+	//				if (col == 0 && feature_buffer < buffers - 3)
+	//				{
+	//					tmp = add_random(tmp, id, sub_vector, feature_buffer, frameIndexCB.FrameIndex);
+	//				}
+	//				tmp_data_private_cache[sub_vector] = tmp;
+	//				tmp_sum_value += tmp * u_vec[index];
+	//			}
+	//		}
+	//		sum_vec[id] = tmp_sum_value;
+	//		AllMemoryBarrierWithGroupSync ();
+	//		parallel_reduction_sum(dot, id);
 
-			for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
-			{
-				const int index = id + sub_vector * LOCAL_SIZE;
-				if (index >= col_limited)
-				{
-					float store_value = tmp_data_private_cache[sub_vector];
-					store_value -= 2 * u_vec[index] * dot / u_length_squared;
-					tmp_data[IN_ACCESS] = store_value;
-				}
-			}
-			DeviceMemoryBarrierWithGroupSync();
-		}
-	}
+	//		for (int sub_vector = 0; sub_vector < BLOCK_PIXELS / LOCAL_SIZE; ++sub_vector)
+	//		{
+	//			const int index = id + sub_vector * LOCAL_SIZE;
+	//			if (index >= col_limited)
+	//			{
+	//				float store_value = tmp_data_private_cache[sub_vector];
+	//				store_value -= 2 * u_vec[index] * dot / u_length_squared;
+	//				tmp_data[IN_ACCESS] = store_value;
+	//			}
+	//		}
+	//		AllMemoryBarrierWithGroupSync ();
+	//	}
+	//}
 	
-	// Back substitution
-	for (int i = R_EDGE - 2; i >= 0; i--)
-	{
-		// divider
-		if (id == 0)
-			divider = load_r_mat(i, i);
-		DeviceMemoryBarrierWithGroupSync();
-		// scale with divider
-		if (id < R_EDGE)
-		{
-			float3 value = load_r_mat(id, i);
-			store_r_mat(id, i, value / divider);
-		}
-		DeviceMemoryBarrierWithGroupSync();
-		 //Optimization proposal: parallel reduction to calculate Xn
-		if (id == 0)
-			for (int j = i + 1; j < R_EDGE - 1; j++)
-			{
-				float3 value = load_r_mat(R_EDGE - 1, i);
-				float3 value2 = load_r_mat(j, i);
-				store_r_mat(R_EDGE - 1, i, value - value2);
-			}
-		DeviceMemoryBarrierWithGroupSync();
-		// scale R with Xn
-		if (id < R_EDGE)
-		{
-			float3 value = load_r_mat(i, id);
-			float3 value2 = load_r_mat(R_EDGE - 1, i);
-			store_r_mat(i, id, value * value2);
-		}
-		DeviceMemoryBarrierWithGroupSync();
-	}
+	//// Back substitution
+	//for (int i = R_EDGE - 2; i >= 0; i--)
+	//{
+	//	// divider
+	//	if (id == 0)
+	//		divider = load_r_mat(i, i);
+	//	AllMemoryBarrierWithGroupSync ();
+	//	// scale with divider
+	//	if (id < R_EDGE)
+	//	{
+	//		float3 value = load_r_mat(id, i);
+	//		store_r_mat(id, i, value / divider);
+	//	}
+	//	AllMemoryBarrierWithGroupSync ();
+	//	 //Optimization proposal: parallel reduction to calculate Xn
+	//	if (id == 0)
+	//		for (int j = i + 1; j < R_EDGE - 1; j++)
+	//		{
+	//			float3 value = load_r_mat(R_EDGE - 1, i);
+	//			float3 value2 = load_r_mat(j, i);
+	//			store_r_mat(R_EDGE - 1, i, value - value2);
+	//		}
+	//	AllMemoryBarrierWithGroupSync ();
+	//	// scale R with Xn
+	//	if (id < R_EDGE)
+	//	{
+	//		float3 value = load_r_mat(i, id);
+	//		float3 value2 = load_r_mat(R_EDGE - 1, i);
+	//		store_r_mat(i, id, value * value2);
+	//	}
+	//	AllMemoryBarrierWithGroupSync ();
+	//}
 	
-	// Store weights
-	if (id < buffers - 3)
-	{
-		int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
-		float3 weight = load_r_mat(R_EDGE - 1, id);
-		weights[index] = float4(weight, 1.0);
-	}
+	//// Store weights
+	//if (id < buffers - 3)
+	//{
+	//	int3 index = int3(BLOCK_INDEX_X, BLOCK_INDEX_Y, id);
+	//	float3 weight = load_r_mat(R_EDGE - 1, id);
+	//	weights[index] = float4(weight, 1.0);
+	//}
 }
