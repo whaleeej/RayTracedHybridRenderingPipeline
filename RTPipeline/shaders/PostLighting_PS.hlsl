@@ -138,7 +138,6 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float gid = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).w;
 	float visibility = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
 	float3 reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
-	float3 brdfLDir = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).yzw;
 	if (hit == 0.0)
 	{
 		return float4(emissive, 1.0f);
@@ -152,7 +151,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 color0 = 0.000 * albedo;
 	
 	// direct
-	float3 color1 = DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
+	float3 color1 =0* DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
 	// indirect
 	float3 color2 = reflectivity;

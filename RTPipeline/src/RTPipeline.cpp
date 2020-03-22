@@ -399,7 +399,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
 	}
 
-	// Perform BMFR_3_WeightedSum
+	// Perform BMFR_4_
 	{
 		commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
 		commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
@@ -428,7 +428,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);

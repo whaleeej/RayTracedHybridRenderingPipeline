@@ -114,7 +114,7 @@ bool isReprojValid(int2 res, int2 curr_coord, int2 prev_coord)
 		return false;
     // reject the pixel is not hit / hit another geometry
 	if (previous_positions.Load(int3(prev_coord.x, prev_coord.y, 0)).w == 0.0 ||
-		(previous_extra.Load(int3(prev_coord.x, prev_coord.y, 0)).w - current_extra.Load(int3(curr_coord.x, curr_coord.y, 0)).w) >= 0.1)
+		abs(previous_extra.Load(int3(prev_coord.x, prev_coord.y, 0)).w - current_extra.Load(int3(curr_coord.x, curr_coord.y, 0)).w) >= 0.1)
 		return false;
  //   // reject if the normal deviation is not acceptable
 	if (distance(current_normals.Load(int3(curr_coord.x, curr_coord.y, 0)).xyz, previous_normals.Load(int3(prev_coord.x, prev_coord.y, 0)).xyz) > NORMAL_LIMIT_SQUARED)
@@ -155,15 +155,16 @@ void main(ComputeShaderInput IN)
 	float blend_alpha = 1.0f;
 	float3 previous_color = 0.0f;
 	float sample_spp = 0.0f;
-	
+	float total_weight = 0.0f;
+	float weights[4] = { 0.0, 0.0, 0.0, 0.0 };
 	if (frameIndexCB.FrameIndex > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
 	{
 		// back reprojection
 		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
 		float ndcx = clip_position.x / clip_position.w * 0.5 + 0.5;
 		float ndcy = -clip_position.y / clip_position.w * 0.5 + 0.5;
-		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.503;
-		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.503;
+		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.50;
+		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.50;
 		int2 prev_frame_pixel = int2(floor(prev_frame_pixel_f.x), floor(prev_frame_pixel_f.y));
 		
 		// These are needed for  the bilinear sampling
@@ -174,12 +175,12 @@ void main(ComputeShaderInput IN)
 		offsets[3] = (int2) (1, 1);
 		float2 prev_pixel_fract = prev_frame_pixel_f - float2(prev_frame_pixel);
 		float2 one_minus_prev_pixel_fract = 1.f - prev_pixel_fract;
-		float weights[4];
+		
 		weights[0] = one_minus_prev_pixel_fract.x * one_minus_prev_pixel_fract.y;
 		weights[1] = prev_pixel_fract.x * one_minus_prev_pixel_fract.y;
 		weights[2] = one_minus_prev_pixel_fract.x * prev_pixel_fract.y;
 		weights[3] = prev_pixel_fract.x * prev_pixel_fract.y;
-		float total_weight = 0.0f;
+		
 		// to bilinear sample
 		for (int i = 0; i < 4; ++i)
 		{
@@ -196,7 +197,7 @@ void main(ComputeShaderInput IN)
 				total_weight += weights[i];
 			}
 		}
-		if (total_weight>0.01)
+		if (total_weight > 0.0)
 		{
 			sample_spp /= total_weight;
 			previous_color /= total_weight;
@@ -210,7 +211,7 @@ void main(ComputeShaderInput IN)
 
 	// Store new spp
 	uint new_spp = 1;
-	if (blend_alpha < 1.0f)
+	if (blend_alpha < 1.0)
 	{
 		if (sample_spp > 254.f)
 		{
@@ -228,7 +229,8 @@ void main(ComputeShaderInput IN)
       pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
 	{
 		current_spp[pixel] = new_spp;
-		current_noisy[pixel] = float4(new_color, 1.0f);
+		current_noisy[pixel] = float4(new_color, total_weight);
+		//current_noisy[pixel] = float4(weights[0], weights[1], weights[2], weights[3]);
 		out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
 		accept_bools[pixel] = store_accept;
 	}

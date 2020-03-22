@@ -49,7 +49,7 @@ bool isReprojValid(float2 res, float2 curr_coord, float2 prev_coord)
 		return false;
     // reject the pixel is not hit / hit another geometry
 	if (gPosition_prev.Load(int3(prev_coord.x, prev_coord.y, 0)).w == 0.0 || 
-		(gExtra_prev.Load(int3(prev_coord.x, prev_coord.y, 0)).w - gExtra.Load(int3(curr_coord.x, curr_coord.y, 0)).w) >= 0.1)
+		abs(gExtra_prev.Load(int3(prev_coord.x, prev_coord.y, 0)).w - gExtra.Load(int3(curr_coord.x, curr_coord.y, 0)).w) >= 0.1)
 		return false;
     // reject if the normal deviation is not acceptable
 	if (distance(gNormalRoughness.Load(int3(curr_coord.x, curr_coord.y, 0)).xyz, gNormalRoughness_prev.Load(int3(prev_coord.x, prev_coord.y, 0)).xyz) > 0.1)
