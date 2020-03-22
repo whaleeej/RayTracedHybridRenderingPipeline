@@ -158,7 +158,8 @@ void main(ComputeShaderInput IN)
 	float total_weight = 0.0f;
 	float weights[4] = { 0.0, 0.0, 0.0, 0.0 };
 	int2 prev_frame_pixel = 0;
-	if (frameIndexCB.FrameIndex > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
+	
+	if (previous_spp.Load(int3(pixel, 0)) > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
 	{
 		// back reprojection
 		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
