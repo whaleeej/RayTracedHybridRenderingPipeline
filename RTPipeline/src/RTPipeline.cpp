@@ -360,6 +360,36 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
 	}
 
+	// Perform BMFR_3_WeightedSum
+	{
+		commandList->SetPipelineState(m_PostBMFRWeightedSumPipelineState);
+		commandList->SetComputeRootSignature(m_PostBMFRWeightedSumRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetCompute32BitConstants(1, totalFrameCount);
+		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
+	}
+
+	// Perform BMFR_3_WeightedSum
+	{
+		commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
+		commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
+		uint32_t ppSrvUavOffset = 0;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetCompute32BitConstants(1, totalFrameCount);
+		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
+	}
+
 	//// perform post spatial resample 
 	//{
 	//	commandList->SetPipelineState(m_PostSpatialResampleState);
@@ -412,7 +442,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
@@ -437,6 +467,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		swapCurrPrevTexture(radiance_acc_prev, radiance_acc);
 		swapCurrPrevTexture(noisy_prev, noisy_curr);
 		swapCurrPrevTexture(spp_prev, spp_curr);
+		swapCurrPrevTexture(filtered_prev, filtered_curr);
 
 		// G Buffer re-orgnizating
 		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
@@ -864,6 +895,11 @@ void HybridPipeline::loadDXResource() {
 		A_LSQ_matrix = createTex3D_ReadWrite(L"A_LSQ_matrix", WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGHT, BUFFER_COUNT, DXGI_FORMAT_R32_FLOAT);
 		lsq_weights = createTex3D_ReadWrite(L"lsq_weights", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, BUFFER_COUNT - 3, DXGI_FORMAT_R32G32B32A32_FLOAT);
 		feature_scale_minmax = createTex3D_ReadWrite(L"feature_scale_minmax", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, 6, DXGI_FORMAT_R32G32B32A32_FLOAT);
+		
+		weighted_sum = createTex2D_ReadWrite(L"weighted_output", m_Width, m_Height);
+
+		filtered_curr = createTex2D_ReadWrite(L"filtered_curr", m_Width, m_Height);
+		filtered_prev = createTex2D_ReadWrite(L"filtered_prev", m_Width, m_Height);
 	}
 
 }
@@ -1075,6 +1111,76 @@ void HybridPipeline::loadPipeline() {
 				sizeof(PostBMFRQRFactorizationPipelineStateStream), &postBMFRQRFactorizationPipelineStateStream
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postBMFRQRFactorizationPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRQRFactorizationPipelineState)));
+		}
+
+		// Create the PostBMFRWeightedSum_CS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
+			rootParameters[1].InitAsConstants(4, 0);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
+
+			m_PostBMFRWeightedSumRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> cs;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_3_WeightedSum_CS.cso", &cs));
+
+			struct PostBMFRWeightedSumStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+			} postBMFRWeightedSumStateStream;
+
+			postBMFRWeightedSumStateStream.pRootSignature = m_PostBMFRWeightedSumRootSignature.GetRootSignature().Get();
+			postBMFRWeightedSumStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRWeightedSumStateStreamDesc = {
+				sizeof(postBMFRWeightedSumStateStream), &postBMFRWeightedSumStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postBMFRWeightedSumStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRWeightedSumPipelineState)));
+		}
+
+		// Create the PostBMFRTemporalFiltered_CS Root Signature
+		{
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0)
+			};
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
+			rootParameters[1].InitAsConstants(4, 0);
+
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
+
+			m_PostBMFRTemporalFilteredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			ComPtr<ID3DBlob> cs;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_4_TemporalFiltered_CS.cso", &cs));
+
+			struct PostBMFRTemporalFilteredStateStream
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+			} postBMFRTemporalFilteredStateStream;
+
+			postBMFRTemporalFilteredStateStream.pRootSignature = m_PostBMFRTemporalFilteredRootSignature.GetRootSignature().Get();
+			postBMFRTemporalFilteredStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+
+			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalFilteredStateStreamDesc = {
+				sizeof(postBMFRTemporalFilteredStateStream), &postBMFRTemporalFilteredStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalFilteredStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
 		}
 
 		// Create the PostSpatial_CS Root Signature

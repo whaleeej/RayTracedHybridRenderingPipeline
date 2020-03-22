@@ -254,6 +254,13 @@ private:
 	Texture lsq_weights;
 	Texture feature_scale_minmax;
 
+	// BMFR_3_WeightedSUm
+	Texture weighted_sum;
+
+	// BMFR_4_TemporalFilterd
+	Texture filtered_curr;
+	Texture filtered_prev;
+
 	// Root signatures
 	RootSignature m_DeferredRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
@@ -278,7 +285,12 @@ private:
 
 	RootSignature m_PostBMFRQRFactorizationRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRQRFactorizationPipelineState;
+	
+	RootSignature m_PostBMFRWeightedSumRootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRWeightedSumPipelineState;
 
+	RootSignature m_PostBMFRTemporalFilteredRootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRTemporalFilteredPipelineState;
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;
