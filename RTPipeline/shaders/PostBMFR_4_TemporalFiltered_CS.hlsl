@@ -148,7 +148,7 @@ void main(ComputeShaderInput IN)
 			total_weight += weight;
 			prev_color += weight * accumulated_prev_frame.Load(int3(prev_frame_pixel + offsets[3], 0)).xyz;
 		}
-		if (total_weight > 0.00)
+		if (total_weight > 0.01)
 		{
 			// Blend_alpha is dymically decided so that the result is average
 			 // of all samples until the cap defined by BLEND_ALPHA is reached

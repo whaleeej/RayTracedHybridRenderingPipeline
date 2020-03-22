@@ -116,7 +116,7 @@ bool isReprojValid(int2 res, int2 curr_coord, int2 prev_coord)
 	if (previous_positions.Load(int3(prev_coord.x, prev_coord.y, 0)).w == 0.0 ||
 		(previous_extra.Load(int3(prev_coord.x, prev_coord.y, 0)).w - current_extra.Load(int3(curr_coord.x, curr_coord.y, 0)).w) >= 0.1)
 		return false;
-    // reject if the normal deviation is not acceptable
+ //   // reject if the normal deviation is not acceptable
 	if (distance(current_normals.Load(int3(curr_coord.x, curr_coord.y, 0)).xyz, previous_normals.Load(int3(prev_coord.x, prev_coord.y, 0)).xyz) > NORMAL_LIMIT_SQUARED)
 		return false;
 	return true;
@@ -162,8 +162,8 @@ void main(ComputeShaderInput IN)
 		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
 		float ndcx = clip_position.x / clip_position.w * 0.5 + 0.5;
 		float ndcy = -clip_position.y / clip_position.w * 0.5 + 0.5;
-		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.495;
-		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.495;
+		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.503;
+		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.503;
 		int2 prev_frame_pixel = int2(floor(prev_frame_pixel_f.x), floor(prev_frame_pixel_f.y));
 		
 		// These are needed for  the bilinear sampling
@@ -196,7 +196,7 @@ void main(ComputeShaderInput IN)
 				total_weight += weights[i];
 			}
 		}
-		if (total_weight>0.00)
+		if (total_weight>0.01)
 		{
 			sample_spp /= total_weight;
 			previous_color /= total_weight;

@@ -28,8 +28,8 @@ set( PIXEL_SHADER_FILES
 
 set( COMPUTE_SHADER_FILES 
 #experimental filtering
-    shaders/PostResampleTemporal_CS.hlsl
-    shaders/PostResampleSpatial_CS.hlsl
+#    shaders/PostResampleTemporal_CS.hlsl
+ #   shaders/PostResampleSpatial_CS.hlsl
 # SVGF filtering: ta+Atrous
     shaders/PostSVGFTemporal_CS.hlsl
     shaders/PostSVGFATrous_CS.hlsl

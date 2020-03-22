@@ -201,6 +201,7 @@ private:
     float m_Down;
     float m_Pitch;
     float m_Yaw;
+	bool m_AnimateCamera;
     // Rotate the lights in a circle.
     bool m_AnimateLights;
     // Set to true if the Shift key is pressed.
@@ -234,13 +235,6 @@ private:
 
 	uint32_t ATrous_Level_Max = 2;
 
-	// Post SpatialResample
-	Texture g_indirectOutput;
-
-	// Post Temporal Resample
-	Texture radiance_acc;
-	Texture radiance_acc_prev;
-
 	// BMFR_1_TemporalNoisy
 	Texture noisy_curr;
 	Texture noisy_prev;
@@ -270,12 +264,6 @@ private:
 
 	RootSignature m_PostSVGFATrousRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSVGFATrousPipelineState;
-
-	RootSignature m_PostSpatialResampleRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSpatialResampleState;
-
-	RootSignature m_PostTemporalResampleRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostTemporalResampleState;
 
 	RootSignature m_PostLightingRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;

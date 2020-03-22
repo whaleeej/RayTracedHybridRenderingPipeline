@@ -33,6 +33,7 @@ static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
 static uint64_t totalFrameCount = 0;
 static double totalTime = 0.0;
+static float cameraAnimTime = 0.0f;
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
@@ -46,6 +47,7 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Down(0)
     , m_Pitch(0)
     , m_Yaw(0)
+	, m_AnimateCamera(false)
     , m_AnimateLights(false)
     , m_Shift(false)
 	, m_Width(0)
@@ -134,22 +136,37 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 	// camera
 	{
-		float speedMultipler = (m_Shift ? 16.0f : 4.0f);
+		if (m_AnimateCamera)
+		{
+			cameraAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI/10.0f;
+			// Setup the lights.
+			const float radius = 35.0f;
+			XMVECTOR cameraPos = XMVectorSet(static_cast<float>(std::sin(cameraAnimTime))* radius,
+																			10,
+																			static_cast<float>(std::cos(3.141562653 + cameraAnimTime))* radius,
+																			1.0);
+			XMVECTOR cameraTarget = XMVectorSet(0, 10, 0, 1);
+			XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
 
-		XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-		XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-		m_Camera.Translate(cameraTranslate, Space::Local);
-		m_Camera.Translate(cameraPan, Space::Local);
+			m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+		}
+		else {
+			float speedMultipler = (m_Shift ? 16.0f : 4.0f);
 
-		XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
-		m_Camera.set_Rotation(cameraRotation);
+			XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+			XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+			m_Camera.Translate(cameraTranslate, Space::Local);
+			m_Camera.Translate(cameraPan, Space::Local);
 
-		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+			XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
+			m_Camera.set_Rotation(cameraRotation);
+
+			XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+		}
 	}
 
 	// light
 	{ 
-		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 		static float lightAnimTime = 0.0f;
 		if (m_AnimateLights)
 		{
@@ -212,6 +229,13 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
 		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+			{
+				// comment the light for pos visualization
+				std::string objIndex = it->first;
+				if (objIndex.find("light") != std::string::npos) {
+					continue;
+				}
+			}
 			it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
 		}
 	}
@@ -390,44 +414,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
 	}
 
-	//// perform post spatial resample 
-	//{
-	//	commandList->SetPipelineState(m_PostSpatialResampleState);
-	//	commandList->SetComputeRootSignature(m_PostSpatialResampleRootSignature);
-	//	uint32_t ppSrvUavOffset = 0;
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtShadowOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, *mpRtReflectOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, g_indirectOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	//	commandList->SetComputeDynamicConstantBuffer(1, mCameraCB);
-	//	commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-	//}
-
-	//// perform postTemporalResample
-	//{
-	//	commandList->SetPipelineState(m_PostTemporalResampleState);
-	//	commandList->SetComputeRootSignature(m_PostTemporalResampleRootSignature);
-	//	uint32_t ppSrvUavOffset = 0;
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, radiance_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, g_indirectOutput, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, radiance_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	//	commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-	//	commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-	//}
-
 	// post lighting
 	{
 		commandList->SetViewport(m_Viewport);
@@ -464,7 +450,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		swapCurrPrevTexture(col_acc_prev, col_acc);
 		swapCurrPrevTexture(moment_acc_prev, moment_acc);
 		swapCurrPrevTexture(his_length_prev, his_length);
-		swapCurrPrevTexture(radiance_acc_prev, radiance_acc);
 		swapCurrPrevTexture(noisy_prev, noisy_curr);
 		swapCurrPrevTexture(spp_prev, spp_curr);
 		swapCurrPrevTexture(filtered_prev, filtered_curr);
@@ -532,9 +517,19 @@ void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
     case KeyCode::E:
         m_Up = 2.0f;
         break;
-    case KeyCode::Space:
+    case KeyCode::L:
         m_AnimateLights = !m_AnimateLights;
         break;
+	case KeyCode::C:
+		m_AnimateCamera = !m_AnimateCamera;
+		cameraAnimTime = 0.0f;
+		if (!m_AnimateCamera) {
+			m_Camera.set_Translation(m_pAlignedCameraData->m_InitialCamPos);
+			m_Camera.set_Rotation(m_pAlignedCameraData->m_InitialCamRot);
+			m_Pitch = 0.0f;
+			m_Yaw = 0.0f;
+		}
+		break;
     case KeyCode::ShiftKey:
         //m_Shift = true;
 		// disable the shift key
@@ -702,13 +697,6 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
 	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
-	gameObjectPool["Back wall"]->gid = gid++;
-	gameObjectPool["Back wall"]->mesh = "plane";
-	gameObjectPool["Back wall"]->material.base = Material::Turquoise;
-	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.5f, 0.1f);
-	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
-
 	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
 	gameObjectPool["Ceiling plane"]->gid = gid++;
 	gameObjectPool["Ceiling plane"]->mesh = "plane";
@@ -716,25 +704,32 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
 	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
 
+	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+	gameObjectPool["Back wall"]->gid = gid++;
+	gameObjectPool["Back wall"]->mesh = "plane";
+	gameObjectPool["Back wall"]->material.base = Material::Pearl;
+	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
+	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+
 	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
 	gameObjectPool["Front wall"]->gid = gid++;
 	gameObjectPool["Front wall"]->mesh = "plane";
 	gameObjectPool["Front wall"]->material.base = Material::Copper;
-	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.5f, 0.7f);
+	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
 	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
 
 	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
 	gameObjectPool["Left wall"]->gid = gid++;
 	gameObjectPool["Left wall"]->mesh = "plane";
 	gameObjectPool["Left wall"]->material.base = Material::Jade;
-	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.5f, 0.3f);
+	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
 	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
 	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
 	gameObjectPool["Right wall"]->gid = gid++;
 	gameObjectPool["Right wall"]->mesh = "plane";
 	gameObjectPool["Right wall"]->material.base = Material::Ruby;
-	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.5f, 0.6f);
+	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
 	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 
 	// light object
@@ -880,11 +875,6 @@ void HybridPipeline::loadDXResource() {
 		color_inout[1] = createTex2D_ReadWrite(L"color_inout[1]", m_Width, m_Height);
 		variance_inout[0] = createTex2D_ReadWrite(L"variance_inout[0]", m_Width, m_Height);
 		variance_inout[1] = createTex2D_ReadWrite(L"variance_inout[1]", m_Width, m_Height);
-
-		g_indirectOutput = createTex2D_ReadWrite(L"g_indirectOutput", m_Width, m_Height);
-
-		radiance_acc = createTex2D_ReadWrite(L"radiance_acc", m_Width, m_Height);
-		radiance_acc_prev = createTex2D_ReadWrite(L"radiance_acc_prev", m_Width, m_Height);
 
 		noisy_curr = createTex2D_ReadWrite(L"noisy_curr", m_Width, m_Height);
 		noisy_prev = createTex2D_ReadWrite(L"noisy_prev", m_Width, m_Height);
@@ -1181,76 +1171,6 @@ void HybridPipeline::loadPipeline() {
 				sizeof(postBMFRTemporalFilteredStateStream), &postBMFRTemporalFilteredStateStream
 			};
 			ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalFilteredStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
-		}
-
-		// Create the PostSpatial_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstantBufferView(0, 0);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostSpatialResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostResampleSpatial_CS.cso", &cs));
-
-			struct PostSpatialResampleStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postSpatialResampleStateStream;
-
-			postSpatialResampleStateStream.pRootSignature = m_PostSpatialResampleRootSignature.GetRootSignature().Get();
-			postSpatialResampleStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postSpatialResampleStateStreamDesc = {
-				sizeof(postSpatialResampleStateStream), &postSpatialResampleStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postSpatialResampleStateStreamDesc, IID_PPV_ARGS(&m_PostSpatialResampleState)));
-		}
-
-		// Create the PostTemporalResample_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 11, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstantBufferView(0, 0);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostTemporalResampleRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostResampleTemporal_CS.cso", &cs));
-
-			struct PostTemporalResampleStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postTemporalResampleStateStream;
-
-			postTemporalResampleStateStream.pRootSignature = m_PostTemporalResampleRootSignature.GetRootSignature().Get();
-			postTemporalResampleStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postTemporalResampleStateStreamDesc = {
-				sizeof(postTemporalResampleStateStream), &postTemporalResampleStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postTemporalResampleStateStreamDesc, IID_PPV_ARGS(&m_PostTemporalResampleState)));
 		}
 
 		// Create the PostLighting_PS Root Signature

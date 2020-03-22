@@ -103,7 +103,6 @@ float3 DoPbrPointLight(float3 radiance, float3 L, float3 N, float3 V, float3 P, 
     // add to outgoing radiance Lo
 	return (kD * albedo / PI + specular) * radiance * NdotL;
 }
-
 // from paper svgf paper 2017
 bool isResampleValid(float2 res, float2 curr_coord, float2 sample_coord)
 {

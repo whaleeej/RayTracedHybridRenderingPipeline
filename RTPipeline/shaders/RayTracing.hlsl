@@ -130,6 +130,40 @@ float3 DoPbrPointLight(PointLight light, float3 N, float3 V, float3 P, float3 al
 	//return ( specular) * radiance * NdotL;
 	//return radiance * NdotL;
 }
+float3 DoPbrRadiance(float3 radiance, float3 L, float3 N, float3 V, float3 P, float3 albedo, float roughness, float metallic)
+{
+	const float PI = 3.14159265359;
+	float3 F0 = float3(0.04, 0.04, 0.04);
+	F0 = lerp(F0, albedo, metallic);
+	float3 H = normalize(V + L);
+
+    // Cook-Torrance BRDF
+	float NDF = DistributionGGX(N, H, roughness);
+	float G = GeometrySmith(N, V, L, roughness);
+	float3 F = fresnelSchlick(clamp(dot(N, V), 0.0, 1.0), F0);
+	
+	float3 nominator = NDF * G * F;
+	float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+	float3 specular = nominator / max(denominator, 0.001); // prevent divide by zero for NdotV=0.0 or NdotL=0.0
+        
+     // kS is equal to Fresnel
+	float3 kS = F;
+    // for energy conservation, the diffuse and specular light can't
+    // be above 1.0 (unless the surface emits light); to preserve this
+    // relationship the diffuse component (kD) should equal 1.0 - kS.
+	float3 kD = float3(1.0, 1.0, 1.0) - kS;
+    // multiply kD by the inverse metalness such that only non-metals 
+    // have diffuse lighting, or a linear blend if partly metal (pure metals
+    // have no diffuse light).
+	kD *= 1.0 - metallic;
+
+    // scale light by NdotL
+	float NdotL = max(dot(N, L), 0.0);
+
+    // add to outgoing radiance Lo
+	return (kD * albedo / PI + specular) * radiance * NdotL;
+}
+
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
 //////////////////////////////////////////////////// Random from svgf paper
@@ -277,6 +311,7 @@ void rayGen()
 	ray.TMin = 0.0f;
 	ShadowRayPayload shadowPayload;
 	float Lo = 0;
+	float3 Lr = 0;
 
 	//// area Point Light
 	// low discrep sampling
@@ -325,10 +360,14 @@ void rayGen()
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
 		pdf = 1.0f;
 	}
-	
+	if(secondaryPayload.color.z != 0.0)
+	{
+		Lr = DoPbrRadiance(secondaryPayload.color.xyz, reflect(-V, H), N, V, P, albedo, roughness, metallic) / max(min(pdf, 2.0),0.3);
+		//Lr =secondaryPayload.color.xyz;
+	}
 	// output
-	reflectOutput[launchIndex.xy] = float4(secondaryPayload.color.xyz, pdf);
-	shadowOutput[launchIndex.xy] = float4(Lo, raySecondary.Direction);
+	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
+	reflectOutput[launchIndex.xy] = float4(Lr, 0);
 }
 //**********************************************************************************************************************//
 //**********************************************************************************************************************//
