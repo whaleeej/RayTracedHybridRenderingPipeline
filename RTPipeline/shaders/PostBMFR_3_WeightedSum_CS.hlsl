@@ -12,14 +12,16 @@
 #define LOCAL_SIZE 256
 #define FITTER_GLOBAL (LOCAL_SIZE * ((WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH) * (WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH)))
 // feature buffer define
-#define BUFFER_COUNT 13
-#define FEATURES_NOT_SCALED 4
+#define BUFFER_COUNT 15
+#define FEATURES_NOT_SCALED 6
 #define FEATURES_SCALED 6
 #define NOT_SCALED_FEATURE_BUFFERS \
 1.f,\
 normal.x,\
 normal.y,\
-normal.z,
+normal.z,\
+metallic.x,\
+roughness.x,
 #define SCALED_FEATURE_BUFFERS \
 world_position.x,\
 world_position.y,\
@@ -59,7 +61,7 @@ struct ComputeShaderInput
 
 #define Post_RootSignature \
     "RootFlags(0), " \
-    "DescriptorTable( SRV(t0, numDescriptors = 5)," \
+    "DescriptorTable( SRV(t0, numDescriptors = 6)," \
 								"UAV(u0, numDescriptors = 1) )," \
     "RootConstants(b0, num32BitConstants = 4)" 
 
@@ -71,6 +73,7 @@ Texture3D<float4> mins_maxs : register(t1);
 Texture2D<float4> current_normals : register(t2);
 Texture2D<float4> current_positions : register(t3);
 Texture2D<float4> current_noisy : register(t4);
+Texture2D<float4> current_metallic : register(t5);
 RWTexture2D<float4> output : register(u0);
 struct FrameIndex
 {
@@ -105,6 +108,8 @@ void main(ComputeShaderInput IN)
 	// Load feature buffers
 	float3 world_position = current_positions.Load(int3(pixel,0));
 	float3 normal = current_normals.Load(int3(pixel, 0));
+	float3 metallic = current_metallic.Load(int3(pixel, 0)).w;
+	float3 roughness = current_normals.Load(int3(pixel, 0)).w;
 	float features[BUFFER_COUNT - 3] =
 	{
       FEATURE_BUFFERS

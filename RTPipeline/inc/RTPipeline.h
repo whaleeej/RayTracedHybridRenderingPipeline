@@ -28,14 +28,16 @@
 #define LOCAL_SIZE 256
 #define FITTER_GLOBAL (LOCAL_SIZE * ((WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH) * (WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH)))
 // feature buffer define
-#define BUFFER_COUNT 13
-#define FEATURES_NOT_SCALED 4
+#define BUFFER_COUNT 15
+#define FEATURES_NOT_SCALED 6
 #define FEATURES_SCALED 6
 #define NOT_SCALED_FEATURE_BUFFERS \
-"1.f,"\
-"normal.x,"\
-"normal.y,"\
-"normal.z,"
+1.f,\
+normal.x,\
+normal.y,\
+normal.z,\
+metallic.x,\
+roughness.x,
 #define SCALED_FEATURE_BUFFERS \
 "world_position.x,"\
 "world_position.y,"\
