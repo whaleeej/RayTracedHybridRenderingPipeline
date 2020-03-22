@@ -212,32 +212,32 @@ void main(ComputeShaderInput IN)
 		}
 	}
 
-	// Store new spp
-	uint new_spp = 1;
-	if (blend_alpha < 1.0)
-	{
-		if (sample_spp > 254.f)
-		{
-			new_spp = 255;
-		}
-		else
-		{
-			new_spp = uint(sample_spp) + 1;
-		}
-	}
-	// blending color
 	float3 new_color = blend_alpha * current_color + (1.f - blend_alpha) * previous_color;
-	// history,nosiy,reprojection,accept caching
-	if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
-      pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+	if (store_accept > 0)
 	{
-		current_spp[pixel] = new_spp;
-		current_noisy[pixel] = float4(new_color, total_weight);
-		//current_noisy[pixel] = float4(weights[0], weights[1], weights[2], weights[3]);
-		//current_noisy[pixel] = float4(prev_frame_pixel_f, prev_frame_pixel);
-		out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
-		accept_bools[pixel] = store_accept;
+		// blending color
+		// history,nosiy,reprojection,accept caching
+		if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
+				pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+		{
+			current_spp[pixel] = uint(sample_spp) + 1;
+			current_noisy[pixel] = float4(new_color, 1);
+			out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
+			accept_bools[pixel] = store_accept;
+		}
 	}
+	else
+	{
+		if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
+				pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+		{
+			current_spp[pixel] =1;
+			current_noisy[pixel] = float4(new_color, 1);
+			out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
+			accept_bools[pixel] = store_accept;
+		}
+	}
+	
 	
 	// feature buffer caching
 	float features[BUFFER_COUNT] =
