@@ -428,7 +428,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
@@ -884,7 +884,7 @@ void HybridPipeline::loadDXResource() {
 		pixel_accept = createTex2D_ReadWrite(L"pixel_accept", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
 		A_LSQ_matrix = createTex3D_ReadWrite(L"A_LSQ_matrix", WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGHT, BUFFER_COUNT, DXGI_FORMAT_R32_FLOAT);
 		lsq_weights = createTex3D_ReadWrite(L"lsq_weights", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, BUFFER_COUNT - 3, DXGI_FORMAT_R32G32B32A32_FLOAT);
-		feature_scale_minmax = createTex3D_ReadWrite(L"feature_scale_minmax", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, 6, DXGI_FORMAT_R32G32B32A32_FLOAT);
+		feature_scale_minmax = createTex3D_ReadWrite(L"feature_scale_minmax", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, 12, DXGI_FORMAT_R32G32B32A32_FLOAT);
 		
 		weighted_sum = createTex2D_ReadWrite(L"weighted_output", m_Width, m_Height);
 
