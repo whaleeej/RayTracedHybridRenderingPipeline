@@ -39,12 +39,12 @@ normal.z,\
 metallic.x,\
 roughness.x,
 #define SCALED_FEATURE_BUFFERS \
-"world_position.x,"\
-"world_position.y,"\
-"world_position.z,"\
-"world_position.x*world_position.x,"\
-"world_position.y*world_position.y,"\
-"world_position.z*world_position.z"
+world_position.x,\
+world_position.y,\
+world_position.z,\
+world_position.x*world_position.x,\
+world_position.y*world_position.y,\
+world_position.z*world_position.z
 
 class HybridPipeline : public Game
 {
