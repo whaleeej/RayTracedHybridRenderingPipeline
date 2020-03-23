@@ -1,6 +1,6 @@
 // temporal define
 #define NORMAL_LIMIT_SQUARED 0.1f
-#define BLEND_ALPHA 0.2f
+#define BLEND_ALPHA 0.1f
 // parallel workset define
 #define LOCAL_WIDTH 8
 #define LOCAL_HEIGHT 8
