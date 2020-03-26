@@ -315,7 +315,7 @@ void rayGen()
 
 	//// area Point Light
 	// low discrep sampling
-	float bias = 1e-4f;
+	float bias = 1e-2f;
 	float3 P_biased = P + N * bias;
 	float3 dest = pointLight.PositionWS.xyz;
 	float distan = distance(P_biased, dest);

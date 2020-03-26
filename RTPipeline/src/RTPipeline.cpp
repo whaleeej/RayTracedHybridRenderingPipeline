@@ -162,6 +162,14 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			m_Camera.set_Rotation(cameraRotation);
 
 			XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+
+			//char buffer[512];
+			//sprintf_s(buffer, "%f, %f, %f, %f\n",
+			//	m_Camera.get_Translation().m128_f32[0],
+			//	m_Camera.get_Translation().m128_f32[1],
+			//	m_Camera.get_Translation().m128_f32[2],
+			//	m_Camera.get_Translation().m128_f32[3]);
+			//OutputDebugStringA(buffer);
 		}
 	}
 
@@ -185,7 +193,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		l.Color = XMFLOAT4(Colors::White);
 		l.Intensity = 2.0f;
 		l.Attenuation = 0.01f;
-		l.Radius = 1.0f;
+		l.Radius = 2.0f;
 
 		// Update the pointlight gameobject
 		{
