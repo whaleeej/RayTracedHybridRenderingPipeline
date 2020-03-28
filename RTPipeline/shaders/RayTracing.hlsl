@@ -311,31 +311,40 @@ void rayGen()
 	ray.TMin = 0.0f;
 	ShadowRayPayload shadowPayload;
 	float Lo = 0;
+	float weight = 0;
 	float3 Lr = 0;
 
 	//// area Point Light
 	// low discrep sampling
-	float bias = 1e-2f;
-	float3 P_biased = P + N * bias;
-	float3 dest = pointLight.PositionWS.xyz;
-	float distan = distance(P_biased, dest);
-	float3 dir = (dest - P_biased) / distan;
-	float sampleDestRadius = pointLight.radius;
-	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
-	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
-	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
-	// ray setup
-	ray.Origin = P_biased;
-	ray.Direction = distributedDir;
-	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
-	shadowPayload.hit = false;
-	// ray tracing
-	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 
-	0xFF, 0, 0, 0, ray, shadowPayload);
-	if (shadowPayload.hit == false)
+	for (int i = 0; i < 4096; i++)
 	{
-		Lo += 1.0f;
+		float2 lowDiscrepSeq_prime = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+		float r1 = lowDiscrepSeq_prime.x;
+		float r2 = lowDiscrepSeq_prime.y;
+		float bias = 1e-3f;
+		float3 P_biased = P + N * bias;
+		float3 dest = pointLight.PositionWS.xyz;
+		float distan = distance(P_biased, dest);
+		float3 dir = (dest - P_biased) / distan;
+		float sampleDestRadius = pointLight.radius;
+		float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+		float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(r1, r2), maxCosTheta);
+		float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+	// ray setup
+		ray.Origin = P_biased;
+		ray.Direction = distributedDir;
+		ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+		shadowPayload.hit = false;
+	// ray tracing
+		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+	0xFF, 0, 0, 0, ray, shadowPayload);
+		if (shadowPayload.hit == false)
+		{
+			Lo += 1.0f;
+		}
+		weight += 1.0f;
 	}
+	
 	
 	// reflection
 	float3 H = ImportanceSampleGGX(float2(rnd1, rnd2), N, roughness); // importance sample the half vector
@@ -366,7 +375,7 @@ void rayGen()
 		//Lr =secondaryPayload.color.xyz;
 	}
 	// output
-	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
+	shadowOutput[launchIndex.xy] = float4(Lo/weight, 0,0,0);
 	reflectOutput[launchIndex.xy] = float4(Lr, 0);
 }
 //**********************************************************************************************************************//
