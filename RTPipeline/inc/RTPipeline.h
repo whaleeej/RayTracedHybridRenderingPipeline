@@ -235,7 +235,7 @@ private:
 	Texture color_inout[2];
 	Texture variance_inout[2];
 
-	uint32_t ATrous_Level_Max = 2;
+	uint32_t ATrous_Level_Max = 3;
 
 	// BMFR_1_TemporalNoisy
 	Texture noisy_curr;
