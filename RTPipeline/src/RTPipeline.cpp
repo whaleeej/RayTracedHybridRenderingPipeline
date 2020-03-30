@@ -175,7 +175,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 	// light
 	{ 
-		static float lightAnimTime = 0.0f;
+		static float lightAnimTime = 0.5f * XM_PI;
 		if (m_AnimateLights)
 		{
 			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
