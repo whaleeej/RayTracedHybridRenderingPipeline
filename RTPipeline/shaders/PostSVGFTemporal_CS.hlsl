@@ -184,7 +184,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 [numthreads(LOCAL_WIDTH, LOCAL_HEIGHT, 1)]
 void main(ComputeShaderInput IN)
 {
-	float col_alpha = 0.1;
+	float col_alpha = 0.05;
 	float mom_alpha = 0.9;
 	
 	int2 texCoord = (int2) IN.DispatchThreadID.xy;

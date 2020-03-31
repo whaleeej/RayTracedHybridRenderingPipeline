@@ -1,3 +1,6 @@
+#define DIRECT_SHADOW
+#define AMBIENT_OCCLUSION
+#define INDIRECT_ILLUM
 struct ShadowRayPayload
 {
 	bool hit;
@@ -209,13 +212,6 @@ float2 Hammersley(uint i, uint N)
 
 //////////////////////////////////////////////////// Sampling method
 // from PBRT
-float3 UniformSampleCone(float2 u, float cosThetaMax)
-{
-	float cosTheta = (1.0f - u.x) + u.x * cosThetaMax;
-	float sinTheta = sqrt( 1.0f - cosTheta * cosTheta);
-	float phi = u.y * 2 * 3.141592653f;
-	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-}
 float3 SampleTan2W(float3 H, float3 N)
 {
 	float3 up = abs(N.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
@@ -224,6 +220,28 @@ float3 SampleTan2W(float3 H, float3 N)
 	
 	float3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
 	return sampleVec;
+}
+float3 UniformSample(float2 Xi, float3 N)
+{
+	float PI = 3.141592653;
+
+	float phi = 2.0 * PI * Xi.x;
+	float theta = 0.5 * PI * Xi.y;
+	
+    // from spherical coordinates to cartesian coordinates
+	float3 R;
+	R.x = cos(phi) * sin(theta);
+	R.y = sin(phi) * sin(theta);
+	R.z = cos(theta);
+	
+	return normalize(SampleTan2W(R, N));
+}
+float3 UniformSampleCone(float2 u, float cosThetaMax)
+{
+	float cosTheta = (1.0f - u.x) + u.x * cosThetaMax;
+	float sinTheta = sqrt( 1.0f - cosTheta * cosTheta);
+	float phi = u.y * 2 * 3.141592653f;
+	return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 }
 // from https://learnopengl.com/PBR/IBL/Specular-IBL based on Disney's research on PBRT
 float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
@@ -242,21 +260,6 @@ float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
 	H.z = cosTheta;
 	
 	return normalize(SampleTan2W(H,N));
-}
-float3 UniformSample(float2 Xi, float3 N)
-{
-	float PI = 3.141592653;
-
-	float phi = 2.0 * PI * Xi.x;
-	float theta = 0.5 * PI * Xi.y;
-	
-    // from spherical coordinates to cartesian coordinates
-	float3 R;
-	R.x = cos(phi) * sin(theta);
-	R.y = sin(phi) * sin(theta);
-	R.z =  cos(theta);
-	
-	return normalize(SampleTan2W(R, N));
 }
 float ImportanceSamplePdf(float roughness, float cosTheta)
 {
@@ -302,19 +305,17 @@ void rayGen()
 	float3 N = normalize(normal);
 	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), frameIndexCB.FrameIndex, 16);
-	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
-
-	//// shadow and lighting
-	RayDesc ray;
-	ray.TMin = 0.0f;
-	ShadowRayPayload shadowPayload;
+	
 	float Lo = 0;
 	float3 Lr = 0;
 
 	//// area Point Light
-	// low discrep sampling
+	RayDesc ray;
+	ray.TMin = 0.0f;
+	ShadowRayPayload shadowPayload;
 	float bias = 1e-2f;
 	float3 P_biased = P + N * bias;
 	float3 dest = pointLight.PositionWS.xyz;
@@ -336,8 +337,28 @@ void rayGen()
 	{
 		Lo += 1.0f;
 	}
+
+#ifdef AMBIENT_OCCLUSION
+	//// Ambient
+	float minAOLength = 0.01f;
+	float maxAOLength = 2.0f;
+	RayDesc aoRay;
+	ShadowRayPayload aoRayPayload;
+	aoRay.Origin = P;
+	aoRay.TMin = minAOLength;
+	aoRay.TMax = maxAOLength;
+	float3 aoDir = UniformSample(float2(rnd1, rnd2), N);
+	aoRay.Direction = aoDir;
+	TraceRay(gRtScene,  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+	0xFF, 0, 0, 0, aoRay, aoRayPayload);
+	if (aoRayPayload.hit == true)
+	{
+		Lo = 0.0f;
+	}
+#endif
 	
-	// reflection
+#ifdef INDIRECT_ILLUM
+	//// reflection
 	float3 H = ImportanceSampleGGX(float2(rnd1, rnd2), N, roughness); // importance sample the half vector
 	RayDesc raySecondary;
 	raySecondary.TMin = 0.01f;
@@ -350,16 +371,18 @@ void rayGen()
 	if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
 	{
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		pdf= ImportanceSamplePdf(roughness, dot(N, H));
-		pdf = max(min(pdf, 10.0),0.2);
+	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+		pdf = ImportanceSamplePdf(roughness, dot(N, H));
+		pdf = max(min(pdf, 10.0), 0.2);
 	}
-	if(secondaryPayload.color.z != 0.0)
+	if (secondaryPayload.color.z != 0.0)
 	{
 		Lr = DoPbrRadiance(secondaryPayload.color.xyz, raySecondary.Direction, N, V, P, albedo, roughness, metallic) / pdf;
 	}
-	// output
-	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
+#endif
+	
+	//// output
+	shadowOutput[launchIndex.xy] = float4(Lo, 0, 0, 0);
 	reflectOutput[launchIndex.xy] = float4(Lr, 0);
 }
 //**********************************************************************************************************************//
@@ -560,7 +583,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	
 	// direct lighting
 	uint seed = initRand((triangleTexCoord.x * 200 + (triangleTexCoord.y * 200*200)), localFrameIndexCB.FrameIndex, 16);
-	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
 	//// shadow and lighting
@@ -591,6 +614,25 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	{
 		color +=DoPbrPointLight(localPointLight, N, V, P, albedo, roughness, metallic);
 	}
+
+#ifdef AMBIENT_OCCLUSION
+	////// Ambient
+	float minAOLength = 0.01f;
+	float maxAOLength = 2.0f;
+	RayDesc aoRay;
+	ShadowRayPayload aoRayPayload;
+	aoRay.Origin = P;
+	aoRay.TMin = minAOLength;
+	aoRay.TMax = maxAOLength;
+	float3 aoDir = UniformSample(float2(rnd1, rnd2), N);
+	aoRay.Direction = aoDir;
+	TraceRay(localRtScene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+	0xFF, 0, 0, 0, aoRay, aoRayPayload);
+	if (aoRayPayload.hit == true)
+	{
+		color = 0.0f;
+	}
+#endif
 	
 	payload.color = float4(color, 1);
 }
