@@ -60,8 +60,9 @@ bool isReprojValid(float2 res, float2 curr_coord, float2 prev_coord)
 float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alpha)
 {
 	int N = his_length_prev.Load(int3(x, y, 0)).x;
-	float sample = rt_input.Load(int3(x, y, 0)).x;
-	float3 sampleRef = rt_input.Load(int3(x, y, 0)).yzw;
+	float2 sample = rt_input.Load(int3(x, y, 0)).xy;
+	float illum = sample.x+0.25*sample.y;
+	float2 sampleRef = rt_input.Load(int3(x, y, 0)).zw;
 	
 	if (N > 0 && gPosition.Load(int3(x, y, 0)).w != 0.0)
 	{
@@ -90,7 +91,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 			valid = valid && v[sampleIdx];
 		}
 	
-		float prevColor = 0.0f;
+		float2 prevColor = 0.0f;
 		float2 prevMoments = float2(0.0f, 0.0f);
 		float prevHistoryLength = 0.0f;
 		if (valid)
@@ -110,7 +111,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 				float2 loc = float2(floorx, floory) + offset[sampleIdx];
 				if (v[sampleIdx])
 				{
-					prevColor += w[sampleIdx] * col_acc_prev.Load(int3(loc, 0)).x;
+					prevColor += w[sampleIdx] * col_acc_prev.Load(int3(loc, 0)).xy;
 					prevMoments += w[sampleIdx] * moment_acc_prev.Load(int3(loc, 0)).xy;
 					prevHistoryLength += w[sampleIdx] * his_length_prev.Load(int3(loc, 0)).x;
 					sumw += w[sampleIdx];
@@ -137,7 +138,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 					float2 loc = float2(floorx, floory) + float2(xx, yy);
 					if (isReprojValid(res, float2(x, y), loc))
 					{
-						prevColor += col_acc_prev.Load(int3(loc, 0)).x;
+						prevColor += col_acc_prev.Load(int3(loc, 0)).xy;
 						prevMoments += moment_acc_prev.Load(int3(loc, 0)).xy;
 						prevHistoryLength += his_length_prev.Load(int3(loc, 0)).x;
 						cnt += 1.0f;
@@ -164,8 +165,8 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 			// color accumulation 
 			col_acc[int2(x, y)] = float4(sample * color_alpha + prevColor * (1.0f - color_alpha), sampleRef);
 			// moment accumulation
-			float first_moment = moment_alpha * prevMoments.x + (1.0f - moment_alpha) * sample;
-			float second_moment = moment_alpha * prevMoments.y + (1.0f - moment_alpha) * sample * sample;
+			float first_moment = moment_alpha * prevMoments.x + (1.0f - moment_alpha) * illum;
+			float second_moment = moment_alpha * prevMoments.y + (1.0f - moment_alpha) * illum * illum;
 			moment_acc[int2(x, y)] = float4(first_moment, second_moment, 0, 0);
 
 			// calculate variance from moments
@@ -176,7 +177,7 @@ float3 backProject(float x, float y, float2 res, float col_alpha, float mom_alph
 	
 	his_length[int2(x, y)] = float4(1.0, 0.0, 0.0, 0.0);
 	col_acc[int2(x, y)] = float4(sample, sampleRef);
-	moment_acc[int2(x, y)] = float4(sample, sample * sample, 0.0, 0.0);
+	moment_acc[int2(x, y)] = float4(illum, illum * illum, 0.0, 0.0);
 	return 100.0f;
 }
 

@@ -310,6 +310,7 @@ void rayGen()
 	float rnd2 = lowDiscrepSeq.y;
 	
 	float Lo = 0;
+	float La = 0;
 	float3 Lr = 0;
 
 	//// area Point Light
@@ -351,9 +352,9 @@ void rayGen()
 	aoRay.Direction = aoDir;
 	TraceRay(gRtScene,  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
 	0xFF, 0, 0, 0, aoRay, aoRayPayload);
-	if (aoRayPayload.hit == true)
+	if (aoRayPayload.hit == false)
 	{
-		Lo = 0.0f;
+		La += 1.0f;
 	}
 #endif
 	
@@ -382,7 +383,7 @@ void rayGen()
 #endif
 	
 	//// output
-	shadowOutput[launchIndex.xy] = float4(Lo, 0, 0, 0);
+	shadowOutput[launchIndex.xy] = float4(Lo, La, 0, 0);
 	reflectOutput[launchIndex.xy] = float4(Lr, 0);
 }
 //**********************************************************************************************************************//

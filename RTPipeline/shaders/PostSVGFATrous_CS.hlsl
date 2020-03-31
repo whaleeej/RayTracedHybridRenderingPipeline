@@ -99,11 +99,11 @@ void ATrousFilter(float x, float y, float2 res, int level,
         
         // Load pixel p data
 		int3 p = int3(x, y, 0);
-		float lp = color_in.Load(p).x;
+		float2 lp = color_in.Load(p).xy;
 		float3 np = gNormalRoughness.Load(p).xyz;
 		float3 pp = gPosition.Load(p).xyz;
 
-		float color_sum = 0.0f;
+		float2 color_sum = 0.0f;
 		float variance_sum = 0.0f;
 		float weights_sum = 0;
 		float weights_squared_sum = 0;
@@ -116,7 +116,7 @@ void ATrousFilter(float x, float y, float2 res, int level,
 				{
                     // Load pixel q data
 					int3 q = int3(xq, yq, 0);
-					float lq = color_in.Load(q).x;
+					float2 lq = color_in.Load(q).xy;
 					float3 nq = gNormalRoughness.Load(q).xyz;
 					float3 pq = gPosition.Load(q).xyz;
 					float wq = variance_in.Load(q).x;
@@ -139,12 +139,12 @@ void ATrousFilter(float x, float y, float2 res, int level,
         // update color and variance
 		if (weights_sum > 10e-6)
 		{
-			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).yzw);
+			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).zw);
 			variance_out[p.xy] = float4(variance_sum / weights_squared_sum, 0, 0, 0);
 		}
 		else
 		{
-			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).yzw);
+			color_out[p.xy] = float4(color_sum / weights_sum, color_in.Load(int3(x, y, 0)).zw);
 			variance_out[p.xy] = variance_in.Load(p);
 		}
 	}
