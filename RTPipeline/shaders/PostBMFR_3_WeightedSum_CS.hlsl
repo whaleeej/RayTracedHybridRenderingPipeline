@@ -107,7 +107,7 @@ void main(ComputeShaderInput IN)
       - BLOCK_OFFSETS[frameIndexCB.FrameIndex % BLOCK_OFFSETS_COUNT]) / int2(BLOCK_EDGE_LENGTH, BLOCK_EDGE_LENGTH);
 	// Load feature buffers
 	float3 world_position = current_positions.Load(int3(pixel,0));
-	float3 normal = current_normals.Load(int3(pixel, 0));
+	float3 normal = current_normals.Load(int3(pixel, 0))/2.0+0.5;
 	float3 metallic = current_metallic.Load(int3(pixel, 0)).w;
 	float3 roughness = current_normals.Load(int3(pixel, 0)).w;
 	float features[BUFFER_COUNT - 3] =

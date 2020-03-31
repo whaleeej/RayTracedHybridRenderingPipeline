@@ -357,7 +357,6 @@ void rayGen()
 	if(secondaryPayload.color.z != 0.0)
 	{
 		Lr = DoPbrRadiance(secondaryPayload.color.xyz, raySecondary.Direction, N, V, P, albedo, roughness, metallic) / pdf;
-		//Lr =secondaryPayload.color.xyz;
 	}
 	// output
 	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);

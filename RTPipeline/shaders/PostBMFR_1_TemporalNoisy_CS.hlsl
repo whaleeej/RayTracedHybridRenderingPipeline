@@ -146,7 +146,7 @@ void main(ComputeShaderInput IN)
 	const int2 pixel = mirror2(pixel_without_mirror, int2(IMAGE_WIDTH, IMAGE_HEIGHT));
 	
 	float4 world_position = current_positions.Load(int3(pixel, 0));
-	float3 normal = current_normals.Load(int3(pixel, 0)).xyz;
+	float3 normal = current_normals.Load(int3(pixel, 0)).xyz/2.0+0.5;
 	float3 metallic = current_metallic.Load(int3(pixel, 0)).w;
 	float3 roughness = current_normals.Load(int3(pixel, 0)).w;
 	float3 current_color = noisy_input.Load(int3(pixel, 0)).xyz;
