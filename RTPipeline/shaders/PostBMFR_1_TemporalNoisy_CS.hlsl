@@ -165,109 +165,23 @@ void main(ComputeShaderInput IN)
 	float weights[4] = { 0.0, 0.0, 0.0, 0.0 };
 	int2 prev_frame_pixel = 0;
 	
-	if (previous_spp.Load(int3(pixel, 0)) > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
+	if (previous_spp.Load(int3(pixel, 0)) > 0)
 	{
-		// back reprojection
-		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
-		float ndcx = clip_position.x / clip_position.w * 0.5 + 0.5;
-		float ndcy = -clip_position.y / clip_position.w * 0.5 + 0.5;
-		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.52;
-		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.52;
-		
-		prev_frame_pixel = int2(floor(prev_frame_pixel_f.x), floor(prev_frame_pixel_f.y));
-		
-		
-		// These are needed for  the bilinear sampling
-		int2 offsets[4];
-		offsets[0] = (int2) (0, 0);
-		offsets[1] = (int2) (1, 0);
-		offsets[2] = (int2) (0, 1);
-		offsets[3] = (int2) (1, 1);
-		float2 prev_pixel_fract = prev_frame_pixel_f - float2(prev_frame_pixel);
-		float2 one_minus_prev_pixel_fract = 1.f - prev_pixel_fract;
-		
-		weights[0] = one_minus_prev_pixel_fract.x * one_minus_prev_pixel_fract.y;
-		weights[1] = prev_pixel_fract.x * one_minus_prev_pixel_fract.y;
-		weights[2] = one_minus_prev_pixel_fract.x * prev_pixel_fract.y;
-		weights[3] = prev_pixel_fract.x * prev_pixel_fract.y;
-		
-		// to bilinear sample
-		for (int i = 0; i < 4; ++i)
-		{
-			int2 sample_location = prev_frame_pixel + offsets[i];
-			if (isReprojValid(int2(IMAGE_WIDTH, IMAGE_HEIGHT), pixel, sample_location))
-			{
-				// Pixel passes all tests so store it to accept bools
-				store_accept |= 1 << i;
-
-				sample_spp += weights[i] * float(previous_spp.Load(int3(sample_location, 0)));
-
-				previous_color += weights[i] * float3(previous_noisy.Load(int3(sample_location, 0)).xyz);
-
-				total_weight += weights[i];
-			}
-		}
-		if (total_weight > 0.0)
-		{
-			sample_spp /= total_weight;
-			previous_color /= total_weight;
-
-			// Blend_alpha is dymically decided so that the result is average
-			 // of all samples until the cap defined by BLEND_ALPHA is reached
-			blend_alpha = 1.f / (sample_spp + 1.f);
-			blend_alpha = max(blend_alpha, BLEND_ALPHA);
-		}
-	}
-
-	float3 new_color = blend_alpha * current_color + (1.f - blend_alpha) * previous_color;
-	if (store_accept > 0)
-	{
-		// blending color
-		// history,nosiy,reprojection,accept caching
 		if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
-				pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+                pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
 		{
-			current_spp[pixel] = uint(sample_spp) + 1;
-			current_noisy[pixel] = float4(new_color, 1);
-			out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
-			accept_bools[pixel] = store_accept;
+			int tmp_spp = previous_spp.Load(int3(pixel, 0));
+			current_spp[pixel] = tmp_spp + 1;
+			current_noisy[pixel] = float4((previous_noisy.Load(int3(pixel, 0)).xyz * tmp_spp + noisy_input.Load(int3(pixel, 0)).xyz) / (tmp_spp + 1),0);
 		}
 	}
 	else
 	{
 		if (pixel_without_mirror.x >= 0 && pixel_without_mirror.x < IMAGE_WIDTH &&
-				pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
+                pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
 		{
-			current_spp[pixel] =1;
-			current_noisy[pixel] = float4(new_color, 1);
-			out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
-			accept_bools[pixel] = store_accept;
+			current_spp[pixel] = 1;
+			current_noisy[pixel] = noisy_input.Load(int3(pixel, 0)).xyzw;
 		}
 	}
-	
-	
-	// feature buffer caching
-	float features[BUFFER_COUNT] =
-	{
-		FEATURE_BUFFERS,
-		new_color.x,
-		new_color.y,
-		new_color.z
-	};
-	for (int feature_num = 0; feature_num < BUFFER_COUNT; ++feature_num)
-	{
-		//int x_in_block = gid.x % BLOCK_EDGE_LENGTH;
-		//int y_in_block = gid.y % BLOCK_EDGE_LENGTH;
-		//int x_block = gid.x / BLOCK_EDGE_LENGTH;
-		//int y_block = gid.y / BLOCK_EDGE_LENGTH;
-		uint3 location_in_data = uint3(gid.x, gid.y,
-			feature_num
-		);
-
-		float storeValue = features[feature_num];
-		if (isnan(storeValue))
-			storeValue = 0.0f;
-		tmp_data[location_in_data] = storeValue;
-	}
-	
 }

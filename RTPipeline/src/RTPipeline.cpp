@@ -381,48 +381,48 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->Dispatch(WORKSET_WITH_MARGINS_WIDTH / local_width, WORKSET_WITH_MARGINS_HEIGHT / local_height);
 	}
 
-	// Perform BMFR_2_QR
-	{
-		commandList->SetPipelineState(m_PostBMFRQRFactorizationPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRQRFactorizationRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
-		commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
-	}
+	//// Perform BMFR_2_QR
+	//{
+	//	commandList->SetPipelineState(m_PostBMFRQRFactorizationPipelineState);
+	//	commandList->SetComputeRootSignature(m_PostBMFRQRFactorizationRootSignature);
+	//	uint32_t ppSrvUavOffset = 0;
+	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	commandList->SetCompute32BitConstants(1, totalFrameCount);
+	//	commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
+	//}
 
-	// Perform BMFR_3_WeightedSum
-	{
-		commandList->SetPipelineState(m_PostBMFRWeightedSumPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRWeightedSumRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
+	//// Perform BMFR_3_WeightedSum
+	//{
+	//	commandList->SetPipelineState(m_PostBMFRWeightedSumPipelineState);
+	//	commandList->SetComputeRootSignature(m_PostBMFRWeightedSumRootSignature);
+	//	uint32_t ppSrvUavOffset = 0;
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	commandList->SetCompute32BitConstants(1, totalFrameCount);
+	//	commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
+	//}
 
-	// Perform BMFR_4_
-	{
-		commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
+	//// Perform BMFR_4_
+	//{
+	//	commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
+	//	commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
+	//	uint32_t ppSrvUavOffset = 0;
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	//	commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	commandList->SetCompute32BitConstants(1, totalFrameCount);
+	//	commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
+	//}
 
 	// post lighting
 	{
@@ -438,7 +438,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);

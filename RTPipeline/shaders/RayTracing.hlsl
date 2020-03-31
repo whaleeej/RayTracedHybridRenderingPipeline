@@ -347,23 +347,29 @@ void rayGen()
 	SecondaryPayload secondaryPayload;
 	secondaryPayload.color = float4(0, 0, 0, 0);
 	float pdf = 1;
+	//if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
+	//{
+	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+	//	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+	//	pdf = ImportanceSamplePdf(roughness, dot(N, H));
+	//}
+	//else
+	//{
+	//	raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
+	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+	//	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
+	//	pdf = 1.0f;
+	//}
+	raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
 	if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
 	{
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		pdf= ImportanceSamplePdf(roughness, dot(N, H));
+		pdf = 1 / (2.0 * 3.1415926);
 	}
-	else
+	if (secondaryPayload.color.z != 0.0)
 	{
-		raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		pdf = 1.0f;
-	}
-	if(secondaryPayload.color.z != 0.0)
-	{
-		Lr = DoPbrRadiance(secondaryPayload.color.xyz, reflect(-V, H), N, V, P, albedo, roughness, metallic) / max(min(pdf, 2.0),0.3);
-		//Lr =secondaryPayload.color.xyz;
+		Lr = DoPbrRadiance(secondaryPayload.color.xyz, raySecondary.Direction, N, V, P, albedo, roughness, metallic) / pdf;
 	}
 	// output
 	shadowOutput[launchIndex.xy] = float4(Lo, 0,0,0);
