@@ -352,17 +352,11 @@ void rayGen()
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
 		pdf= ImportanceSamplePdf(roughness, dot(N, H));
-	}
-	else
-	{
-		raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
-		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		pdf = 1.0f;
+		pdf = max(min(pdf, 10.0),0.2);
 	}
 	if(secondaryPayload.color.z != 0.0)
 	{
-		Lr = DoPbrRadiance(secondaryPayload.color.xyz, reflect(-V, H), N, V, P, albedo, roughness, metallic) / max(min(pdf, 2.0),0.3);
+		Lr = DoPbrRadiance(secondaryPayload.color.xyz, raySecondary.Direction, N, V, P, albedo, roughness, metallic) / pdf;
 		//Lr =secondaryPayload.color.xyz;
 	}
 	// output

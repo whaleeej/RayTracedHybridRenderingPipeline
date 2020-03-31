@@ -148,10 +148,10 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 N = normalize(normal);
 	
 	// ambient
-	float3 color0 = 0.000 * albedo;
+	float3 color0 = 0 * albedo;
 	
 	// direct
-	float3 color1 =0*DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
+	float3 color1 = 0 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
 	// indirect
 	float3 color2 = reflectivity;
