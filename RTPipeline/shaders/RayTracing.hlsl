@@ -302,7 +302,7 @@ void rayGen()
 	float3 N = normalize(normal);
 	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), frameIndexCB.FrameIndex, 16);
-	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 4095), 4096);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 16384), 16384);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
 
@@ -347,25 +347,12 @@ void rayGen()
 	SecondaryPayload secondaryPayload;
 	secondaryPayload.color = float4(0, 0, 0, 0);
 	float pdf = 1;
-	//if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
-	//{
-	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-	//	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-	//	pdf = ImportanceSamplePdf(roughness, dot(N, H));
-	//}
-	//else
-	//{
-	//	raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
-	//	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-	//	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-	//	pdf = 1.0f;
-	//}
-	raySecondary.Direction = UniformSample(float2(rnd1, rnd2), N);
 	if (dot(raySecondary.Direction, N) >= 0) // trace reflected ray only if the ray is not below the surface
 	{
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 1, 0, 1, raySecondary, secondaryPayload);
-		pdf = 1 / (2.0 * 3.1415926);
+		pdf = ImportanceSamplePdf(roughness, dot(N, H));
+		pdf = max(min(pdf, 100), 0.01);
 	}
 	if (secondaryPayload.color.z != 0.0)
 	{

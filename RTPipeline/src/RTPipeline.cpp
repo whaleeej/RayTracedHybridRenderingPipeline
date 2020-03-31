@@ -54,8 +54,8 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
 	, m_Height(0)
 {
 
-    XMVECTOR cameraPos = XMVectorSet(0, 10, -35 , 1);
-    XMVECTOR cameraTarget = XMVectorSet(0, 5, 0, 1);
+    XMVECTOR cameraPos = XMVectorSet(0, 10, -35, 1);
+    XMVECTOR cameraTarget = XMVectorSet(0, 10, 0, 1);
     XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
 
     m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
@@ -135,43 +135,43 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 	}
 
 	// camera
-	{
-		if (m_AnimateCamera)
-		{
-			cameraAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI/10.0f;
-			// Setup the lights.
-			const float radius = 35.0f;
-			XMVECTOR cameraPos = XMVectorSet(static_cast<float>(std::sin(cameraAnimTime))* radius,
-																			10,
-																			static_cast<float>(std::cos(3.141562653 + cameraAnimTime))* radius,
-																			1.0);
-			XMVECTOR cameraTarget = XMVectorSet(0, 10, 0, 1);
-			XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
+	//{
+	//	if (m_AnimateCamera)
+	//	{
+	//		cameraAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI/10.0f;
+	//		// Setup the lights.
+	//		const float radius = 35.0f;
+	//		XMVECTOR cameraPos = XMVectorSet(static_cast<float>(std::sin(cameraAnimTime))* radius,
+	//																		10,
+	//																		static_cast<float>(std::cos(3.141562653 + cameraAnimTime))* radius,
+	//																		1.0);
+	//		XMVECTOR cameraTarget = XMVectorSet(0, 10, 0, 1);
+	//		XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
 
-			m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
-		}
-		else {
-			float speedMultipler = (m_Shift ? 16.0f : 4.0f);
+	//		m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+	//	}
+	//	else {
+	//		float speedMultipler = (m_Shift ? 16.0f : 4.0f);
 
-			XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-			XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-			m_Camera.Translate(cameraTranslate, Space::Local);
-			m_Camera.Translate(cameraPan, Space::Local);
+	//		XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+	//		XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
+	//		m_Camera.Translate(cameraTranslate, Space::Local);
+	//		m_Camera.Translate(cameraPan, Space::Local);
 
-			XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
-			m_Camera.set_Rotation(cameraRotation);
+	//		XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
+	//		m_Camera.set_Rotation(cameraRotation);
 
-			XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
+	//		XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
 
-			//char buffer[512];
-			//sprintf_s(buffer, "%f, %f, %f, %f\n",
-			//	m_Camera.get_Translation().m128_f32[0],
-			//	m_Camera.get_Translation().m128_f32[1],
-			//	m_Camera.get_Translation().m128_f32[2],
-			//	m_Camera.get_Translation().m128_f32[3]);
-			//OutputDebugStringA(buffer);
-		}
-	}
+	//		//char buffer[512];
+	//		//sprintf_s(buffer, "%f, %f, %f, %f\n",
+	//		//	m_Camera.get_Translation().m128_f32[0],
+	//		//	m_Camera.get_Translation().m128_f32[1],
+	//		//	m_Camera.get_Translation().m128_f32[2],
+	//		//	m_Camera.get_Translation().m128_f32[3]);
+	//		//OutputDebugStringA(buffer);
+	//	}
+	//}
 
 	// light
 	{ 
