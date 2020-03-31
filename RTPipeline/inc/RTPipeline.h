@@ -13,6 +13,7 @@
 #include <RTHelper.h>
 #include <DirectXMath.h>
 #include <Material.h>
+#include <random>
 
 // temporal define for workset dim
 #define LOCAL_WIDTH 8
@@ -177,7 +178,8 @@ private:
 	struct FrameIndexCB
 	{
 		uint32_t FrameIndex;
-		float padding[3];
+		uint32_t seed;
+		float padding[2];
 	};
 	// ObjectIndex
 	struct ObjectIndexRTCB {
@@ -208,6 +210,7 @@ private:
     bool m_AnimateLights;
     // Set to true if the Shift key is pressed.
     bool m_Shift;
+	std::mt19937 m_generatorURNG;
 
 	/////////////////////////////////////////////// Raster  Object 
 	// Deferred gbuffer gen

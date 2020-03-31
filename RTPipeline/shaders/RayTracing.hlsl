@@ -39,7 +39,8 @@ struct Camera
 struct FrameIndex
 {
 	uint FrameIndex;
-	float3 Padding;
+	uint seed;
+	float2 Padding;
 }; ConstantBuffer<FrameIndex> frameIndexCB : register(b2);
 
 ////////////////////////////////////////////////////// PBR workflow Cook-Torrance
@@ -170,22 +171,27 @@ float3 DoPbrRadiance(float3 radiance, float3 L, float3 N, float3 V, float3 P, fl
 ////////////////////////////////////////////////////// PBR workflow SchlickGGX
 
 //////////////////////////////////////////////////// Random from svgf paper
-unsigned int initRand(unsigned int val0, unsigned int val1, unsigned int backoff = 16)
+float hash(float3 p)
 {
-	unsigned int v0 = val0, v1 = val1, s0 = 0;
-
-	for (unsigned int n = 0; n < backoff; n++)
-	{
-		s0 += 0x9e3779b9;
-		v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
-		v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
-	}
-	return v0;
+	p = frac(p * 0.3183099 + .1);
+	p *= 17.0;
+	return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
-float nextRand(inout unsigned int s)
+unsigned int initRand(uint seed)
 {
-	s = (1664525u * s + 1013904223u);
-	return float(s & 0x00FFFFFF) / float(0x01000000);
+	seed = (seed ^ 61) ^ (seed >> 16);
+	seed *= 9;
+	seed = seed ^ (seed >> 4);
+	seed *= 0x27d4eb2d;
+	seed = seed ^ (seed >> 15);
+	return seed;
+}
+float nextRand(inout uint state)
+{
+	state ^= (state << 13);
+	state ^= (state >> 17);
+	state ^= (state << 5);
+	return state / float(0xffffffff);
 }
 uint nextRandomRange(inout uint state, uint lower, uint upper) // [lower, upper]
 {
@@ -304,7 +310,7 @@ void rayGen()
 	float3 V = normalize(cameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
-	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.y)), frameIndexCB.FrameIndex, 16);
+	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.x)) * hash(P) + frameIndexCB.seed);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
@@ -583,7 +589,7 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	float3 V = normalize(-WorldRayDirection());
 	
 	// direct lighting
-	uint seed = initRand((triangleTexCoord.x * 200 + (triangleTexCoord.y * 200*200)), localFrameIndexCB.FrameIndex, 16);
+	uint seed = initRand((triangleTexCoord.x * 200 + (triangleTexCoord.y * 200 * 200)) * hash(P) + localFrameIndexCB.seed);
 	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;

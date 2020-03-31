@@ -165,24 +165,24 @@ void main(ComputeShaderInput IN)
 	float weights[4] = { 0.0, 0.0, 0.0, 0.0 };
 	int2 prev_frame_pixel = 0;
 	
-	if (previous_spp.Load(int3(pixel, 0)) > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
+	if (frameIndexCB.FrameIndex>1&&previous_spp.Load(int3(pixel, 0)) > 0 && current_positions.Load(int3(pixel, 0)).w != 0.0)
 	{
 		// back reprojection
 		float4 clip_position = mul(viewProjectMatrix_prev.viewProject_prev, float4(world_position.xyz, 1.0f));
 		float ndcx = clip_position.x / clip_position.w * 0.5 + 0.5;
 		float ndcy = -clip_position.y / clip_position.w * 0.5 + 0.5;
-		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.52;
-		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.52;
+		prev_frame_pixel_f.x = ndcx * IMAGE_WIDTH-0.5;
+		prev_frame_pixel_f.y = ndcy * IMAGE_HEIGHT-0.5;
 		
 		prev_frame_pixel = int2(floor(prev_frame_pixel_f.x), floor(prev_frame_pixel_f.y));
 		
 		
 		// These are needed for  the bilinear sampling
 		int2 offsets[4];
-		offsets[0] = (int2) (0, 0);
-		offsets[1] = (int2) (1, 0);
-		offsets[2] = (int2) (0, 1);
-		offsets[3] = (int2) (1, 1);
+		offsets[0] = int2 (0, 0);
+		offsets[1] = int2 (1, 0);
+		offsets[2] = int2 (0, 1);
+		offsets[3] = int2 (1, 1);
 		float2 prev_pixel_fract = prev_frame_pixel_f - float2(prev_frame_pixel);
 		float2 one_minus_prev_pixel_fract = 1.f - prev_pixel_fract;
 		
@@ -239,7 +239,7 @@ void main(ComputeShaderInput IN)
 				pixel_without_mirror.y >= 0 && pixel_without_mirror.y < IMAGE_HEIGHT)
 		{
 			current_spp[pixel] =1;
-			current_noisy[pixel] = float4(new_color, 1);
+			current_noisy[pixel] = float4(current_color, 1);
 			out_prev_frame_pixel[pixel] = prev_frame_pixel_f;
 			accept_bools[pixel] = store_accept;
 		}

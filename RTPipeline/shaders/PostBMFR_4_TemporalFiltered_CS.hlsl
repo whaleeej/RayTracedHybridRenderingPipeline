@@ -113,10 +113,10 @@ void main(ComputeShaderInput IN)
 		
 		// These are needed for  the bilinear sampling
 		int2 offsets[4];
-		offsets[0] = (int2) (0, 0);
-		offsets[1] = (int2) (1, 0);
-		offsets[2] = (int2) (0, 1);
-		offsets[3] = (int2) (1, 1);
+		offsets[0] = int2 (0, 0);
+		offsets[1] = int2 (1, 0);
+		offsets[2] = int2 (0, 1);
+		offsets[3] = int2 (1, 1);
 		float2 prev_pixel_fract = prev_frame_pixel_f - float2(prev_frame_pixel);
 		float2 one_minus_prev_pixel_fract = 1.f - prev_pixel_fract;
 		float weights[4];

@@ -63,6 +63,7 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     m_pAlignedCameraData = (CameraData*)_aligned_malloc(sizeof(CameraData), 16);
     m_pAlignedCameraData->m_InitialCamPos = m_Camera.get_Translation();
     m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
+	m_generatorURNG.seed(1729);
 }
 
 HybridPipeline::~HybridPipeline()
@@ -1236,8 +1237,10 @@ void HybridPipeline::updateBuffer()
 {
 	// update the structure buffer of frameId
 	{
+		std::uniform_int_distribution<uint32_t> seedDistribution(0, UINT_MAX);
 		FrameIndexCB fid;
 		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
+		fid.seed = seedDistribution(m_generatorURNG);
 		void* pData;
 		mpRTFrameIndexCB->Map(0, nullptr, (void**)&pData);
 		memcpy(pData, &fid, sizeof(FrameIndexCB));
