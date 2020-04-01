@@ -1,4 +1,6 @@
 # Ray Traced Hybrid Rendering Pipeline
+## Demo Video Link
+-   [click me](http://47.100.57.110:8079/images/HybridRenderingPipelineDemo.mp4)
 ## Pipeline Design
 - Stages
     - Raster Stage - G-Buffer Gen + Post Processing 
@@ -26,17 +28,15 @@
 ![5_Indirect_Sample](./Assets/demo/5_Indirect_Sample.png)
 ## Computing Filtering and Reconstruction
 - Shadow&AO Reconstruction
-    - Pipeline Design
+    - Pipeline Design  
     ![6_SVGF_design](./Assets/demo/6_SVGF_design.png)
-    - Illuntration
+    - Illuntration  
     ![7_SVGF_filtered](./Assets/demo/7_SVGF_filtered.png)
 - Illumination Reconstruction
-    - Pipeline Design
+    - Pipeline Design  
     ![8_BMFR_design](./Assets/demo/8_BMFR_design.png)
-    - Illuntration
+    - Illuntration  
     ![9_BMFR_filtered](./Assets/demo/9_BMFR_filtered.png)
-## Demo Video Link
--   [click me](http://47.100.57.110:8079/images/HybridRenderingPipelineDemo.mp4)
 ## Build
 1. install visual studio 2019
 2. modify the "cd D:\Repos\DX12-HybridPipeline" in GenerateProjectFiles.bat to your root
