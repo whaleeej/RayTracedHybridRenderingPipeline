@@ -18,25 +18,32 @@
     |Normal| Metallic|	RT3|
     |Emissive|	Id|	RT4|
 ## Ray Tracing Sampeling  
-- Acceleration Struture    
-<img src="./Assets/demo/3_AS_Design.png" width="300" height="高度" alt="3_AS_Design">  
+- Acceleration Struture
+
+    <img src="./Assets/demo/3_AS_Design.png" width="300" height="高度" alt="3_AS_Design">  
 - Rays per sample pixel  
     - [1 shadow] + [1 ao] + [1 secondary] + [1 secondary shadow] spp  
 - Shadow Sampling Illustration    
-<img src="./Assets/demo/4_Shadow_Sample.png" width="300" height="高度" alt="4_Shadow_Sample">  
+
+    <img src="./Assets/demo/4_Shadow_Sample.png" width="300" height="高度" alt="4_Shadow_Sample">  
 - Indirect Illumination Sampling Illustration    
-<img src="./Assets/demo/5_Indirect_Sample.png" width="300" height="高度" alt="5_Indirect_Sample">  
+
+    <img src="./Assets/demo/5_Indirect_Sample.png" width="300" height="高度" alt="5_Indirect_Sample">  
 ## Computing Filtering and Reconstruction  
 - Shadow&AO Reconstruction  
     - Pipeline Design    
-    <img src="./Assets/demo/6_SVGF_design.png" width="300" height="高度" alt="6_SVGF_design">  
+    
+        <img src="./Assets/demo/6_SVGF_design.png" width="300" height="高度" alt="6_SVGF_design">  
     - Illuntration    
-    <img src="./Assets/demo/7_SVGF_filtered.png" width="400" height="高度" alt="7_SVGF_filtered">  
+    
+        <img src="./Assets/demo/7_SVGF_filtered.png" width="400" height="高度" alt="7_SVGF_filtered">  
 - Illumination Reconstruction  
     - Pipeline Design     
-    <img src="./Assets/demo/8_BMFR_design.png" width="300" height="高度" alt="8_BMFR_design">  
-    - Illuntration    
-    <img src="./Assets/demo/9_BMFR_filtered.png" width="400" height="高度" alt="9_BMFR_filtered">  
+    
+        <img src="./Assets/demo/8_BMFR_design.png" width="300" height="高度" alt="8_BMFR_design">  
+    - Illuntration
+    
+        <img src="./Assets/demo/9_BMFR_filtered.png" width="400" height="高度" alt="9_BMFR_filtered">  
 ## Build  
 1. install visual studio 2019  
 2. modify the "cd D:\Repos\DX12-HybridPipeline" in GenerateProjectFiles.bat to your root  
