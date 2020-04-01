@@ -31,12 +31,12 @@
     - Pipeline Design    
     <img src="./Assets/demo/6_SVGF_design.png" width="300" height="高度" alt="6_SVGF_design">  
     - Illuntration    
-    ![7_SVGF_filtered](./Assets/demo/7_SVGF_filtered.png)  
+    <img src="./Assets/demo/7_SVGF_filtered.png" width="400" height="高度" alt="7_SVGF_filtered">  
 - Illumination Reconstruction  
     - Pipeline Design     
     <img src="./Assets/demo/8_BMFR_design.png" width="300" height="高度" alt="8_BMFR_design">  
     - Illuntration    
-    ![9_BMFR_filtered](./Assets/demo/9_BMFR_filtered.png)  
+    <img src="./Assets/demo/9_BMFR_filtered.png" width="400" height="高度" alt="9_BMFR_filtered">  
 ## Build  
 1. install visual studio 2019  
 2. modify the "cd D:\Repos\DX12-HybridPipeline" in GenerateProjectFiles.bat to your root  
