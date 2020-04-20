@@ -93,12 +93,18 @@ add_executable( RTPipeline WIN32
 
 target_include_directories( RTPipeline
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assimp/include
+)
+
+target_link_directories(RTPipeline
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assimp
 )
 
 target_link_libraries( RTPipeline
     DX12Lib
     D3DCompiler.lib
     Shlwapi.lib
+    assimp-vc142-mt.lib
 )
 
 # Set debug database to enable the "Edit and Continue" feature.
