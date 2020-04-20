@@ -6,7 +6,6 @@
 #include <Light.h>
 #include <Window.h>
 #include <Mesh.h>
-#include <RenderTarget.h>
 #include <RootSignature.h>
 #include <Texture.h>
 #include <VertexBuffer.h>
@@ -14,6 +13,7 @@
 #include <DirectXMath.h>
 #include <Material.h>
 #include <random>
+#include <RenderTarget.h>
 
 // temporal define for workset dim
 #define LOCAL_WIDTH 8

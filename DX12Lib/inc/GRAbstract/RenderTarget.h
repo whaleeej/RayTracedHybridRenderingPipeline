@@ -39,7 +39,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "Texture.h"
+#include <Texture.h>
 
  // Don't use scoped enums to avoid the explicit cast required to use these as 
 // array indices.
