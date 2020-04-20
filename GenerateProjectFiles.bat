@@ -17,10 +17,10 @@ cd D:\Repos\DX12-HybridPipeline
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Release /e /I
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Debug /e /I
 
-XCOPY .\DX12Lib\lib\assimp\*.exp .\build_vs2019\bin\Release /e /I
-XCOPY .\DX12Lib\lib\assimp\*.exp .\build_vs2019\bin\Debug /e /I
-XCOPY .\DX12Lib\lib\assimp\*.dll .\build_vs2019\bin\Release /e /I
-XCOPY .\DX12Lib\lib\assimp\*.dll .\build_vs2019\bin\Debug /e /I
+XCOPY .\RTPipeline\assimp\*.exp .\build_vs2019\bin\Release /e /I
+XCOPY .\RTPipeline\assimp\*.exp .\build_vs2019\bin\Debug /e /I
+XCOPY .\RTPipeline\assimp\*.dll .\build_vs2019\bin\Release /e /I
+XCOPY .\RTPipeline\assimp\*.dll .\build_vs2019\bin\Debug /e /I
 
 IF ERRORLEVEL 1 (
     PAUSE
