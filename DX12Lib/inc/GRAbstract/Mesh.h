@@ -74,6 +74,9 @@ using IndexCollection = std::vector<uint16_t>;
 class Mesh
 {
 public:
+    Mesh();
+    virtual ~Mesh();
+    Mesh(const Mesh& copy) = delete;
 
     void Draw(CommandList& commandList);
 
@@ -94,10 +97,6 @@ protected:
 
 private:
     friend struct std::default_delete<Mesh>;
-
-    Mesh();
-    Mesh(const Mesh& copy) = delete;
-    virtual ~Mesh();
 
     VertexBuffer m_VertexBuffer;
     IndexBuffer m_IndexBuffer;

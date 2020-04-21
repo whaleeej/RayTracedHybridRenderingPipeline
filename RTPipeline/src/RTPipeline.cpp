@@ -1332,9 +1332,9 @@ void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> 
 		////Éú³Émesh
 		MeshIndex meshIndex;
 		meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh);
-		//std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
-		//dxMesh->Initialize(*commandList, vertices, indices, false);
-		//meshPool.emplace(meshIndex, dxMesh);
+		std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
+		dxMesh->Initialize(*commandList, vertices, indices, false);
+		meshPool.emplace(meshIndex, dxMesh);
 
 		TextureIndex albedoIndex;
 		TextureIndex metallicIndex;
