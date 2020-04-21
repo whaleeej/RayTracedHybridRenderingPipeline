@@ -195,12 +195,13 @@ private:
 		float index;
 		float padding[3];
 	};
-	void importModel(std::string path, std::shared_ptr<CommandList> commandList);
+	std::string importModel(std::string path, std::shared_ptr<CommandList> commandList);
 
 	/////////////////////////////////////////////// Container
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
 	std::map<TextureIndex, Texture> texturePool;
 	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
+	std::multimap<GameObjectIndex, GameObjectIndex> gameObjectAssembling;
 	PointLight m_PointLight;
 	GameObjectIndex lightObjectIndex;
 

@@ -673,7 +673,9 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("metal_roughness", Texture());
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
+	// load external object
 	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList);
+	
 
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
@@ -759,6 +761,18 @@ void HybridPipeline::transformGameObject() {
 
 	/////////////////////////////////// Initial the transform
 	{
+		// transform assembling gameobject
+		GameObjectIndex cerberus = "Assets/Cerberus";
+		auto cerberusAssemble = gameObjectAssembling.equal_range(cerberus);
+		auto cerberusTranslation = XMMatrixTranslation(0.0f, 10.0f, 0.0f);
+		auto cerberusRotation =  XMMatrixRotationX(-90.0f / 180.0f * std::_Pi)* XMMatrixRotationY(-90.0f / 180.0f * std::_Pi);
+		auto cerberusScaling = XMMatrixScaling(0.05f, 0.05f, 0.05f);
+		for (auto k = cerberusAssemble.first; k != cerberusAssemble.second; k++) {
+			gameObjectPool[k->second]->Translate(cerberusTranslation);
+			gameObjectPool[k->second]->Rotate(cerberusRotation);
+			gameObjectPool[k->second]->Scale(cerberusScaling);
+		}
+
 		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
 		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
 		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
@@ -1286,8 +1300,10 @@ void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, 
 	}
 }
 
-void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList) {
-	// 同目录下的同名的其他贴图
+std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList) {
+	std::string rootPath = path.substr(0, path.find_last_of('/'));
+
+	// 获得同目录下的同名的其他贴图的转换函数
 	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
 		size_t start = albedoName.find_first_of(replace_from);
 		size_t length = replace_from.size();
@@ -1329,12 +1345,6 @@ void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> 
 				indices.push_back(face.mIndices[j]);
 			}
 		}
-		////生成mesh
-		MeshIndex meshIndex;
-		meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh);
-		std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
-		dxMesh->Initialize(*commandList, vertices, indices, false);
-		meshPool.emplace(meshIndex, dxMesh);
 
 		TextureIndex albedoIndex;
 		TextureIndex metallicIndex;
@@ -1361,12 +1371,36 @@ void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> 
 			ThrowIfFailed(-1);
 		}
 
-		gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
-		gameObjectPool[meshIndex]->gid = gid++;
-		gameObjectPool[meshIndex]->mesh = meshIndex;
-		gameObjectPool[meshIndex]->material.base = Material::White;
-		gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
-		gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
+		////生成mesh //因为index是int16 所以要分多批mesh填装 USHRT_MAX
+		size_t slot_size = USHRT_MAX - 3;
+		for (size_t i = 0; i < int((float)indices.size()/slot_size+0.5f); i++)
+		{
+			VertexCollection localVetices;
+			IndexCollection localIndices;
+			size_t start = i * slot_size;
+			size_t end = std::min(start+slot_size, indices.size() );
+			for (size_t j = start; j < end; j++)
+			{
+				localVetices.push_back(vertices[j]);
+				localIndices.push_back(indices[j]);
+			}
+			MeshIndex meshIndex;
+			meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh)+"_"+std::to_string(i);
+			std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
+			dxMesh->Initialize(*commandList, localVetices, localIndices, true);
+			meshPool.emplace(meshIndex, dxMesh);
+
+			//缓存gameobject
+			gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
+			gameObjectPool[meshIndex]->gid = gid++;
+			gameObjectPool[meshIndex]->mesh = meshIndex;
+			gameObjectPool[meshIndex]->material.base = Material::White;
+			gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
+			gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
+
+			//组装gameobject
+			gameObjectAssembling.emplace(rootPath, meshIndex);
+		}
 	};
 	// processMesh
 	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
@@ -1385,7 +1419,6 @@ void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> 
 	};
 
 	Assimp::Importer importer;
-	std::string rootPath = path.substr(0, path.find_last_of('/'));
 	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals /* | aiProcess_FlipUVs*/);
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
@@ -1418,6 +1451,7 @@ void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> 
 	}
 	//随后load mesh并且绑定贴图加载入
 	processNode(scene->mRootNode, scene, commandList);
+	return rootPath;
 }
 
 ////////////////////////////////////////////////////////////////////// RT Object 
