@@ -1328,7 +1328,7 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
 			{
 				vnt.textureCoordinate.x = mesh->mTextureCoords[0][i].x;
-				vnt.textureCoordinate.y = mesh->mTextureCoords[0][i].y;
+				vnt.textureCoordinate.y = 1.0f - mesh->mTextureCoords[0][i].y;
 			}
 			else {
 				vnt.textureCoordinate.x = 0.0f;
