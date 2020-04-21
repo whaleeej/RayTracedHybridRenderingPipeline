@@ -87,6 +87,9 @@ public:
 	IndexBuffer getIndexBuffer() { return m_IndexBuffer; }
 	UINT getVertexCount() { return m_VertexCount; }
 	UINT getIndexCount() { return m_IndexCount; }
+
+    void Initialize(CommandList& commandList, VertexCollection& vertices, IndexCollection& indices, bool rhcoords);
+
 protected:
 
 private:
@@ -95,8 +98,6 @@ private:
     Mesh();
     Mesh(const Mesh& copy) = delete;
     virtual ~Mesh();
-
-    void Initialize(CommandList& commandList, VertexCollection& vertices, IndexCollection& indices, bool rhcoords);
 
     VertexBuffer m_VertexBuffer;
     IndexBuffer m_IndexBuffer;

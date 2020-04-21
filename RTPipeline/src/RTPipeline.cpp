@@ -34,6 +34,7 @@ static uint64_t frameCount = 0;
 static uint64_t totalFrameCount = 0;
 static double totalTime = 0.0;
 static float cameraAnimTime = 0.0f;
+static float gid = 0.0f;
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
@@ -672,13 +673,14 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("metal_roughness", Texture());
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
+	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList);
+
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
 }
 void HybridPipeline::loadGameObject() {
 	auto device = Application::Get().GetDevice();
 	/////////////////////////////////// GameObject Gen
-	float gid = 0.0f;
 
 	gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
 	gameObjectPool["sphere"]->gid = gid++;
@@ -1282,6 +1284,140 @@ void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, 
 	if (meshPool.find(mesh) != meshPool.end()) {
 		meshPool[mesh]->Draw(commandList);
 	}
+}
+
+void HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList) {
+	// 同目录下的同名的其他贴图
+	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
+		size_t start = albedoName.find_first_of(replace_from);
+		size_t length = replace_from.size();
+		std::string ret = albedoName.substr(0, start) + replace_to + albedoName.substr(start + length, albedoName.length());
+		return ret;
+	};
+
+	// processMesh
+	auto processMesh = [&](aiMesh* mesh, const aiScene* scene, std::shared_ptr<CommandList> commandList){
+		VertexCollection vertices;
+		IndexCollection indices;
+		// 构建vertex
+		for (size_t i = 0; i < mesh->mNumVertices; i++)
+		{
+			VertexPositionNormalTexture vnt;
+			vnt.position.x = mesh->mVertices[i].x;
+			vnt.position.y = mesh->mVertices[i].y;
+			vnt.position.z = mesh->mVertices[i].z;
+			vnt.normal.x = mesh->mNormals[i].x;
+			vnt.normal.y = mesh->mNormals[i].y;
+			vnt.normal.z = mesh->mNormals[i].z;
+			if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
+			{
+				vnt.textureCoordinate.x = mesh->mTextureCoords[0][i].x;
+				vnt.textureCoordinate.y = mesh->mTextureCoords[0][i].y;
+			}
+			else {
+				vnt.textureCoordinate.x = 0.0f;
+				vnt.textureCoordinate.y = 0.0f;
+			}
+			vertices.push_back(vnt);
+		}
+		// 构建indices
+		for (size_t i = 0; i < mesh->mNumFaces; i++)
+		{
+			aiFace face = mesh->mFaces[i];
+			for (size_t j = 0; j < face.mNumIndices; j++)
+			{
+				indices.push_back(face.mIndices[j]);
+			}
+		}
+		////生成mesh
+		MeshIndex meshIndex;
+		meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh);
+		//std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
+		//dxMesh->Initialize(*commandList, vertices, indices, false);
+		//meshPool.emplace(meshIndex, dxMesh);
+
+		TextureIndex albedoIndex;
+		TextureIndex metallicIndex;
+		TextureIndex normalIndex;
+		TextureIndex roughnessIndex;
+		// 加载贴图
+		if (mesh->mMaterialIndex >= 0)
+		{
+			aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+			//加载模型内的albedo贴图 顺带加载同目录下的Metallic，Normal，Roughness
+			unsigned int count = material->GetTextureCount(aiTextureType_DIFFUSE);
+			aiString str;
+			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
+			albedoIndex = str.data;
+			metallicIndex = albedoStrToDefined(albedoIndex, "A", "M");
+			normalIndex = albedoStrToDefined(albedoIndex, "A", "N");
+			roughnessIndex = albedoStrToDefined(albedoIndex, "A", "R");
+		}
+		if (texturePool.find(albedoIndex) == texturePool.end()//错误检查
+			|| texturePool.find(metallicIndex) == texturePool.end()
+			|| texturePool.find(normalIndex) == texturePool.end()
+			|| texturePool.find(roughnessIndex) == texturePool.end()
+			) {
+			ThrowIfFailed(-1);
+		}
+
+		gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
+		gameObjectPool[meshIndex]->gid = gid++;
+		gameObjectPool[meshIndex]->mesh = meshIndex;
+		gameObjectPool[meshIndex]->material.base = Material::White;
+		gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
+		gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
+	};
+	// processMesh
+	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
+
+		// processNodes
+		for (unsigned int i = 0; i < node->mNumMeshes; i++)
+		{
+			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+			processMesh(mesh, scene, commandList);
+		}
+		// then do the same for each of its children
+		for (unsigned int i = 0; i < node->mNumChildren; i++)
+		{
+			processNode(node->mChildren[i], scene, commandList);
+		}
+	};
+
+	Assimp::Importer importer;
+	std::string rootPath = path.substr(0, path.find_last_of('/'));
+	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals /* | aiProcess_FlipUVs*/);
+	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+	{
+		ThrowIfFailed(-1);
+	}
+	//先缓存所有的texture
+	for (size_t i = 0; i < scene->mNumMaterials; i++)
+	{
+		aiMaterial* material = scene->mMaterials[i];
+		int count = material->GetTextureCount(aiTextureType_DIFFUSE);
+		if (count <= 0) {
+			continue;
+		}
+		aiString str;
+		//默认的diffuse贴图
+		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
+		TextureIndex albedoIndex;
+		albedoIndex = str.data;
+		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, "A", "M");
+		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, "A", "N");
+		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, "A", "R");
+		texturePool.emplace(albedoIndex, Texture());//albedo
+		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(rootPath+"/"+ albedoIndex), TextureUsage::Albedo);
+		texturePool.emplace(metallicIndex, Texture());//metallic
+		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(rootPath + "/" + metallicIndex), TextureUsage::MetallicMap);
+		texturePool.emplace(normalIndex, Texture());//normal
+		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(rootPath + "/" + normalIndex), TextureUsage::Normalmap);
+		texturePool.emplace(roughnessIndex, Texture());//roughness
+		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(rootPath + "/" + roughnessIndex), TextureUsage::RoughnessMap);
+	}
+	//随后load mesh并且绑定贴图加载入
+	processNode(scene->mRootNode, scene, commandList);
 }
 
 ////////////////////////////////////////////////////////////////////// RT Object 

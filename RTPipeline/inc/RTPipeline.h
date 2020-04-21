@@ -14,6 +14,9 @@
 #include <Material.h>
 #include <random>
 #include <RenderTarget.h>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 // temporal define for workset dim
 #define LOCAL_WIDTH 8
@@ -121,6 +124,12 @@ private:
 			NormalTexture = index_leading + "_normal";
 			RoughnessTexture = index_leading + "_roughness";
 		}
+		TextureMaterial(TextureIndex albedo, TextureIndex metallic, TextureIndex normal, TextureIndex roughness) {
+			AlbedoTexture = albedo;
+			MetallicTexture = metallic;
+			NormalTexture = normal;
+			RoughnessTexture =roughness;
+		}
 		TextureIndex AlbedoTexture;
 		TextureIndex MetallicTexture;
 		TextureIndex NormalTexture;
@@ -186,6 +195,7 @@ private:
 		float index;
 		float padding[3];
 	};
+	void importModel(std::string path, std::shared_ptr<CommandList> commandList);
 
 	/////////////////////////////////////////////// Container
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
