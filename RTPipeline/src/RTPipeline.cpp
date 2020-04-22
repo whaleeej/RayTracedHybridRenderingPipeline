@@ -675,6 +675,12 @@ void HybridPipeline::loadResource() {
 	// load external object
 	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList);
 	
+	// load cubemap
+	texturePool.emplace("skybox_pano", Texture());
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+	texturePool.emplace("skybox_cubemap", Texture());
+	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
+
 
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
