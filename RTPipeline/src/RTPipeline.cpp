@@ -1402,7 +1402,7 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			gameObjectAssembling.emplace(rootPath, meshIndex);
 		}
 	};
-	// processMesh
+	// processNode
 	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
 
 		// processNodes
