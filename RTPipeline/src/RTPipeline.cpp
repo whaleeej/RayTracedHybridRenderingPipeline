@@ -1370,9 +1370,9 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			ThrowIfFailed(-1);
 		}
 
-		////生成mesh //因为index是int16 所以要分多批mesh填装 USHRT_MAX
-		size_t slot_size = USHRT_MAX - 3;
-		for (size_t i = 0; i < int((float)indices.size()/slot_size+0.5f); i++)
+		////生成mesh //因为index是int32 所以可能要分多批mesh填装
+		size_t slot_size = 0xffffffff - 3;
+		for (size_t i = 0; i < (int)std::ceil((float)indices.size()/slot_size); i++)
 		{
 			VertexCollection localVetices;
 			IndexCollection localIndices;
@@ -1943,7 +1943,7 @@ void HybridPipeline::createSrvUavHeap() {
 		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		indexSrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 		indexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		indexSrvDesc.Buffer.NumElements = (UINT)((meshPool[pLobject->mesh]->getIndexCount()+1)/2);
+		indexSrvDesc.Buffer.NumElements = (UINT)((meshPool[pLobject->mesh]->getIndexCount()/*+1*/)/*/2*/); // 修改为32bit的index
 		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

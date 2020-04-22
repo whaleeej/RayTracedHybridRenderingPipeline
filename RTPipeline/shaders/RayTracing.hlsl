@@ -506,6 +506,12 @@ uint3 Load3x16BitIndices(uint offsetBytes)
 	return indices;
 }
 
+uint3 Load3x32BitIndices(uint offsetBytes)
+{
+	const uint3 indices = Indices.Load3(offsetBytes);
+	return indices;
+}
+
 float3 getFromNormalMapping(float3 sampledNormal, float3 NormalWS, float3 vertexPosition[3], float2 vertexUV[3], float3x3 R)
 {
 	float3 tangentNormal = sampledNormal.xyz * 2.0 - 1.0; // [-1, 1]
@@ -542,14 +548,14 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 {
 	float3 hitPosition = HitWorldPosition();
 
-    // Get the base index of the triangle's first 16 bit index.
-	uint indexSizeInBytes = 2;
+    // Get the base index of the triangle's first 32 bit index.
+	uint indexSizeInBytes = 4;
 	uint indicesPerTriangle = 3;
 	uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
 	uint baseIndex = PrimitiveIndex() * triangleIndexStride;
 
-    // Load up 3 16 bit indices for the triangle.
-	const uint3 indices = Load3x16BitIndices(baseIndex);
+    // Load up 3 32 bit indices for the triangle.
+	const uint3 indices = Load3x32BitIndices(baseIndex);
 
     // Retrieve corresponding vertex normals for the triangle vertices.
 	float3 vertexPositions[3] =

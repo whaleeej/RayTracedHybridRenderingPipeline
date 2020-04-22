@@ -83,13 +83,13 @@ std::unique_ptr<Mesh> Mesh::CreateSphere(CommandList& commandList, float diamete
             size_t nextI = i + 1;
             size_t nextJ = (j + 1) % stride;
 
-            indices.push_back(static_cast<uint16_t>( i * stride + j ));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + j));
-            indices.push_back(static_cast<uint16_t>(i * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>( i * stride + j ));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + j));
+            indices.push_back(static_cast<uint32_t>(i * stride + nextJ));
 
-            indices.push_back(static_cast<uint16_t>(i * stride + nextJ));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + j));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>(i * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + j));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + nextJ));
         }
     }
 
@@ -142,13 +142,13 @@ std::unique_ptr<Mesh> Mesh::CreateCube(CommandList& commandList, float size, boo
 
         // Six indices (two triangles) per face.
         size_t vbase = vertices.size();
-        indices.push_back(static_cast<uint16_t>(vbase + 0));
-        indices.push_back(static_cast<uint16_t>(vbase + 1));
-        indices.push_back(static_cast<uint16_t>(vbase + 2));
+        indices.push_back(static_cast<uint32_t>(vbase + 0));
+        indices.push_back(static_cast<uint32_t>(vbase + 1));
+        indices.push_back(static_cast<uint32_t>(vbase + 2));
 
-        indices.push_back(static_cast<uint16_t>(vbase + 0));
-        indices.push_back(static_cast<uint16_t>(vbase + 2));
-        indices.push_back(static_cast<uint16_t>(vbase + 3));
+        indices.push_back(static_cast<uint32_t>(vbase + 0));
+        indices.push_back(static_cast<uint32_t>(vbase + 2));
+        indices.push_back(static_cast<uint32_t>(vbase + 3));
 
         // Four vertices per face.
         vertices.push_back(VertexPositionNormalTexture((normal - side1 - side2) * size, normal, textureCoordinates[0]));
@@ -165,9 +165,9 @@ std::unique_ptr<Mesh> Mesh::CreateCube(CommandList& commandList, float size, boo
     return mesh;
 }
 
-// Helper computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
 static inline XMVECTOR GetCircleVector(size_t i, size_t tessellation)
 {
+    // Helper computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
     float angle = i * XM_2PI / tessellation;
     float dx, dz;
 
@@ -188,9 +188,9 @@ static inline XMVECTOR GetCircleTangent(size_t i, size_t tessellation)
     return v;
 }
 
-// Helper creates a triangle fan to close the end of a cylinder / cone
 static void CreateCylinderCap(VertexCollection& vertices, IndexCollection& indices, size_t tessellation, float height, float radius, bool isTop)
 {
+    // Helper creates a triangle fan to close the end of a cylinder / cone
     // Create cap indices.
     for (size_t i = 0; i < tessellation - 2; i++)
     {
@@ -203,9 +203,9 @@ static void CreateCylinderCap(VertexCollection& vertices, IndexCollection& indic
         }
 
         size_t vbase = vertices.size();
-        indices.push_back(static_cast<uint16_t>(vbase));
-        indices.push_back(static_cast<uint16_t>(vbase + i1));
-        indices.push_back(static_cast<uint16_t>(vbase + i2));
+        indices.push_back(static_cast<uint32_t>(vbase));
+        indices.push_back(static_cast<uint32_t>(vbase + i1));
+        indices.push_back(static_cast<uint32_t>(vbase + i2));
     }
 
     // Which end of the cylinder is this?
@@ -266,9 +266,9 @@ std::unique_ptr<Mesh> Mesh::CreateCone(CommandList& commandList, float diameter,
         vertices.push_back(VertexPositionNormalTexture(topOffset, normal, g_XMZero));
         vertices.push_back(VertexPositionNormalTexture(pt, normal, textureCoordinate + g_XMIdentityR1));
 
-        indices.push_back(static_cast<uint16_t>(i * 2));
-        indices.push_back(static_cast<uint16_t>((i * 2 + 3) % (stride * 2)));
-        indices.push_back(static_cast<uint16_t>((i * 2 + 1) % (stride * 2)));
+        indices.push_back(static_cast<uint32_t>(i * 2));
+        indices.push_back(static_cast<uint32_t>((i * 2 + 3) % (stride * 2)));
+        indices.push_back(static_cast<uint32_t>((i * 2 + 1) % (stride * 2)));
     }
 
     // Create flat triangle fan caps to seal the bottom.
@@ -327,13 +327,13 @@ std::unique_ptr<Mesh> Mesh::CreateTorus(CommandList& commandList, float diameter
             size_t nextI = (i + 1) % stride;
             size_t nextJ = (j + 1) % stride;
 
-            indices.push_back(static_cast<uint16_t>(i * stride + j));
-            indices.push_back(static_cast<uint16_t>(i * stride + nextJ));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + j));
+            indices.push_back(static_cast<uint32_t>(i * stride + j));
+            indices.push_back(static_cast<uint32_t>(i * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + j));
 
-            indices.push_back(static_cast<uint16_t>(i * stride + nextJ));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + nextJ));
-            indices.push_back(static_cast<uint16_t>(nextI * stride + j));
+            indices.push_back(static_cast<uint32_t>(i * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + nextJ));
+            indices.push_back(static_cast<uint32_t>(nextI * stride + j));
         }
     }
 
@@ -385,15 +385,15 @@ static void ReverseWinding(IndexCollection& indices, VertexCollection& vertices)
 
 void Mesh::Initialize(CommandList& commandList, VertexCollection& vertices, IndexCollection& indices, bool rhcoords)
 {
-    if (vertices.size() >= USHRT_MAX)
-        throw std::exception("Too many vertices for 16-bit index buffer");
+    if (vertices.size() >= 0xffffffff)
+        throw std::exception("Too many vertices for 32-bit index buffer");
 
     if (!rhcoords)
         ReverseWinding(indices, vertices);
 
-	if (indices.size() % 2 != 0) {
-		indices.push_back(static_cast<uint16_t>(0));
-	}
+	//if (indices.size() % 2 != 0) { // 为了保证在byte address buffer中的兼容性 // 修改为32bit后已经对齐
+	//	indices.push_back(static_cast<uint32_t>(0));
+	//}
 
     commandList.CopyVertexBuffer(m_VertexBuffer, vertices);
     commandList.CopyIndexBuffer(m_IndexBuffer, indices);
