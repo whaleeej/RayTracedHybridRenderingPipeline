@@ -84,7 +84,6 @@ bool HybridPipeline::LoadContent()
 		createRtPipelineState();
 		createShaderResources();
 		createSrvUavHeap();
-		//createSamplerHeap();
 		createShaderTable();
 	}
 	return true;
