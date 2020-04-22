@@ -498,6 +498,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
 	}
 
+
     commandQueue->ExecuteCommandList(commandList);
     // Present
     m_pWindow->Present();
@@ -706,11 +707,11 @@ void HybridPipeline::loadResource() {
 	
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Field.hdr", TextureUsage::Albedo);
 	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
-	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024;
+	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024*1;
 	skyboxCubemapDesc.DepthOrArraySize = 6;
-	skyboxCubemapDesc.MipLevels = 0;
+	skyboxCubemapDesc.MipLevels = 1;
 	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
 	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
 
@@ -997,7 +998,7 @@ void HybridPipeline::loadPipeline() {
 			rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 			rootParameters[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
-			CD3DX12_STATIC_SAMPLER_DESC linearClampSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+			CD3DX12_STATIC_SAMPLER_DESC linearClampSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &linearClampSampler, rootSignatureFlags);

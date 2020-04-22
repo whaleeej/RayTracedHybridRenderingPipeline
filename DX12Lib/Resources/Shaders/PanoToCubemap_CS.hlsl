@@ -79,11 +79,11 @@ void main( ComputeShaderInput IN )
             break;
         // +Y
         case 2:
-            dir = normalize(float3(-dir.x, 0.5f, -dir.y));
+            dir = normalize(float3(dir.x, 0.5f, dir.y));
             break;
         // -Y
         case 3:
-            dir = normalize(float3(-dir.x, -0.5f, dir.y));
+            dir = normalize(float3(dir.x, -0.5f, -dir.y));
             break;
         // +Z
         case 4:
@@ -97,9 +97,8 @@ void main( ComputeShaderInput IN )
 
     // Convert the world space direction into U,V texture coordinates in the panoramic texture.
     // Source: http://gl.ict.usc.edu/Data/HighResProbes/
-    float2 panoUV = float2(1.0f + atan2(dir.x, -dir.z), acos(dir.y)) * InvPI;
-
-    DstMip1[texCoord] = SrcTexture.SampleLevel(LinearRepeatSampler, panoUV, PanoToCubemapCB.FirstMip);
+	float2 panoUV = float2( (atan2(dir.x, -dir.z)) * InvPI / 2.0f, acos(dir.y) * InvPI);
+	DstMip1[texCoord] = SrcTexture.SampleLevel(LinearRepeatSampler, panoUV, PanoToCubemapCB.FirstMip);
 
     // Only perform on threads that are a multiple of 2.
     if (PanoToCubemapCB.NumMips > 1 && (IN.GroupIndex & 0x11) == 0)
