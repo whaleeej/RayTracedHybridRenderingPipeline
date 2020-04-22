@@ -204,6 +204,7 @@ private:
 	std::multimap<GameObjectIndex, GameObjectIndex> gameObjectAssembling;
 	PointLight m_PointLight;
 	GameObjectIndex lightObjectIndex;
+	std::unique_ptr<Mesh> m_SkyboxMesh;
 
 	/////////////////////////////////////////////// Camera controller
 	Camera m_Camera;
@@ -272,6 +273,9 @@ private:
 	Texture filtered_prev;
 
 	// Root signatures
+	RootSignature m_SkyboxSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
+
 	RootSignature m_DeferredRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
 

@@ -1,5 +1,4 @@
 #include <RTPipeline.h>
-
 #include <Application.h>
 #include <CommandQueue.h>
 #include <CommandList.h>
@@ -221,16 +220,43 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 	mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
 	mCameraCB.fov = m_Camera.get_FoV();
 
+	{
+		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
+		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
+		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
+		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
+		commandList->ClearDepthStencilTexture(m_GBuffer.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
+	}
+
+	// Render the skybox.
+	{
+		commandList->SetViewport(m_Viewport);
+		commandList->SetScissorRect(m_ScissorRect);
+		commandList->SetRenderTarget(m_GBuffer);
+		commandList->SetPipelineState(m_SkyboxPipelineState);
+		commandList->SetGraphicsRootSignature(m_SkyboxSignature);
+
+		// The view matrix should only consider the camera's rotation, but not the translation.
+		auto viewMatrix = XMMatrixTranspose(XMMatrixRotationQuaternion(m_Camera.get_Rotation()));
+		auto projMatrix = m_Camera.get_ProjectionMatrix();
+		auto viewProjMatrix = viewMatrix * projMatrix;
+		commandList->SetGraphics32BitConstants(0, viewProjMatrix);
+
+		// skybox rendering
+		auto& skybox_texture = texturePool["skybox_cubemap"];
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
+		// TODO: Need a better way to bind a cubemap.
+		commandList->SetShaderResourceView(1, 0, skybox_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
+		
+		m_SkyboxMesh->Draw(*commandList);
+	}
+
 	// Rasterizing Pipe, G-Buffer-Gen
 	{
-		{
-			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
-			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
-			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
-			commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
-			commandList->ClearDepthStencilTexture(m_GBuffer.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
-		}
-
 		commandList->SetViewport(m_Viewport);
 		commandList->SetScissorRect(m_ScissorRect);
 		commandList->SetRenderTarget(m_GBuffer);
@@ -635,6 +661,9 @@ void HybridPipeline::loadResource() {
 	meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
 	meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
 
+	// Create a skybox mesh
+	m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
+
 	// load PBR textures
 	texturePool.emplace("default_albedo", Texture());
 	commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
@@ -678,10 +707,14 @@ void HybridPipeline::loadResource() {
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/Textures/grace-new.hdr", TextureUsage::Albedo);
-	texturePool.emplace("skybox_cubemap", Texture());
+	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
+	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024;
+	skyboxCubemapDesc.DepthOrArraySize = 6;
+	skyboxCubemapDesc.MipLevels = 0;
+	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
 	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
 
-
+	// run ocmmandlist
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
 }
@@ -937,6 +970,65 @@ void HybridPipeline::loadPipeline() {
 		}
 		// Disable the multiple sampling for performance and simplicity
 		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
+
+		// Create a root signature and PSO for the skybox shaders.
+		{
+			// Load the Skybox shaders.
+			ComPtr<ID3DBlob> vs;
+			ComPtr<ID3DBlob> ps;
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_VS.cso", &vs));
+			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_PS.cso", &ps));
+
+			// Setup the input layout for the skybox vertex shader.
+			D3D12_INPUT_ELEMENT_DESC inputLayout[1] = {
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			};
+
+			// Allow input layout and deny unnecessary access to certain pipeline stages.
+			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+			rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+			rootParameters[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
+
+			CD3DX12_STATIC_SAMPLER_DESC linearClampSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+
+			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &linearClampSampler, rootSignatureFlags);
+
+			m_SkyboxSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+
+			// Setup the Skybox pipeline state.
+			struct SkyboxPipelineState
+			{
+				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+				CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+				CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
+			} skyboxPipelineStateStream;
+
+			skyboxPipelineStateStream.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
+			skyboxPipelineStateStream.InputLayout = { inputLayout, 1 };
+			skyboxPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			skyboxPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+			skyboxPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+			skyboxPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
+			skyboxPipelineStateStream.SampleDesc = sampleDesc;
+
+			D3D12_PIPELINE_STATE_STREAM_DESC skyboxPipelineStateStreamDesc = {
+				sizeof(SkyboxPipelineState), &skyboxPipelineStateStream
+			};
+			ThrowIfFailed(device->CreatePipelineState(&skyboxPipelineStateStreamDesc, IID_PPV_ARGS(&m_SkyboxPipelineState)));
+		}
 
 		// Create a root signature for the Deferred Shadings pipeline.
 		{
