@@ -35,6 +35,8 @@ static double totalTime = 0.0;
 static float cameraAnimTime = 0.0f;
 static float gid = 0.0f;
 
+////////////////////////////////////////////////////////////////////// framework
+
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
     , m_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX))
@@ -1760,7 +1762,6 @@ void HybridPipeline::createRtPipelineState()
 	subobjects[index++] = rgsRootAssociation.subobject; // 4 Associate Root Sig to RGS
 
 	// Create the secondary root-signature and association
-
 	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 7, 1, &static_sampler_desc ,5,0,1).desc);
 	subobjects[index] = secondaryRootSignature.subobject;// 5 Secondary chs sig
 

@@ -141,7 +141,10 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	if (hit == 0.0)
 	{
-		return float4(emissive, 1.0f);
+		if (emissive.x>0||emissive.y>0||emissive.z>0)
+			return float4(emissive, 1.0f);
+		else
+			return float4(LinearToSRGB(position),1);
 	}
 	
 	float3 P = position;
