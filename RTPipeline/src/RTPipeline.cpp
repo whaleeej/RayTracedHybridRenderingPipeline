@@ -709,7 +709,7 @@ void HybridPipeline::loadResource() {
 	
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Field.hdr", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/newport_loft.hdr", TextureUsage::Albedo);
 	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
 	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024*1;
 	skyboxCubemapDesc.DepthOrArraySize = 6;
@@ -753,40 +753,40 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
 	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
-	gameObjectPool["Ceiling plane"]->gid = gid++;
-	gameObjectPool["Ceiling plane"]->mesh = "plane";
-	gameObjectPool["Ceiling plane"]->material.base = Material::White;
-	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
-	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+	//gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+	//gameObjectPool["Ceiling plane"]->gid = gid++;
+	//gameObjectPool["Ceiling plane"]->mesh = "plane";
+	//gameObjectPool["Ceiling plane"]->material.base = Material::White;
+	//gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
+	//gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
-	gameObjectPool["Back wall"]->gid = gid++;
-	gameObjectPool["Back wall"]->mesh = "plane";
-	gameObjectPool["Back wall"]->material.base = Material::Pearl;
-	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
-	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+	//gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+	//gameObjectPool["Back wall"]->gid = gid++;
+	//gameObjectPool["Back wall"]->mesh = "plane";
+	//gameObjectPool["Back wall"]->material.base = Material::Pearl;
+	//gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
+	//gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
-	gameObjectPool["Front wall"]->gid = gid++;
-	gameObjectPool["Front wall"]->mesh = "plane";
-	gameObjectPool["Front wall"]->material.base = Material::Copper;
-	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
-	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+	//gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+	//gameObjectPool["Front wall"]->gid = gid++;
+	//gameObjectPool["Front wall"]->mesh = "plane";
+	//gameObjectPool["Front wall"]->material.base = Material::Copper;
+	//gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
+	//gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
-	gameObjectPool["Left wall"]->gid = gid++;
-	gameObjectPool["Left wall"]->mesh = "plane";
-	gameObjectPool["Left wall"]->material.base = Material::Jade;
-	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+	//gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+	//gameObjectPool["Left wall"]->gid = gid++;
+	//gameObjectPool["Left wall"]->mesh = "plane";
+	//gameObjectPool["Left wall"]->material.base = Material::Jade;
+	//gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	//gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
 
-	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
-	gameObjectPool["Right wall"]->gid = gid++;
-	gameObjectPool["Right wall"]->mesh = "plane";
-	gameObjectPool["Right wall"]->material.base = Material::Ruby;
-	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+	//gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+	//gameObjectPool["Right wall"]->gid = gid++;
+	//gameObjectPool["Right wall"]->mesh = "plane";
+	//gameObjectPool["Right wall"]->material.base = Material::Ruby;
+	//gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	//gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
 
 	// light object
 	lightObjectIndex = "sphere light";
@@ -833,25 +833,25 @@ void HybridPipeline::transformGameObject() {
 		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
 		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-		gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-		gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
+		//gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
+		//gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-		gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-		gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
+		//gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
+		//gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-		gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-		gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
+		//gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
+		//gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-		gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
-		gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
+		//gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
+		//gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-		gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
-		gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		//gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
+		//gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
+		//gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 }
 void HybridPipeline::loadDXResource() {
@@ -1736,7 +1736,7 @@ void HybridPipeline::createRtPipelineState()
 	//  1 for the global root signature
 	auto mpDevice = Application::Get().GetDevice();
 
-	std::array<D3D12_STATE_SUBOBJECT, 13> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 15> subobjects;
 	uint32_t index = 0;
 
 	// Compile the shader
@@ -1769,38 +1769,46 @@ void HybridPipeline::createRtPipelineState()
 	ExportAssociation secondaryRootAssociation(&kSecondaryClosestHitShader, 1, &(subobjects[secondaryRootIndex]));
 	subobjects[index++] = secondaryRootAssociation.subobject;//6 Associate secondary sig to secondarychs
 
+	// Create the secondary miss root-signature and association
+	LocalRootSignature secondaryMissRootSignature(mpDevice, createLocalRootDesc(0, 1, 1, &static_sampler_desc, 0, 0, 2).desc);
+	subobjects[index] = secondaryMissRootSignature.subobject;// 7 Secondary miss sig
+
+	uint32_t secondaryMissRootIndex = index++;//7
+	ExportAssociation secondaryMissRootAssociation(&kSecondaryMissShader, 1, &(subobjects[secondaryMissRootIndex]));
+	subobjects[index++] = secondaryMissRootAssociation.subobject;//8 Associate secondary sig to secondarychs
+
 	// Create the miss- and hit-programs root-signature and association
 	D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
 	emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 	LocalRootSignature hitMissRootSignature(mpDevice, emptyDesc);
-	subobjects[index] = hitMissRootSignature.subobject; // 7 Root Sig to be shared between Miss and shadowCHS
+	subobjects[index] = hitMissRootSignature.subobject; // 9 Root Sig to be shared between Miss and shadowCHS
 
-	uint32_t hitMissRootIndex = index++; // 7
-	const WCHAR* missHitExportName[] = { kShadowMissShader, kShadwoClosestHitShader, kSecondaryMissShader };
+	uint32_t hitMissRootIndex = index++; // 9
+	const WCHAR* missHitExportName[] = { kShadowMissShader, kShadwoClosestHitShader};
 	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
-	subobjects[index++] = missHitRootAssociation.subobject; // 8 Associate Root Sig to Miss and CHS
+	subobjects[index++] = missHitRootAssociation.subobject; // 10 Associate Root Sig to Miss and CHS
 
 	// Bind the payload size to the programs
 	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 4);
-	subobjects[index] = shaderConfig.subobject; // 9 Shader Config
+	subobjects[index] = shaderConfig.subobject; // 11 Shader Config
 
-	uint32_t shaderConfigIndex = index++; // 9 
+	uint32_t shaderConfigIndex = index++; // 11 
 	const WCHAR* shaderExports[] = {kRayGenShader, kShadowMissShader, kSecondaryMissShader, kShadwoClosestHitShader, kSecondaryClosestHitShader};
 	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
-	subobjects[index++] = configAssociation.subobject; // 10 Associate Shader Config to Miss, shadowCHS, shadowRGS, secondaryCHS, secondaryRGS
+	subobjects[index++] = configAssociation.subobject; // 12 Associate Shader Config to Miss, shadowCHS, shadowRGS, secondaryCHS, secondaryRGS
 
 	// Create the pipeline config
 	PipelineConfig config(4);
-	subobjects[index++] = config.subobject; // 11 configuration 
+	subobjects[index++] = config.subobject; // 13 configuration 
 
 	// Create the global root signature and store the empty signature
 	GlobalRootSignature root(mpDevice, {});
 	mpEmptyRootSig = root.pRootSig;
-	subobjects[index++] = root.subobject; // 12
+	subobjects[index++] = root.subobject; // 14
 
 	// Create the state
 	D3D12_STATE_OBJECT_DESC desc;
-	desc.NumSubobjects = index; // 13
+	desc.NumSubobjects = index; // 15
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
@@ -1983,7 +1991,7 @@ void HybridPipeline::createSrvUavHeap() {
 	//****************************Descriptor heap
 
 	// Create the uavSrvHeap and its handle
-	uint32_t srvuavBias = 7;
+	uint32_t srvuavBias = 8;
 	uint32_t srvuavPerHitSize = 7;
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = srvuavBias + objectToRT * srvuavPerHitSize;
@@ -2017,6 +2025,17 @@ void HybridPipeline::createSrvUavHeap() {
 			1, &m_GBuffer.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
+
+	// skybox
+	auto& skybox_texture = texturePool["skybox_cubemap"];
+	D3D12_SHADER_RESOURCE_VIEW_DESC skyboxSrvDesc = {};
+	skyboxSrvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
+	skyboxSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	skyboxSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+	skyboxSrvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
+	// TODO: Need a better way to bind a cubemap.
+	pDevice->CreateShaderResourceView(skybox_texture.GetD3D12Resource().Get(), &skyboxSrvDesc, uavSrvHandle);
+	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	objectToRT = 0;
 	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
@@ -2161,9 +2180,12 @@ void HybridPipeline::createShaderTable()
 
 	// entry 2 - secondary miss program
 	memcpy(pData + mShaderTableEntrySize*2, pRtsoProps->GetShaderIdentifier(kSecondaryMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	 heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + //°ó¶¨ skybox
+		 +mpDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 7;
+	 *(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + mShaderTableEntrySize * 2 + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 0) = heapStart;
 
 	objectToRT = 0;
-	uint32_t srvuavBias = 7;
+	uint32_t srvuavBias = 8;
 	uint32_t srvuavPerHitSize = 7;
 	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
 	{

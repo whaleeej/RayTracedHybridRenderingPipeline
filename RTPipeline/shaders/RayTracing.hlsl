@@ -382,7 +382,7 @@ void rayGen()
 		pdf = ImportanceSamplePdf(roughness, dot(N, H));
 		pdf = max(min(pdf, 10.0), 0.2);
 	}
-	if (secondaryPayload.color.z != 0.0)
+	if (secondaryPayload.color.w > 0.1f)
 	{
 		Lr = DoPbrRadiance(secondaryPayload.color.xyz, raySecondary.Direction, N, V, P, albedo, roughness, metallic) / pdf;
 	}
@@ -647,13 +647,18 @@ void secondaryChs(inout SecondaryPayload payload, in BuiltInTriangleIntersection
 	}
 #endif
 	
-	payload.color = float4(color, 1);
+	payload.color = float4(color, 1.0f);
 }
+
+TextureCube<float4> SkyboxTexture : register(t0,space2);
 
 [shader("miss")]
 void secondaryMiss(inout SecondaryPayload payload)
 {
-	payload.color = float4(0, 0, 0, 0);
+	float3 direction = normalize(WorldRayDirection());
+	float3 skyboxsample = SkyboxTexture.SampleLevel(AnisotropicSampler, direction, 0).xyz;
+	//skyboxsample = float3(0, 0, 0);
+	payload.color = float4(skyboxsample, 1.0f);
 }
 //**********************************************************************************************************************//
 //**********************************************************************************************************************//
