@@ -824,9 +824,9 @@ void HybridPipeline::transformGameObject() {
 	{/////////////////////////////////// Initial the transform
 		// transform assembling gameobject
 		transform_a_object_assembling("Assets/Cerberus", 
-			XMMatrixTranslation(3.0f, 10.0f, 0.0f)
-			, XMMatrixRotationX(std::_Pi)
-			, XMMatrixScaling(0.03f, 0.03f, 0.03f));
+			XMMatrixTranslation(-1.2f, 6.0f, -1.6f)
+			, XMMatrixRotationX(-std::_Pi/3.0f*2.0f)
+			, XMMatrixScaling(0.02f, 0.02f, 0.02f));
 
 		transform_a_object_assembling("Assets/Unreal-actor",
 			XMMatrixTranslation(0.0f, 6.0f, 0.0f)
