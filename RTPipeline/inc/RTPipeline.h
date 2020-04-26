@@ -195,7 +195,7 @@ private:
 		float index;
 		float padding[3];
 	};
-	std::string importModel(std::string path, std::shared_ptr<CommandList> commandList);
+	std::string importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo="albedo", std::string metallic="metallic", std::string normal="normal", std::string roughness="roughness");
 
 	/////////////////////////////////////////////// Container
 	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;

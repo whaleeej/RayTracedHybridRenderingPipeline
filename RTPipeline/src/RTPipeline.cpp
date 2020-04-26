@@ -705,8 +705,10 @@ void HybridPipeline::loadResource() {
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
 	// load external object
-	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList);
-	
+	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList,"A.tga","M.tga","N.tga","R.tga");
+	importModel("Assets/Unreal-actor/model.dae", commandList);
+
+
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/newport_loft.hdr", TextureUsage::Albedo);
@@ -717,6 +719,7 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
 	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
 
+
 	// run ocmmandlist
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
@@ -725,26 +728,29 @@ void HybridPipeline::loadGameObject() {
 	auto device = Application::Get().GetDevice();
 	/////////////////////////////////// GameObject Gen
 
-	gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
-	gameObjectPool["sphere"]->gid = gid++;
-	gameObjectPool["sphere"]->mesh = "sphere";
-	gameObjectPool["sphere"]->material.base = Material::White;
-	gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
+	//gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
+	//gameObjectPool["sphere"]->gid = gid++;
+	//gameObjectPool["sphere"]->mesh = "sphere";
+	//gameObjectPool["sphere"]->material.base = Material::White;
+	//gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	//gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
+	//gameObjectAssembling.emplace("sphere", "sphere");
 
-	gameObjectPool.emplace("cube", std::make_shared<GameObject>());
-	gameObjectPool["cube"]->gid = gid++;
-	gameObjectPool["cube"]->mesh = "cube";
-	gameObjectPool["cube"]->material.base = Material::White;
-	gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
+	//gameObjectPool.emplace("cube", std::make_shared<GameObject>());
+	//gameObjectPool["cube"]->gid = gid++;
+	//gameObjectPool["cube"]->mesh = "cube";
+	//gameObjectPool["cube"]->material.base = Material::White;
+	//gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	//gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
+	//gameObjectAssembling.emplace("cube", "cube");
 
-	gameObjectPool.emplace("torus", std::make_shared<GameObject>());
-	gameObjectPool["torus"]->gid = gid++;
-	gameObjectPool["torus"]->mesh = "torus";
-	gameObjectPool["torus"]->material.base = Material::White;
-	gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
+	//gameObjectPool.emplace("torus", std::make_shared<GameObject>());
+	//gameObjectPool["torus"]->gid = gid++;
+	//gameObjectPool["torus"]->mesh = "torus";
+	//gameObjectPool["torus"]->material.base = Material::White;
+	//gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	//gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
+	//gameObjectAssembling.emplace("torus", "torus");
 
 	gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
 	gameObjectPool["Floor plane"]->gid = gid++;
@@ -752,6 +758,7 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Floor plane"]->material.base = Material::White;
 	gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
 	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Floor plane", "Floor plane");
 
 	//gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
 	//gameObjectPool["Ceiling plane"]->gid = gid++;
@@ -759,6 +766,7 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Ceiling plane"]->material.base = Material::White;
 	//gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
 	//gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
 
 	//gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
 	//gameObjectPool["Back wall"]->gid = gid++;
@@ -766,6 +774,7 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Back wall"]->material.base = Material::Pearl;
 	//gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
 	//gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Back wall", "Back wall");
 
 	//gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
 	//gameObjectPool["Front wall"]->gid = gid++;
@@ -773,6 +782,7 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Front wall"]->material.base = Material::Copper;
 	//gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
 	//gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Front wall", "Front wall");
 
 	//gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
 	//gameObjectPool["Left wall"]->gid = gid++;
@@ -780,6 +790,7 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Left wall"]->material.base = Material::Jade;
 	//gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
 	//gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Left wall", "Left wall");
 
 	//gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
 	//gameObjectPool["Right wall"]->gid = gid++;
@@ -787,6 +798,7 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Right wall"]->material.base = Material::Ruby;
 	//gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
 	//gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Right wall", "Right wall");
 
 	// light object
 	lightObjectIndex = "sphere light";
@@ -799,59 +811,75 @@ void HybridPipeline::loadGameObject() {
 }
 void HybridPipeline::transformGameObject() {
 	auto device = Application::Get().GetDevice();
-
-	/////////////////////////////////// Initial the transform
-	{
-		// transform assembling gameobject
-		GameObjectIndex cerberus = "Assets/Cerberus";
-		auto cerberusAssemble = gameObjectAssembling.equal_range(cerberus);
-		auto cerberusTranslation = XMMatrixTranslation(0.0f, 10.0f, 0.0f);
-		auto cerberusRotation =  XMMatrixRotationX(-90.0f / 180.0f * std::_Pi)* XMMatrixRotationY(-90.0f / 180.0f * std::_Pi);
-		auto cerberusScaling = XMMatrixScaling(0.05f, 0.05f, 0.05f);
-		for (auto k = cerberusAssemble.first; k != cerberusAssemble.second; k++) {
-			gameObjectPool[k->second]->Translate(cerberusTranslation);
-			gameObjectPool[k->second]->Rotate(cerberusRotation);
-			gameObjectPool[k->second]->Scale(cerberusScaling);
+	auto transform_a_object_assembling = [&](std::string name, XMMATRIX translation, XMMATRIX rotation, XMMATRIX scaling) {
+		auto objAssemble = gameObjectAssembling.equal_range(name);
+		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
+			gameObjectPool[k->second]->Translate(translation);
+			gameObjectPool[k->second]->Rotate(rotation);
+			gameObjectPool[k->second]->Scale(scaling);
 		}
+	};
 
-		gameObjectPool["sphere"]->Translate(XMMatrixTranslation(4.0f, 3.0f, 2.0f));
-		gameObjectPool["sphere"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["sphere"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
+	
+	{/////////////////////////////////// Initial the transform
+		// transform assembling gameobject
+		transform_a_object_assembling("Assets/Cerberus", 
+			XMMatrixTranslation(3.0f, 10.0f, 0.0f)
+			, XMMatrixRotationX(std::_Pi)
+			, XMMatrixScaling(0.03f, 0.03f, 0.03f));
 
-		gameObjectPool["cube"]->Translate(XMMatrixTranslation(-4.0f, 3.0f, -2.0f));
-		gameObjectPool["cube"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["cube"]->Scale(XMMatrixScaling(6.0f, 6.0f, 6.0f));
+		transform_a_object_assembling("Assets/Unreal-actor",
+			XMMatrixTranslation(0.0f, 6.0f, 0.0f)
+			, XMMatrixRotationY( std::_Pi)
+			, XMMatrixScaling(6.f, 6.f, 6.0f));
 
-		gameObjectPool["torus"]->Translate(XMMatrixTranslation(4.0f, 0.6f, -6.0f));
-		gameObjectPool["torus"]->Rotate(XMMatrixRotationY(XMConvertToRadians(45.0f)));
-		gameObjectPool["torus"]->Scale(XMMatrixScaling(4.0f, 4.0f, 4.0f));
+		transform_a_object_assembling("sphere"
+			, XMMatrixTranslation(4.0f, 3.0f, 2.0f)
+			, XMMatrixIdentity()
+			, XMMatrixScaling(6.0f, 6.0f, 6.0f));
+
+		transform_a_object_assembling("cube"
+			, XMMatrixTranslation(-4.0f, 3.0f, -2.0f)
+			, XMMatrixRotationY(XMConvertToRadians(45.0f))
+			, XMMatrixScaling(6.0f, 6.0f, 6.0f));
+
+		transform_a_object_assembling("torus"
+			, XMMatrixTranslation(4.0f, 0.6f, -6.0f)
+			, XMMatrixRotationY(XMConvertToRadians(45.0f))
+			, XMMatrixScaling(4.0f, 4.0f, 4.0f));
 
 		float scalePlane = 20.0f;
 		float translateOffset = scalePlane / 2.0f;
 
-		gameObjectPool["Floor plane"]->Translate(XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-		gameObjectPool["Floor plane"]->Rotate(XMMatrixIdentity());
-		gameObjectPool["Floor plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Floor plane"
+			, XMMatrixTranslation(0.0f, 0.0f, 0.0f)
+			, XMMatrixIdentity()
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Back wall"]->Translate(XMMatrixTranslation(0.0f, translateOffset, translateOffset));
-		//gameObjectPool["Back wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)));
-		//gameObjectPool["Back wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Back wall"
+			, XMMatrixTranslation(0.0f, translateOffset, translateOffset)
+			, XMMatrixRotationX(XMConvertToRadians(-90))
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Ceiling plane"]->Translate(XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0));
-		//gameObjectPool["Ceiling plane"]->Rotate(XMMatrixRotationX(XMConvertToRadians(180)));
-		//gameObjectPool["Ceiling plane"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Ceiling plane"
+			, XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0)
+			, XMMatrixRotationX(XMConvertToRadians(180))
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Front wall"]->Translate(XMMatrixTranslation(0, translateOffset, -translateOffset));
-		//gameObjectPool["Front wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(90)));
-		//gameObjectPool["Front wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Front wall"
+			, XMMatrixTranslation(0, translateOffset, -translateOffset)
+			, XMMatrixRotationX(XMConvertToRadians(90))
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Left wall"]->Translate(XMMatrixTranslation(-translateOffset, translateOffset, 0));
-		//gameObjectPool["Left wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90)));
-		//gameObjectPool["Left wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Left wall"
+			, XMMatrixTranslation(-translateOffset, translateOffset, 0)
+			, XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90))
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		//gameObjectPool["Right wall"]->Translate(XMMatrixTranslation(translateOffset, translateOffset, 0));
-		//gameObjectPool["Right wall"]->Rotate(XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90)));
-		//gameObjectPool["Right wall"]->Scale(XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+		transform_a_object_assembling("Right wall"
+			, XMMatrixTranslation(translateOffset, translateOffset, 0)
+			, XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90))
+			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 }
 void HybridPipeline::loadDXResource() {
@@ -1400,14 +1428,15 @@ void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, 
 	}
 }
 
-std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList) {
+std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo, std::string metallic, std::string normal, std::string roughness) {
 	std::string rootPath = path.substr(0, path.find_last_of('/'));
 
 	// 获得同目录下的同名的其他贴图的转换函数
 	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
-		size_t start = albedoName.find_first_of(replace_from);
+		size_t start = albedoName.find_last_of(replace_from) ;
 		size_t length = replace_from.size();
-		std::string ret = albedoName.substr(0, start) + replace_to + albedoName.substr(start + length, albedoName.length());
+		start -= length;
+		std::string ret = albedoName.substr(0, start+1) + replace_to + albedoName.substr(start + length+1, albedoName.length());
 		return ret;
 	};
 
@@ -1459,16 +1488,20 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			aiString str;
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
 			albedoIndex = str.data;
-			metallicIndex = albedoStrToDefined(albedoIndex, "A", "M");
-			normalIndex = albedoStrToDefined(albedoIndex, "A", "N");
-			roughnessIndex = albedoStrToDefined(albedoIndex, "A", "R");
+			albedoIndex = rootPath + "/" + albedoIndex;
+			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
 		}
 		if (texturePool.find(albedoIndex) == texturePool.end()//错误检查
 			|| texturePool.find(metallicIndex) == texturePool.end()
 			|| texturePool.find(normalIndex) == texturePool.end()
 			|| texturePool.find(roughnessIndex) == texturePool.end()
 			) {
-			ThrowIfFailed(-1);
+			albedoIndex = rootPath + "/" + "default_albedo.jpg";
+			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
 		}
 
 		////生成mesh //因为index是int32 所以可能要分多批mesh填装
@@ -1525,6 +1558,7 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 		ThrowIfFailed(-1);
 	}
 	//先缓存所有的texture
+	bool isLoaded = false;
 	for (size_t i = 0; i < scene->mNumMaterials; i++)
 	{
 		aiMaterial* material = scene->mMaterials[i];
@@ -1537,17 +1571,33 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
 		TextureIndex albedoIndex;
 		albedoIndex = str.data;
-		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, "A", "M");
-		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, "A", "N");
-		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, "A", "R");
+		albedoIndex = rootPath + "/" + albedoIndex;
+		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
 		texturePool.emplace(albedoIndex, Texture());//albedo
-		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(rootPath+"/"+ albedoIndex), TextureUsage::Albedo);
+		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring( albedoIndex), TextureUsage::Albedo);
 		texturePool.emplace(metallicIndex, Texture());//metallic
-		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(rootPath + "/" + metallicIndex), TextureUsage::MetallicMap);
+		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
 		texturePool.emplace(normalIndex, Texture());//normal
-		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(rootPath + "/" + normalIndex), TextureUsage::Normalmap);
+		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring( normalIndex), TextureUsage::Normalmap);
 		texturePool.emplace(roughnessIndex, Texture());//roughness
-		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(rootPath + "/" + roughnessIndex), TextureUsage::RoughnessMap);
+		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring( roughnessIndex), TextureUsage::RoughnessMap);
+		isLoaded = true;
+	}
+	if (!isLoaded) {
+		TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
+		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+		texturePool.emplace(albedoIndex, Texture());//albedo
+		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(albedoIndex), TextureUsage::Albedo);
+		texturePool.emplace(metallicIndex, Texture());//metallic
+		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
+		texturePool.emplace(normalIndex, Texture());//normal
+		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(normalIndex), TextureUsage::Normalmap);
+		texturePool.emplace(roughnessIndex, Texture());//roughness
+		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(roughnessIndex), TextureUsage::RoughnessMap);
 	}
 	//随后load mesh并且绑定贴图加载入
 	processNode(scene->mRootNode, scene, commandList);
