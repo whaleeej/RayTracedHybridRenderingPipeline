@@ -368,7 +368,7 @@ void rayGen()
 	//// reflection
 	float3 H = ImportanceSampleGGX(float2(rnd1, rnd2), N, roughness); // importance sample the half vector
 	RayDesc raySecondary;
-	raySecondary.TMin = 0.01f;
+	raySecondary.TMin = 0.001f;
 	raySecondary.Origin = P;
 	raySecondary.Direction = reflect(-V, H);
 	raySecondary.TMax = 10000.0f;
@@ -380,7 +380,7 @@ void rayGen()
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
 		pdf = ImportanceSamplePdf(roughness, dot(N, H));
-		pdf = max(min(pdf, 10.0), 0.2);
+		pdf = max(min(pdf, 10.0),  0.2);
 	}
 	if (secondaryPayload.color.w > 0.1f)
 	{
