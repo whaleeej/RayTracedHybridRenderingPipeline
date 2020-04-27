@@ -652,6 +652,24 @@ void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 
 ////////////////////////////////////////////////////////////////////// internal update
 void HybridPipeline::loadResource() {
+	auto copy_Gameobject_assembling = [&](std::string from, std::string to) {
+		auto objAssemble = gameObjectAssembling.equal_range(from);
+		std::vector<GameObjectIndex> indices;
+		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
+			std::shared_ptr<GameObject> localGo = std::make_shared<GameObject>();
+			localGo->gid = gid++;
+			localGo->mesh = gameObjectPool[k->second]->mesh;
+			localGo->transform = gameObjectPool[k->second]->transform;
+			localGo->material = gameObjectPool[k->second]->material;
+			gameObjectPool.emplace(k->second + to, localGo);
+			indices.push_back(k->second + to);
+		}
+		for (size_t i = 0; i < indices.size(); i++)
+		{
+			gameObjectAssembling.emplace(to, indices[i]);
+		}
+		
+	};
 	auto device = Application::Get().GetDevice();
 	/////////////////////////////////// Resource Loading
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
@@ -705,9 +723,14 @@ void HybridPipeline::loadResource() {
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
 	// load external object
-	importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList,"A.tga","M.tga","N.tga","R.tga");
-	importModel("Assets/Unreal-actor/model.dae", commandList);
-
+	//importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList,"A.tga","M.tga","N.tga","R.tga");
+	//importModel("Assets/Unreal-actor/model.dae", commandList);
+	importModel("Assets/SM_Chair/SM_Chair.FBX", commandList);
+	importModel("Assets/SM_TableRound/SM_TableRound.FBX", commandList);
+	importModel("Assets/SM_Couch/SM_Couch.FBX", commandList);
+	importModel("Assets/SM_Lamp_Ceiling/SM_Lamp_Ceiling.FBX", commandList);
+	importModel("Assets/SM_MatPreviewMesh/SM_MatPreviewMesh.FBX", commandList);
+	copy_Gameobject_assembling("Assets/SM_Chair","Assets/SM_Chair_copy");
 
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
@@ -736,13 +759,13 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 	gameObjectAssembling.emplace("Floor plane", "Floor plane");
 
-	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
-	gameObjectPool["Ceiling plane"]->gid = gid++;
-	gameObjectPool["Ceiling plane"]->mesh = "plane";
-	gameObjectPool["Ceiling plane"]->material.base = Material::White;
-	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
-	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
+	//gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+	//gameObjectPool["Ceiling plane"]->gid = gid++;
+	//gameObjectPool["Ceiling plane"]->mesh = "plane";
+	//gameObjectPool["Ceiling plane"]->material.base = Material::White;
+	//gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
+	//gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
 
 	//gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
 	//gameObjectPool["Back wall"]->gid = gid++;
@@ -752,29 +775,29 @@ void HybridPipeline::loadGameObject() {
 	//gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
 	//gameObjectAssembling.emplace("Back wall", "Back wall");
 
-	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
-	gameObjectPool["Front wall"]->gid = gid++;
-	gameObjectPool["Front wall"]->mesh = "plane";
-	gameObjectPool["Front wall"]->material.base = Material::Copper;
-	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
-	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Front wall", "Front wall");
+	//gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+	//gameObjectPool["Front wall"]->gid = gid++;
+	//gameObjectPool["Front wall"]->mesh = "plane";
+	//gameObjectPool["Front wall"]->material.base = Material::Copper;
+	//gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
+	//gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Front wall", "Front wall");
 
-	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
-	gameObjectPool["Left wall"]->gid = gid++;
-	gameObjectPool["Left wall"]->mesh = "plane";
-	gameObjectPool["Left wall"]->material.base = Material::Jade;
-	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Left wall", "Left wall");
+	//gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+	//gameObjectPool["Left wall"]->gid = gid++;
+	//gameObjectPool["Left wall"]->mesh = "plane";
+	//gameObjectPool["Left wall"]->material.base = Material::Jade;
+	//gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	//gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Left wall", "Left wall");
 
-	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
-	gameObjectPool["Right wall"]->gid = gid++;
-	gameObjectPool["Right wall"]->mesh = "plane";
-	gameObjectPool["Right wall"]->material.base = Material::Ruby;
-	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Right wall", "Right wall");
+	//gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+	//gameObjectPool["Right wall"]->gid = gid++;
+	//gameObjectPool["Right wall"]->mesh = "plane";
+	//gameObjectPool["Right wall"]->material.base = Material::Ruby;
+	//gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	//gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+	//gameObjectAssembling.emplace("Right wall", "Right wall");
 
 	//gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
 	//gameObjectPool["sphere"]->gid = gid++;
@@ -824,6 +847,37 @@ void HybridPipeline::transformGameObject() {
 	
 	{/////////////////////////////////// Initial the transform
 		// transform assembling gameobject
+
+		transform_a_object_assembling("Assets/SM_TableRound",
+			XMMatrixTranslation(0, 0.0, 0)
+			, XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
+
+		transform_a_object_assembling("Assets/SM_Chair",
+			XMMatrixTranslation(-10, 0.0, -6)
+			, XMMatrixRotationZ(-std::_Pi / 4.0f) * XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
+
+		transform_a_object_assembling("Assets/SM_Chair_copy",
+			XMMatrixTranslation(-4, 0.0, 6)
+			, XMMatrixRotationZ(std::_Pi / 3.0f)*XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
+
+		transform_a_object_assembling("Assets/SM_Couch",
+			XMMatrixTranslation(8, 0.0, 0)
+			, XMMatrixRotationZ(-std::_Pi ) *XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
+
+		transform_a_object_assembling("Assets/SM_Lamp_Ceiling",
+			XMMatrixTranslation(2, 0.0, 14)
+			,  XMMatrixRotationX(std::_Pi / 2.0f)
+			, XMMatrixScaling(0.12f, 0.12f, 0.12f));
+
+		transform_a_object_assembling("Assets/SM_MatPreviewMesh",
+			XMMatrixTranslation(0, 5.5,0)
+			, XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixScaling(0.01f, 0.01f, 0.01f));
+
 		transform_a_object_assembling("Assets/Cerberus", 
 			XMMatrixTranslation(-1.2f, 6.0f, -1.6f)
 			, XMMatrixRotationX(-std::_Pi/3.0f*2.0f)
@@ -855,7 +909,7 @@ void HybridPipeline::transformGameObject() {
 		transform_a_object_assembling("Floor plane"
 			, XMMatrixTranslation(0.0f, 0.0f, 0.0f)
 			, XMMatrixIdentity()
-			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
+			, XMMatrixScaling(scalePlane*10, 1.0f, scalePlane*10));
 
 		transform_a_object_assembling("Back wall"
 			, XMMatrixTranslation(0.0f, translateOffset, translateOffset)
