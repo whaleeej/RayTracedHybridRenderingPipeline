@@ -28,6 +28,8 @@ using namespace DirectX;
 #undef max
 #endif
 
+#define SCENE1
+
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
 static uint64_t totalFrameCount = 0;
@@ -652,24 +654,6 @@ void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 
 ////////////////////////////////////////////////////////////////////// internal update
 void HybridPipeline::loadResource() {
-	auto copy_Gameobject_assembling = [&](std::string from, std::string to) {
-		auto objAssemble = gameObjectAssembling.equal_range(from);
-		std::vector<GameObjectIndex> indices;
-		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
-			std::shared_ptr<GameObject> localGo = std::make_shared<GameObject>();
-			localGo->gid = gid++;
-			localGo->mesh = gameObjectPool[k->second]->mesh;
-			localGo->transform = gameObjectPool[k->second]->transform;
-			localGo->material = gameObjectPool[k->second]->material;
-			gameObjectPool.emplace(k->second + to, localGo);
-			indices.push_back(k->second + to);
-		}
-		for (size_t i = 0; i < indices.size(); i++)
-		{
-			gameObjectAssembling.emplace(to, indices[i]);
-		}
-		
-	};
 	auto device = Application::Get().GetDevice();
 	/////////////////////////////////// Resource Loading
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
@@ -681,7 +665,6 @@ void HybridPipeline::loadResource() {
 	meshPool.emplace("cone", Mesh::CreateCone(*commandList));
 	meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
 	meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
-
 	// Create a skybox mesh
 	m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
 
@@ -722,19 +705,13 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("metal_roughness", Texture());
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
 
-	// load external object
-	//importModel("Assets/Cerberus/Cerberus_LP.FBX",commandList,"A.tga","M.tga","N.tga","R.tga");
-	//importModel("Assets/Unreal-actor/model.dae", commandList);
-	importModel("Assets/SM_Chair/SM_Chair.FBX", commandList);
-	importModel("Assets/SM_TableRound/SM_TableRound.FBX", commandList);
-	importModel("Assets/SM_Couch/SM_Couch.FBX", commandList);
-	importModel("Assets/SM_Lamp_Ceiling/SM_Lamp_Ceiling.FBX", commandList);
-	importModel("Assets/SM_MatPreviewMesh/SM_MatPreviewMesh.FBX", commandList);
-	copy_Gameobject_assembling("Assets/SM_Chair","Assets/SM_Chair_copy");
-
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
+#ifdef SCENE1
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/skybox_default.hdr", TextureUsage::Albedo);
+#else
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/newport_loft.hdr", TextureUsage::Albedo);
+#endif
 	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
 	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024*1;
 	skyboxCubemapDesc.DepthOrArraySize = 6;
@@ -742,13 +719,33 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
 	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
 
-
 	// run ocmmandlist
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
 }
 void HybridPipeline::loadGameObject() {
+	auto copy_Gameobject_assembling = [&](std::string from, std::string to) {
+		auto objAssemble = gameObjectAssembling.equal_range(from);
+		std::vector<GameObjectIndex> indices;
+		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
+			std::shared_ptr<GameObject> localGo = std::make_shared<GameObject>();
+			localGo->gid = gid++;
+			localGo->mesh = gameObjectPool[k->second]->mesh;
+			localGo->transform = gameObjectPool[k->second]->transform;
+			localGo->material = gameObjectPool[k->second]->material;
+			gameObjectPool.emplace(k->second + to, localGo);
+			indices.push_back(k->second + to);
+		}
+		for (size_t i = 0; i < indices.size(); i++)
+		{
+			gameObjectAssembling.emplace(to, indices[i]);
+		}
+
+	};
 	auto device = Application::Get().GetDevice();
+	/////////////////////////////////// Resource Loading
+	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
+	auto commandList = commandQueue->GetCommandList();
 	/////////////////////////////////// GameObject Gen
 
 	gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
@@ -759,70 +756,84 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
 	gameObjectAssembling.emplace("Floor plane", "Floor plane");
 
-	//gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
-	//gameObjectPool["Ceiling plane"]->gid = gid++;
-	//gameObjectPool["Ceiling plane"]->mesh = "plane";
-	//gameObjectPool["Ceiling plane"]->material.base = Material::White;
-	//gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
-	//gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
-	//gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
+#ifdef SCENE1
+	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
+	gameObjectPool["Ceiling plane"]->gid = gid++;
+	gameObjectPool["Ceiling plane"]->mesh = "plane";
+	gameObjectPool["Ceiling plane"]->material.base = Material::White;
+	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
+	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
 
-	//gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
-	//gameObjectPool["Back wall"]->gid = gid++;
-	//gameObjectPool["Back wall"]->mesh = "plane";
-	//gameObjectPool["Back wall"]->material.base = Material::Pearl;
-	//gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
-	//gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
-	//gameObjectAssembling.emplace("Back wall", "Back wall");
+	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
+	gameObjectPool["Back wall"]->gid = gid++;
+	gameObjectPool["Back wall"]->mesh = "plane";
+	gameObjectPool["Back wall"]->material.base = Material::Pearl;
+	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
+	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Back wall", "Back wall");
 
-	//gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
-	//gameObjectPool["Front wall"]->gid = gid++;
-	//gameObjectPool["Front wall"]->mesh = "plane";
-	//gameObjectPool["Front wall"]->material.base = Material::Copper;
-	//gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
-	//gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
-	//gameObjectAssembling.emplace("Front wall", "Front wall");
+	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
+	gameObjectPool["Front wall"]->gid = gid++;
+	gameObjectPool["Front wall"]->mesh = "plane";
+	gameObjectPool["Front wall"]->material.base = Material::Copper;
+	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
+	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Front wall", "Front wall");
 
-	//gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
-	//gameObjectPool["Left wall"]->gid = gid++;
-	//gameObjectPool["Left wall"]->mesh = "plane";
-	//gameObjectPool["Left wall"]->material.base = Material::Jade;
-	//gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	//gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
-	//gameObjectAssembling.emplace("Left wall", "Left wall");
+	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
+	gameObjectPool["Left wall"]->gid = gid++;
+	gameObjectPool["Left wall"]->mesh = "plane";
+	gameObjectPool["Left wall"]->material.base = Material::Jade;
+	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Left wall", "Left wall");
 
-	//gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
-	//gameObjectPool["Right wall"]->gid = gid++;
-	//gameObjectPool["Right wall"]->mesh = "plane";
-	//gameObjectPool["Right wall"]->material.base = Material::Ruby;
-	//gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	//gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
-	//gameObjectAssembling.emplace("Right wall", "Right wall");
+	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
+	gameObjectPool["Right wall"]->gid = gid++;
+	gameObjectPool["Right wall"]->mesh = "plane";
+	gameObjectPool["Right wall"]->material.base = Material::Ruby;
+	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
+	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
+	gameObjectAssembling.emplace("Right wall", "Right wall");
 
-	//gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
-	//gameObjectPool["sphere"]->gid = gid++;
-	//gameObjectPool["sphere"]->mesh = "sphere";
-	//gameObjectPool["sphere"]->material.base = Material::White;
-	//gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	//gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
-	//gameObjectAssembling.emplace("sphere", "sphere");
+	gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
+	gameObjectPool["sphere"]->gid = gid++;
+	gameObjectPool["sphere"]->mesh = "sphere";
+	gameObjectPool["sphere"]->material.base = Material::White;
+	gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
+	gameObjectAssembling.emplace("sphere", "sphere");
 
-	//gameObjectPool.emplace("cube", std::make_shared<GameObject>());
-	//gameObjectPool["cube"]->gid = gid++;
-	//gameObjectPool["cube"]->mesh = "cube";
-	//gameObjectPool["cube"]->material.base = Material::White;
-	//gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	//gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
-	//gameObjectAssembling.emplace("cube", "cube");
+	gameObjectPool.emplace("cube", std::make_shared<GameObject>());
+	gameObjectPool["cube"]->gid = gid++;
+	gameObjectPool["cube"]->mesh = "cube";
+	gameObjectPool["cube"]->material.base = Material::White;
+	gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
+	gameObjectAssembling.emplace("cube", "cube");
 
-	//gameObjectPool.emplace("torus", std::make_shared<GameObject>());
-	//gameObjectPool["torus"]->gid = gid++;
-	//gameObjectPool["torus"]->mesh = "torus";
-	//gameObjectPool["torus"]->material.base = Material::White;
-	//gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	//gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
-	//gameObjectAssembling.emplace("torus", "torus");
-
+	gameObjectPool.emplace("torus", std::make_shared<GameObject>());
+	gameObjectPool["torus"]->gid = gid++;
+	gameObjectPool["torus"]->mesh = "torus";
+	gameObjectPool["torus"]->material.base = Material::White;
+	gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
+	gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
+	gameObjectAssembling.emplace("torus", "torus");
+#endif
+#ifdef SCENE2
+	//load external object
+	importModel("Assets/Cerberus/Cerberus_LP.FBX", commandList, "A.tga", "M.tga", "N.tga", "R.tga");
+	importModel("Assets/Unreal-actor/model.dae", commandList);
+#endif
+#ifdef SCENE3
+	importModel("Assets/SM_Chair/SM_Chair.FBX", commandList);
+	importModel("Assets/SM_TableRound/SM_TableRound.FBX", commandList);
+	importModel("Assets/SM_Couch/SM_Couch.FBX", commandList);
+	importModel("Assets/SM_Lamp_Ceiling/SM_Lamp_Ceiling.FBX", commandList);
+	importModel("Assets/SM_MatPreviewMesh/SM_MatPreviewMesh.FBX", commandList);
+	copy_Gameobject_assembling("Assets/SM_Chair", "Assets/SM_Chair_copy");
+#endif
 	// light object
 	lightObjectIndex = "sphere light";
 	gameObjectPool.emplace(lightObjectIndex, std::make_shared<GameObject>());//7
@@ -831,6 +842,9 @@ void HybridPipeline::loadGameObject() {
 	gameObjectPool[lightObjectIndex]->material.base = Material::EmissiveWhite;
 	gameObjectPool[lightObjectIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
 	gameObjectPool[lightObjectIndex]->material.tex = TextureMaterial("default");
+
+	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
+	commandQueue->WaitForFenceValue(fenceValue);
 }
 void HybridPipeline::transformGameObject() {
 
