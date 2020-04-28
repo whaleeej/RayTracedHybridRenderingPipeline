@@ -8,6 +8,8 @@
 #include <Window.h>
 
 #include <wrl.h>
+
+#include <io.h>
 using namespace Microsoft::WRL;
 
 #include <d3dx12.h>
@@ -28,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE1
+#define SCENE2 1
 
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -709,8 +711,10 @@ void HybridPipeline::loadResource() {
 	texturePool.emplace("skybox_pano", Texture());
 #ifdef SCENE1
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/skybox_default.hdr", TextureUsage::Albedo);
+#elif SCENE2
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Milkyway_small.hdr", TextureUsage::Albedo);
 #else
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/newport_loft.hdr", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Ice_Lake_HiRes_TMap_2.hdr", TextureUsage::Albedo);
 #endif
 	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
 	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024*1;
@@ -825,6 +829,7 @@ void HybridPipeline::loadGameObject() {
 	//load external object
 	importModel("Assets/Cerberus/Cerberus_LP.FBX", commandList, "A.tga", "M.tga", "N.tga", "R.tga");
 	importModel("Assets/Unreal-actor/model.dae", commandList);
+	importModel("Assets/Sci-fi-Biolab/source/SciFiBiolab.fbx", commandList, "COLOR","METALLIC","NORMAL","ROUGHNESS");
 #endif
 #ifdef SCENE3
 	importModel("Assets/SM_Chair/SM_Chair.FBX", commandList);
@@ -893,14 +898,19 @@ void HybridPipeline::transformGameObject() {
 			, XMMatrixScaling(0.01f, 0.01f, 0.01f));
 
 		transform_a_object_assembling("Assets/Cerberus", 
-			XMMatrixTranslation(-1.2f, 6.0f, -1.6f)
+			XMMatrixTranslation(-1.2f, 10.0f, -1.6f)
 			, XMMatrixRotationX(-std::_Pi/3.0f*2.0f)
 			, XMMatrixScaling(0.02f, 0.02f, 0.02f));
 
 		transform_a_object_assembling("Assets/Unreal-actor",
-			XMMatrixTranslation(0.0f, 6.0f, 0.0f)
+			XMMatrixTranslation(0.0f, 10.0f, 0.0f)
 			, XMMatrixRotationY( std::_Pi)
 			, XMMatrixScaling(6.f, 6.f, 6.0f));
+
+		transform_a_object_assembling("Assets/Sci-fi-Biolab/source",
+			XMMatrixTranslation(0.0f, 0.0f, 0.0f)
+			, XMMatrixRotationX(-std::_Pi/2.0)
+			, XMMatrixScaling(8.f, 8.f, 8.0f));
 
 		transform_a_object_assembling("sphere"
 			, XMMatrixTranslation(4.0f, 3.0f, 2.0f)
@@ -1557,7 +1567,9 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			aiString str;
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
 			albedoIndex = str.data;
-			albedoIndex = rootPath + "/" + albedoIndex;
+			if ((int)albedoIndex.find_first_of(':') < 0) {
+				albedoIndex = rootPath + "/" + albedoIndex;
+			}
 			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
 			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
 			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
@@ -1568,6 +1580,7 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			|| texturePool.find(roughnessIndex) == texturePool.end()
 			) {
 			albedoIndex = rootPath + "/" + "default_albedo.jpg";
+			albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
 			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
 			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
 			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
@@ -1581,10 +1594,13 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 			IndexCollection localIndices;
 			size_t start = i * slot_size;
 			size_t end = std::min(start+slot_size, indices.size() );
-			for (size_t j = start; j < end; j++)
+			for (size_t j = 0; j < vertices.size(); j++)
 			{
 				localVetices.push_back(vertices[j]);
-				localIndices.push_back(indices[j]);
+			}
+			for (size_t j = start; j < end; j++)
+			{
+					localIndices.push_back(indices[j]);
 			}
 			MeshIndex meshIndex;
 			meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh)+"_"+std::to_string(i);
@@ -1640,7 +1656,10 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
 		TextureIndex albedoIndex;
 		albedoIndex = str.data;
-		albedoIndex = rootPath + "/" + albedoIndex;
+		int a = albedoIndex.find_first_of(':');
+		if((int)albedoIndex.find_first_of(':') <0){
+			albedoIndex = rootPath + "/" + albedoIndex;
+		}
 		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
 		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
 		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
@@ -1654,17 +1673,24 @@ std::string HybridPipeline::importModel(std::string path, std::shared_ptr<Comman
 		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring( roughnessIndex), TextureUsage::RoughnessMap);
 		isLoaded = true;
 	}
-	if (!isLoaded) {
-		TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
-		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+	TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
+	albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
+	TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+	TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+	TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+	if (_access(albedoIndex.c_str(), 0) >= 0) {
 		texturePool.emplace(albedoIndex, Texture());//albedo
 		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(albedoIndex), TextureUsage::Albedo);
+	}
+	if (_access(metallicIndex.c_str(), 0) >= 0) {
 		texturePool.emplace(metallicIndex, Texture());//metallic
 		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
+	}
+	if (_access(normalIndex.c_str(), 0) >= 0) {
 		texturePool.emplace(normalIndex, Texture());//normal
 		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(normalIndex), TextureUsage::Normalmap);
+	}
+	if (_access(roughnessIndex.c_str(), 0) >= 0) {
 		texturePool.emplace(roughnessIndex, Texture());//roughness
 		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(roughnessIndex), TextureUsage::RoughnessMap);
 	}
