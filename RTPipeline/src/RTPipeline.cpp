@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE2 1
+#define SCENE1 1
 
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -712,7 +712,7 @@ void HybridPipeline::loadResource() {
 #ifdef SCENE1
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/skybox_default.hdr", TextureUsage::Albedo);
 #elif SCENE2
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Milkyway_small.hdr", TextureUsage::Albedo);
+	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Milkyway_BG.hdr", TextureUsage::Albedo);
 #else
 	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Ice_Lake_HiRes_TMap_2.hdr", TextureUsage::Albedo);
 #endif
