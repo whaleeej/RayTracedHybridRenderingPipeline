@@ -31,11 +31,12 @@ using namespace DirectX;
 #endif
 
 #define SCENE1 1
-
+#define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
-static uint64_t totalFrameCount = 0;
+static uint64_t globalFrameCount = 0;
 static double totalTime = 0.0;
+static double globalTime = 0.0;
 static float cameraAnimTime = 0.0f;
 static float gid = 0.0f;
 
@@ -53,8 +54,8 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Down(0)
     , m_Pitch(0)
     , m_Yaw(0)
-	, m_AnimateCamera(false)
-    , m_AnimateLights(false)
+	, m_AnimateCamera(true)
+    , m_AnimateLights(true)
     , m_Shift(false)
 	, m_Width(0)
 	, m_Height(0)
@@ -123,22 +124,28 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 	// frametime
 	{
+		globalTime+= e.ElapsedTime;
+		globalFrameCount++;
+
 		totalTime += e.ElapsedTime;
 		frameCount++;
-		totalFrameCount++;
 
 		if (totalTime > 1.0)
 		{
 			double fps = frameCount / totalTime;
-
 			char buffer[512];
-			sprintf_s(buffer, "FPS: %f,  FrameCount: %lld\n", fps, totalFrameCount);
+			sprintf_s(buffer, "FPS: %f,  FrameCount: %lld\n", fps, globalFrameCount);
 			OutputDebugStringA(buffer);
 
 			frameCount = 0;
 			totalTime = 0.0;
 		}
 	}
+
+	if (globalTime >= GLOBAL_BENCHMARK_LIMIT) {
+		Application::Get().Quit(0);
+	}
+
 
 	// camera
 	{
@@ -410,7 +417,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->SetCompute32BitConstants(2, totalFrameCount);
+		commandList->SetCompute32BitConstants(2, globalFrameCount);
 		commandList->Dispatch(WORKSET_WITH_MARGINS_WIDTH / local_width, WORKSET_WITH_MARGINS_HEIGHT / local_height);
 	}
 
@@ -422,7 +429,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
+		commandList->SetCompute32BitConstants(1, globalFrameCount);
 		commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
 	}
 
@@ -438,7 +445,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
+		commandList->SetCompute32BitConstants(1, globalFrameCount);
 		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
 	}
 
@@ -453,7 +460,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, totalFrameCount);
+		commandList->SetCompute32BitConstants(1, globalFrameCount);
 		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
 	}
 
@@ -1462,7 +1469,7 @@ void HybridPipeline::updateBuffer()
 	{
 		std::uniform_int_distribution<uint32_t> seedDistribution(0, UINT_MAX);
 		FrameIndexCB fid;
-		fid.FrameIndex = static_cast<uint32_t>(totalFrameCount);
+		fid.FrameIndex = static_cast<uint32_t>(globalFrameCount);
 		fid.seed = seedDistribution(m_generatorURNG);
 		void* pData;
 		mpRTFrameIndexCB->Map(0, nullptr, (void**)&pData);

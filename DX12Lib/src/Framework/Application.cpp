@@ -349,7 +349,10 @@ int Application::Run(std::shared_ptr<Game> pGame)
 {
     if (!pGame->Initialize()) return 1;
     if (!pGame->LoadContent()) return 2;
-
+    
+    for (auto i = gs_Windows.begin(); i != gs_Windows.end(); i++) {
+        i->second->resetTick();
+    }
 	m_loadedFlg = true;
 
     MSG msg = { 0 };

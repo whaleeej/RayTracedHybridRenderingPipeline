@@ -162,6 +162,11 @@ protected:
     // Update the render target views for the swapchain back buffers.
     void UpdateRenderTargetViews();
 
+    // reset the tick
+    void resetTick() {
+        m_UpdateClock.Reset();
+        m_RenderClock.Reset();
+    }
 private:
     // Windows should not be copied.
     Window(const Window& copy) = delete;
