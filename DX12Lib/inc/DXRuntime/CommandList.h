@@ -57,6 +57,7 @@ class RootSignature;
 class Texture;
 class UploadBuffer;
 class VertexBuffer;
+class CubeMapToIrradianceMapPSO;
 
 class CommandList
 {
@@ -199,6 +200,9 @@ public:
      * Generate a cubemap texture from a panoramic (equirectangular) texture.
      */
     void PanoToCubemap(Texture& cubemap, const Texture& pano);
+
+
+    void CubemapToIrradianceMap(Texture& irradianceMap, const Texture& cubemap);
 
     /**
      * Copy subresource data to a texture.
@@ -467,6 +471,8 @@ private:
 	std::unique_ptr<GenerateMipsPSO> m_GenerateMipsPSO;
     // Pipeline state object for converting panorama (equirectangular) to cubemaps
     std::unique_ptr<PanoToCubemapPSO> m_PanoToCubemapPSO;
+    std::unique_ptr<CubeMapToIrradianceMapPSO> m_CubemapToIrradianceMapPSO;
+    
 
     // Objects that are being tracked by a command list that is "in-flight" on 
     // the command-queue and cannot be deleted. To ensure objects are not deleted 

@@ -23,7 +23,7 @@ CubeMapToIrradianceMapPSO::CubeMapToIrradianceMapPSO()
     CD3DX12_DESCRIPTOR_RANGE1 outMip(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
 
     CD3DX12_ROOT_PARAMETER1 rootParameters[CubeMapToIrradianceMapRS::NumRootParameters];
-    rootParameters[CubeMapToIrradianceMapRS::CubeMapToIrradianceMapCB].InitAsConstants(sizeof(PanoToCubemapCB) / 4, 0);
+    rootParameters[CubeMapToIrradianceMapRS::CubeMapToIrradianceMapCB].InitAsConstants(sizeof(CubeMapToIrradianceCB) / 4, 0);
     rootParameters[CubeMapToIrradianceMapRS::SkyboxCubaMap].InitAsDescriptorTable(1, &srcMip);
     rootParameters[CubeMapToIrradianceMapRS::DstMip].InitAsDescriptorTable(1, &outMip);
 

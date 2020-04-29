@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-struct PanoToCubemapCB
+struct CubeMapToIrradianceCB
 {
     uint32_t CubemapSize;
     uint32_t padding[3];

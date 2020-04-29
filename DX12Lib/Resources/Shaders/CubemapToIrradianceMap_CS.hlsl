@@ -88,7 +88,7 @@ void main( ComputeShaderInput IN )
 	float3 right = cross(up, normal);
 	up = cross(normal, right);
 
-	float sampleDelta = 0.025f;
+	float sampleDelta = 0.05f;
 	float nrSamples = 0.0f;
 	for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
 	{
@@ -98,15 +98,17 @@ void main( ComputeShaderInput IN )
 			float3 tangentSample = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
             // tangent space to world
 			float3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * normal;
-
-			float3 sample = SkyboxCubaMap.Gather(LinearRepeatSampler, sampleVec).xyz;
+			uint status;
+			float3 sample = float3(
+            SkyboxCubaMap.GatherRed(LinearRepeatSampler, sampleVec, status).x,
+            SkyboxCubaMap.GatherGreen(LinearRepeatSampler, sampleVec, status).x,
+            SkyboxCubaMap.GatherBlue(LinearRepeatSampler, sampleVec, status).x);
             
 			irradiance += sample * cos(theta) * sin(theta);
 			nrSamples++;
 		}
 	}
 	irradiance = PI * irradiance * (1.0 / float(nrSamples));
-    
-	float2 panoUV = float2( (atan2(dir.x, -dir.z)) * InvPI / 2.0f, acos(dir.y) * InvPI);
+	
 	DstMip[texCoord] = float4(irradiance, 1.0);
 }

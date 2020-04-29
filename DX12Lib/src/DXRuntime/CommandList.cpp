@@ -18,6 +18,7 @@
 #include <Texture.h>
 #include <UploadBuffer.h>
 #include <VertexBuffer.h>
+#include <CubemapToIrradianceMapPSO.h>
 
 std::map<std::wstring, ID3D12Resource* > CommandList::ms_TextureCache;
 std::mutex CommandList::ms_TextureCacheMutex;
@@ -733,6 +734,61 @@ void CommandList::PanoToCubemap(Texture& cubemapTexture, const Texture& panoText
     {
         CopyResource(cubemapTexture, stagingTexture);
     }
+}
+
+void CommandList::CubemapToIrradianceMap(Texture& irradianceMap, const Texture& cubemap)
+{
+    if (m_d3d12CommandListType == D3D12_COMMAND_LIST_TYPE_COPY)
+    {
+        if (!m_ComputeCommandList)
+        {
+            m_ComputeCommandList = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE)->GetCommandList();
+        }
+        m_ComputeCommandList->CubemapToIrradianceMap(irradianceMap, cubemap);
+        return;
+    }
+
+    if (!m_CubemapToIrradianceMapPSO)
+    {
+        m_CubemapToIrradianceMapPSO = std::make_unique<CubeMapToIrradianceMapPSO>();
+    }
+
+    auto device = Application::Get().GetDevice();
+
+    auto irradianceMapResource = irradianceMap.GetD3D12Resource();
+    if (!irradianceMapResource) return;
+
+    CD3DX12_RESOURCE_DESC irradianceDesc(irradianceMapResource->GetDesc());
+
+    auto stagingResource = irradianceMapResource;
+    Texture stagingTexture(stagingResource);
+
+    TransitionBarrier(stagingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    m_d3d12CommandList->SetPipelineState(m_CubemapToIrradianceMapPSO->GetPipelineState().Get());
+    SetComputeRootSignature(m_CubemapToIrradianceMapPSO->GetRootSignature());
+
+    CubeMapToIrradianceCB cubeMapToIrradianceCB;
+    cubeMapToIrradianceCB.CubemapSize = std::max<uint32_t>(static_cast<uint32_t>(irradianceDesc.Width), irradianceDesc.Height);
+    SetCompute32BitConstants(CubeMapToIrradianceMapRS::CubeMapToIrradianceMapCB, cubeMapToIrradianceCB);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = cubemap.GetD3D12ResourceDesc().Format;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
+    SetShaderResourceView(CubeMapToIrradianceMapRS::SkyboxCubaMap, 0, cubemap, 
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = irradianceDesc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+    uavDesc.Texture2DArray.FirstArraySlice = 0;
+    uavDesc.Texture2DArray.ArraySize = 6;
+    SetUnorderedAccessView(CubeMapToIrradianceMapRS::DstMip, 0, stagingTexture, 
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 0, &uavDesc);
+
+    Dispatch(Math::DivideByMultiple(cubeMapToIrradianceCB.CubemapSize, 16), Math::DivideByMultiple(cubeMapToIrradianceCB.CubemapSize, 16), 6);
 }
 
 void CommandList::ClearTexture( const Texture& texture, const float clearColor[4])

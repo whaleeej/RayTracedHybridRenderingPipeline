@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE2 1
+#define SCENE3 1
 #define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -729,6 +729,16 @@ void HybridPipeline::loadResource() {
 	skyboxCubemapDesc.MipLevels = 1;
 	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
 	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
+
+	// irradiance map
+	auto irradianceCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
+	irradianceCubemapDesc.Width = irradianceCubemapDesc.Height = 512 * 1;
+	irradianceCubemapDesc.DepthOrArraySize = 6;
+	irradianceCubemapDesc.MipLevels = 1;
+	irradianceCubemapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	texturePool.emplace("skybox_irradianceMap", Texture(irradianceCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox IrradianceMap"));
+	commandList->CubemapToIrradianceMap(texturePool["skybox_irradianceMap"], texturePool["skybox_cubemap"]);
+
 
 	// run ocmmandlist
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
