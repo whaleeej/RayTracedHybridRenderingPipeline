@@ -311,7 +311,7 @@ void rayGen()
 	float3 N = normalize(normal);
 	
 	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.x)) * hash(P) + frameIndexCB.seed);
-	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
+	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192 * 4), 8192 * 4);
 	float rnd1 = lowDiscrepSeq.x;
 	float rnd2 = lowDiscrepSeq.y;
 	
@@ -347,7 +347,7 @@ void rayGen()
 
 #ifdef AMBIENT_OCCLUSION
 	//// Ambient
-	float minAOLength = 0.01f;
+	float minAOLength = 0.001f;
 	float maxAOLength = 2.0f;
 	RayDesc aoRay;
 	ShadowRayPayload aoRayPayload;
@@ -380,7 +380,7 @@ void rayGen()
 		TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 	0xFF, 1, 0, 1, raySecondary, secondaryPayload);
 		pdf = ImportanceSamplePdf(roughness, dot(N, H));
-		pdf = max(min(pdf, 10.0),  0.2);
+		pdf = max(min(pdf, 1000.0),  0.01);
 	}
 	if (secondaryPayload.color.w > 0.1f)
 	{

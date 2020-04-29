@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE2 1
+#define SCENE3 1
 #define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
