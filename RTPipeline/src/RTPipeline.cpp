@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE1 1
+#define SCENE2 1
 #define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -54,8 +54,8 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Down(0)
     , m_Pitch(0)
     , m_Yaw(0)
-	, m_AnimateCamera(true)
-    , m_AnimateLights(true)
+	, m_AnimateCamera(false)
+    , m_AnimateLights(false)
     , m_Shift(false)
 	, m_Width(0)
 	, m_Height(0)
@@ -188,7 +188,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 	// light
 	{ 
-		static float lightAnimTime = 0.5f * XM_PI;
+		static float lightAnimTime = 1.0f * XM_PI;
 		if (m_AnimateLights)
 		{
 			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
