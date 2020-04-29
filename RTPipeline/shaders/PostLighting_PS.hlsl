@@ -4,7 +4,11 @@ Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSampleShadow : register(t4);
 Texture2D<float4> GSampleReflect : register(t5);
-Texture3D<float> A_tmp_data : register(t6);
+Texture3D<float4> A_tmp_data : register(t6);
+
+RWTexture2D<float4> prev_SampleShadow : register(u0);
+RWTexture2D<float4> prev_SampleReflect : register(u1);
+
 struct PointLight
 {
 	float4 PositionWS;
@@ -23,6 +27,13 @@ struct Camera
 	float3 padding;
 }; // Total:                              16 * 6 = 96 bytes
 ConstantBuffer<Camera> CameraCB : register(b1);
+struct FrameIndex
+{
+	uint FrameIndex;
+	uint seed;
+	float2 Padding;
+};
+ConstantBuffer<FrameIndex> frameIndexCB : register(b2);
 
 float3 LinearToSRGB(float3 x)
 {
@@ -151,6 +162,23 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
+	if (frameIndexCB.FrameIndex <=1) {
+		prev_SampleShadow[int2(texCoord.x, texCoord.y)] = float4(visibility, ao, 0, 0);
+		prev_SampleReflect[int2(texCoord.x, texCoord.y)] = float4(reflectivity, 0);
+	}
+	else {
+		int count = frameIndexCB.FrameIndex;
+		float prev_visibility = prev_SampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
+		float prev_ao = prev_SampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).y;
+		float3 prev_reflect = prev_SampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
+		visibility = (visibility + prev_visibility * (count - 1)) / count;
+		ao = (ao + prev_ao * (count - 1)) / count;
+		reflectivity = (reflectivity + prev_reflect * (count - 1)) / count;
+		
+		prev_SampleShadow[int2(texCoord.x, texCoord.y)] = float4(visibility, ao, 0, 0);
+		prev_SampleReflect[int2(texCoord.x, texCoord.y)] = float4(reflectivity, 0);
+	}
+	
 	// ambient
 	float3 color0 = 0.01 * ao * albedo;
 	
@@ -163,7 +191,4 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	// compact
 	float3 color = LinearToSRGB(simpleToneMapping(( color0 +  color1 +  color2)));
 	return float4(color, 1);
-	
-	// test
-	//return float4(visibility, visibility, visibility, 0);
 }

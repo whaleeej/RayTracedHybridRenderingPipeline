@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE1 1
+#define SCENE2 1
 #define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -43,19 +43,19 @@ static float gid = 0.0f;
 ////////////////////////////////////////////////////////////////////// framework
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
-    : super(name, width, height, vSync)
-    , m_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX))
-    , m_Viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
-    , m_Forward(0)
-    , m_Backward(0)
-    , m_Left(0)
-    , m_Right(0)
-    , m_Up(0)
-    , m_Down(0)
-    , m_Pitch(0)
-    , m_Yaw(0)
-	, m_AnimateCamera(true)
-    , m_AnimateLights(true)
+	: super(name, width, height, vSync)
+	, m_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX))
+	, m_Viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
+	, m_Forward(0)
+	, m_Backward(0)
+	, m_Left(0)
+	, m_Right(0)
+	, m_Up(0)
+	, m_Down(0)
+	, m_Pitch(0)
+	, m_Yaw(0)
+	, m_AnimateCamera(false)
+    , m_AnimateLights(false)
     , m_Shift(false)
 	, m_Width(0)
 	, m_Height(0)
@@ -188,7 +188,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 	// light
 	{ 
-		static float lightAnimTime = 0.5f * XM_PI;
+		static float lightAnimTime = 1.0f * XM_PI;
 		if (m_AnimateLights)
 		{
 			lightAnimTime += static_cast<float>(e.ElapsedTime) * 0.5f * XM_PI;
@@ -343,126 +343,6 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPipelineState1(mpPipelineState);
 		commandList->DispatchRays(&raytraceDesc);
 	}
-	
-	// Perform Temporal Accumulation and Variance Estimation
-	{ 
-		commandList->SetPipelineState(m_PostSVGFTemporalPipelineState);
-		commandList->SetComputeRootSignature(m_PostSVGFTemporalRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, variance_inout[1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-	}
-	
-	// Perform ATrous Iteration
-	{
-		commandList->SetPipelineState(m_PostSVGFATrousPipelineState);
-		commandList->SetComputeRootSignature(m_PostSVGFATrousRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		
-		// pingpang interation
-		for (uint32_t level = 1; level <= ATrous_Level_Max; level++) {
-			assert(ATrous_Level_Max > 1);
-			uint32_t pingPangSrvUavOffset = ppSrvUavOffset;
-			Texture color_in = (level==1)? col_acc : color_inout[level % 2];
-			Texture color_out = (level == ATrous_Level_Max)? col_acc : color_inout[(level + 1) % 2];
-			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
-			Texture variance_out = variance_inout[(level + 1) % 2];
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, variance_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			commandList->SetCompute32BitConstants(1, level);
-			commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-		}
-	}
-
-	// Perform BMFR_1_TemporalNoisy
-	{
-		commandList->SetPipelineState(m_PostBMFRTemporalNoisyPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRTemporalNoisyRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->SetCompute32BitConstants(2, globalFrameCount);
-		commandList->Dispatch(WORKSET_WITH_MARGINS_WIDTH / local_width, WORKSET_WITH_MARGINS_HEIGHT / local_height);
-	}
-
-	// Perform BMFR_2_QR
-	{
-		commandList->SetPipelineState(m_PostBMFRQRFactorizationPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRQRFactorizationRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
-	}
-
-	// Perform BMFR_3_WeightedSum
-	{
-		commandList->SetPipelineState(m_PostBMFRWeightedSumPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRWeightedSumRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
-
-	// Perform BMFR_4_
-	{
-		commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
 
 	// post lighting
 	{
@@ -477,11 +357,16 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, prev_SampleShadow, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, prev_SampleReflect, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
+		FrameIndexCB fid;
+		fid.FrameIndex = static_cast<uint32_t>(globalFrameCount);
+		commandList->SetGraphicsDynamicConstantBuffer(3, fid);
 		commandList->Draw(3);
 	}
 
@@ -1040,6 +925,8 @@ void HybridPipeline::loadDXResource() {
 		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
 		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
 		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, createTex2D_DepthStencil(L"Depth Render Target", m_Width, m_Height));
+		prev_SampleShadow = createTex2D_ReadWrite(L"prev_SampleShadow", m_Width, m_Height);
+		prev_SampleReflect = createTex2D_ReadWrite(L"prev_SampleReflect", m_Width, m_Height);
 
 		gPosition_prev = createTex2D_RenderTarget(L"gPosition_prev", m_Width, m_Height);
 		gAlbedoMetallic_prev = createTex2D_RenderTarget(L"gAlbedoMetallic_prev", m_Width, m_Height);
@@ -1416,14 +1303,16 @@ void HybridPipeline::loadPipeline() {
 
 		// Create the PostLighting_PS Root Signature
 		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7, 0)
+			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7, 0),
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
 			};
 
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+			CD3DX12_ROOT_PARAMETER1 rootParameters[4];
 			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[3].InitAsConstantBufferView(2, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;

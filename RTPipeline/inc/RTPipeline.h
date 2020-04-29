@@ -235,6 +235,8 @@ private:
 	Texture gAlbedoMetallic_prev; //srv
 	Texture gNormalRoughness_prev; //srv
 	Texture gExtra_prev; //srv
+	Texture prev_SampleShadow;
+	Texture prev_SampleReflect;
 
 	// SVGF Post Temporal
 	Texture col_acc; //uav
