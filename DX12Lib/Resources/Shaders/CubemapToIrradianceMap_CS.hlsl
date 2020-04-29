@@ -11,7 +11,7 @@ struct ComputeShaderInput
 struct CubeMapToIrradianceMap
 {
     uint CubemapSize;
-	uint padding;
+	uint padding[3];
 };
 
 ConstantBuffer<CubeMapToIrradianceMap> CubeMapToIrradianceMapCB : register(b0);

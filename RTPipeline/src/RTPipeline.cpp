@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE3 1
+#define SCENE1 1
 #define GLOBAL_BENCHMARK_LIMIT 1*60.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -256,7 +256,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetGraphics32BitConstants(0, viewProjMatrix);
 
 		// skybox rendering
-		auto& skybox_texture = texturePool["skybox_envMap"];
+		auto& skybox_texture = texturePool["skybox_cubemap"];
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -358,16 +358,26 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+		auto& env_cubemap = texturePool["skybox_envMap"];
+		D3D12_SHADER_RESOURCE_VIEW_DESC env_cubemap_srvDesc = {};
+		env_cubemap_srvDesc.Format = env_cubemap.GetD3D12ResourceDesc().Format;
+		env_cubemap_srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		env_cubemap_srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		env_cubemap_srvDesc.TextureCube.MipLevels = 5;
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, env_cubemap, 
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,&env_cubemap_srvDesc);
+
 		auto& irradiance_cubemap = texturePool["skybox_irradianceMap"];
 		D3D12_SHADER_RESOURCE_VIEW_DESC irradiance_cubemap_srvDesc = {};
 		irradiance_cubemap_srvDesc.Format = irradiance_cubemap.GetD3D12ResourceDesc().Format;
 		irradiance_cubemap_srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		irradiance_cubemap_srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-		irradiance_cubemap_srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
-		// TODO: Need a better way to bind a cubemap.
+		irradiance_cubemap_srvDesc.TextureCube.MipLevels = 1;
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, irradiance_cubemap, 
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,&irradiance_cubemap_srvDesc);
+
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, iBL_LUT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
 		commandList->Draw(3);
@@ -601,6 +611,10 @@ void HybridPipeline::loadResource() {
 	commandList->LoadTextureFromFile(texturePool["metal_normal"], L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
 	texturePool.emplace("metal_roughness", Texture());
 	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
+	//iBL-LUT
+	texturePool.emplace("iBL_LUT", Texture());
+	commandList->LoadTextureFromFile(texturePool["iBL_LUT"], L"Assets/HDR/ibl_brdf_lut.png", TextureUsage::IntermediateBuffer);
+	iBL_LUT = texturePool["iBL_LUT"];
 
 	// load cubemap
 	texturePool.emplace("skybox_pano", Texture());
@@ -631,7 +645,7 @@ void HybridPipeline::loadResource() {
 	auto envCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
 	envCubemapDesc.Width = envCubemapDesc.Height = 128 * 1;
 	envCubemapDesc.DepthOrArraySize = 6;
-	envCubemapDesc.MipLevels = 1;
+	envCubemapDesc.MipLevels = 5;
 	envCubemapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	texturePool.emplace("skybox_envMap", Texture(envCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox EnvMap"));
 	commandList->CubemapToEnvMap(texturePool["skybox_envMap"], texturePool["skybox_cubemap"]);
@@ -1323,7 +1337,7 @@ void HybridPipeline::loadPipeline() {
 		// Create the PostLighting_PS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7, 0)
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0)
 			};
 
 			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
@@ -1331,7 +1345,7 @@ void HybridPipeline::loadPipeline() {
 			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 
-			CD3DX12_STATIC_SAMPLER_DESC sampler(0, D3D12_FILTER_ANISOTROPIC);
+			CD3DX12_STATIC_SAMPLER_DESC sampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters,1,&sampler);

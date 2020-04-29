@@ -11,14 +11,19 @@ struct ComputeShaderInput
 struct CubeMapToEnvMap
 {
     uint CubemapSize;
-	uint padding;
+	uint NumMips;
+	uint padding[2];
 };
 
 ConstantBuffer<CubeMapToEnvMap> CubeMapToEnvMapCB : register(b0);
 
 TextureCube<float4> SkyboxCubaMap : register(t0);
 
-RWTexture2DArray<float4> DstMip : register(u0);
+RWTexture2DArray<float4> DstMip1 : register(u0);
+RWTexture2DArray<float4> DstMip2 : register(u1);
+RWTexture2DArray<float4> DstMip3 : register(u2);
+RWTexture2DArray<float4> DstMip4 : register(u3);
+RWTexture2DArray<float4> DstMip5 : register(u4);
 
 // Linear repeat sampler.
 SamplerState LinearRepeatSampler : register(s0);
@@ -27,7 +32,7 @@ SamplerState LinearRepeatSampler : register(s0);
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 1), " \
     "DescriptorTable( SRV(t0, numDescriptors = 1) )," \
-    "DescriptorTable( UAV(u0, numDescriptors = 1) )," \
+    "DescriptorTable( UAV(u0, numDescriptors = 5) )," \
     "StaticSampler(s0," \
         "addressU = TEXTURE_ADDRESS_WRAP," \
         "addressV = TEXTURE_ADDRESS_WRAP," \
@@ -149,28 +154,45 @@ void main( ComputeShaderInput IN )
 	float3 R = N;
 	float3 V = R;
 
-	const uint SAMPLE_COUNT = 1024u;
-	float totalWeight = 0.0;
-	float3 prefilteredColor = float3(0.0, 0.0, 0.0);
-	for (uint i = 0u; i < SAMPLE_COUNT; ++i)
+	int bitsets[5] = {0x00, 0x11,0x33,0x77,0xFF };
+	int divsets[5] = { 1,2,4,8,16};
+	for (uint mip = 0; mip < min(CubeMapToEnvMapCB.NumMips,5); mip++)
 	{
-		float2 Xi = Hammersley(i, SAMPLE_COUNT);
-		float3 H = ImportanceSampleGGX(Xi, N, 0.1);
-		float3 L = normalize(2.0 * dot(V, H) * H - V);
-
-		float NdotL = max(dot(N, L), 0.0);
-		if (NdotL > 0.0)
+		if ((IN.GroupIndex & bitsets[mip]) == 0)
 		{
-			uint status;
-			float3 sample = float3(
-            SkyboxCubaMap.GatherRed(LinearRepeatSampler, L, status).x,
-            SkyboxCubaMap.GatherGreen(LinearRepeatSampler, L, status).x,
-            SkyboxCubaMap.GatherBlue(LinearRepeatSampler, L, status).x);
-			prefilteredColor += sample * NdotL;
-			totalWeight += NdotL;
+			const uint SAMPLE_COUNT = 1024u;
+			float totalWeight = 0.0;
+			float3 prefilteredColor = float3(0.0, 0.0, 0.0);
+			for (uint i = 0u; i < SAMPLE_COUNT; ++i)
+			{
+				float2 Xi = Hammersley(i, SAMPLE_COUNT);
+				float3 H = ImportanceSampleGGX(Xi, N, mip * 1.0 / ((float) (CubeMapToEnvMapCB.NumMips - 1)));
+				float3 L = normalize(2.0 * dot(V, H) * H - V);
+
+				float NdotL = max(dot(N, L), 0.0);
+				if (NdotL > 0.0)
+				{
+					uint status;
+					float3 sample = float3(
+				 SkyboxCubaMap.GatherRed(LinearRepeatSampler, L, status).x,
+				 SkyboxCubaMap.GatherGreen(LinearRepeatSampler, L, status).x,
+				 SkyboxCubaMap.GatherBlue(LinearRepeatSampler, L, status).x);
+					prefilteredColor += sample * NdotL;
+					totalWeight += NdotL;
+				}
+			}
+			prefilteredColor = prefilteredColor / totalWeight;
+		
+			if (mip == 0)
+				DstMip1[uint3(texCoord.xy / divsets[mip], texCoord.z)] = float4(prefilteredColor, 1.0);
+			else if (mip == 1)
+				DstMip2[uint3(texCoord.xy / divsets[mip], texCoord.z)] = float4(prefilteredColor, 1.0);
+			else if (mip == 2)
+				DstMip3[uint3(texCoord.xy / divsets[mip], texCoord.z)] = float4(prefilteredColor, 1.0);
+			else if (mip == 3)
+				DstMip4[uint3(texCoord.xy / divsets[mip], texCoord.z)] = float4(prefilteredColor, 1.0);
+			else if (mip == 4)
+				DstMip5[uint3(texCoord.xy / divsets[mip], texCoord.z)] = float4(prefilteredColor, 1.0);
 		}
 	}
-	prefilteredColor = prefilteredColor / totalWeight;
-	
-	DstMip[texCoord] = float4(prefilteredColor, 1.0);
 }

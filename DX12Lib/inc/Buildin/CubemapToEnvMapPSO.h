@@ -8,7 +8,8 @@
 struct CubeMapToEnvCB
 {
     uint32_t CubemapSize;
-    uint32_t padding[3];
+    uint32_t NumMips;
+    uint32_t padding[2];
 };
 
 // I don't use scoped enums to avoid the explicit cast that is required to 

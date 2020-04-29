@@ -823,9 +823,11 @@ void CommandList::CubemapToEnvMap(Texture& EnvMap, const Texture& cubemap)
 
     m_d3d12CommandList->SetPipelineState(m_CubeMapToEnvMapPSO->GetPipelineState().Get());
     SetComputeRootSignature(m_CubeMapToEnvMapPSO->GetRootSignature());
-
+    
     CubeMapToEnvCB cubeMapToEnvCB;
     cubeMapToEnvCB.CubemapSize = std::max<uint32_t>(static_cast<uint32_t>(envDesc.Width), envDesc.Height);
+    cubeMapToEnvCB.NumMips = envDesc.MipLevels;
+    assert(cubeMapToEnvCB.NumMips <= 5);
     SetCompute32BitConstants(CubeMapToEnvMapRS::CubeMapToEnvMapCB, cubeMapToEnvCB);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -836,13 +838,17 @@ void CommandList::CubemapToEnvMap(Texture& EnvMap, const Texture& cubemap)
     SetShaderResourceView(CubeMapToEnvMapRS::SkyboxCubaMap, 0, cubemap,
         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
 
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-    uavDesc.Format = envDesc.Format;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-    uavDesc.Texture2DArray.FirstArraySlice = 0;
-    uavDesc.Texture2DArray.ArraySize = 6;
-    SetUnorderedAccessView(CubeMapToEnvMapRS::DstMip, 0, stagingTexture,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 0, &uavDesc);
+    for (int i = 0; i < envDesc.MipLevels; i++) {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = envDesc.Format;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+        uavDesc.Texture2DArray.MipSlice = i;
+        uavDesc.Texture2DArray.FirstArraySlice = 0;
+        uavDesc.Texture2DArray.ArraySize = 6;
+        SetUnorderedAccessView(CubeMapToEnvMapRS::DstMip, i, stagingTexture,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 0, &uavDesc);
+    }
+    
 
     Dispatch(Math::DivideByMultiple(cubeMapToEnvCB.CubemapSize, 16), Math::DivideByMultiple(cubeMapToEnvCB.CubemapSize, 16), 6);
 }

@@ -3,8 +3,9 @@ Texture2D<float4> GAlbedoMetallic : register(t1);
 Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSampleShadow : register(t4);
-Texture2D<float4> GSampleReflect : register(t5);
+TextureCube<float4> EnvMap : register(t5);
 TextureCube<float4> IrradianceMap : register(t6);
+Texture2D<float4> IBL_LUT : register(t7);
 struct PointLight
 {
 	float4 PositionWS;
@@ -87,6 +88,11 @@ float3 fresnelSchlick(float cosTheta, float3 F0)
 {
 	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
+float3 fresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+	return F0 + (max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
 float3 DoPbrPointLight(PointLight light, float3 N, float3 V, float3 P, float3 albedo, float roughness, float metallic, float visibility)
 {
 	const float PI = 3.14159265359;
@@ -152,7 +158,7 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 N = normalize(normal);
 	
 	// ambient
-	float3 color0 = 0.001 * albedo;
+	float3 color0 = 0.01 * albedo;
 	
 	// direct
 	float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
@@ -160,11 +166,19 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	// ibl pbr
 	float3 F0 = float3(0.04, 0.04, 0.04);
 	F0 = lerp(F0, albedo, metallic);
-	float3 kS = fresnelSchlick(max(dot(N, V), 0.0), F0);
+	float F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+	float3 kS = F;
 	float3 kD = 1.0 - kS;
 	float3 irradiance = IrradianceMap.Sample(LinearClampSampler, N).xyz;
 	float3 diffuse = irradiance * albedo;
-	float3 ambient = kD * diffuse;
+	
+	const float MAX_REFLECTION_LOD = 4.0;
+	float3 R = reflect(-V,N);
+	float3 prefilteredColor = EnvMap.SampleLevel(LinearClampSampler, R, roughness * MAX_REFLECTION_LOD).xyz;
+	float2 envBRDF = IBL_LUT.Sample(LinearClampSampler, float2(max(dot(N, V), 0.0), roughness)).rg;
+	float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+	
+	float3 ambient = (kD * diffuse + specular);
 	float3 color2 = ambient;
 	
 	// compact
