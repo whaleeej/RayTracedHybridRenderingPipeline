@@ -12,6 +12,7 @@ set( SHADER_FILES
     Resources/Shaders/GenerateMips_CS.hlsl
     Resources/Shaders/PanoToCubemap_CS.hlsl
     Resources/Shaders/CubemapToIrradianceMap_CS.hlsl
+    Resources/Shaders/CubemapToEnvMap_CS.hlsl
 )
 
 set( RESOURCE_FILES 
@@ -97,4 +98,10 @@ set_source_files_properties( Resources/Shaders/CubemapToIrradianceMap_CS.hlsl
     PROPERTIES
         VS_SHADER_TYPE Compute
         VS_SHADER_VARIABLE_NAME g_CubemapToIrradianceMap_CS
+)
+
+set_source_files_properties( Resources/Shaders/CubemapToEnvMap_CS.hlsl
+    PROPERTIES
+        VS_SHADER_TYPE Compute
+        VS_SHADER_VARIABLE_NAME g_CubemapToEnvMap_CS
 )

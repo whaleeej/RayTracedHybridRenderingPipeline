@@ -10,6 +10,8 @@
 #include <GenerateMipsPSO.h>
 #include <IndexBuffer.h>
 #include <PanoToCubemapPSO.h>
+#include <CubemapToIrradianceMapPSO.h>
+#include <CubemapToEnvMapPSO.h>
 #include <RenderTarget.h>
 #include <Resource.h>
 #include <ResourceStateTracker.h>
@@ -18,7 +20,6 @@
 #include <Texture.h>
 #include <UploadBuffer.h>
 #include <VertexBuffer.h>
-#include <CubemapToIrradianceMapPSO.h>
 
 std::map<std::wstring, ID3D12Resource* > CommandList::ms_TextureCache;
 std::mutex CommandList::ms_TextureCacheMutex;
@@ -789,6 +790,61 @@ void CommandList::CubemapToIrradianceMap(Texture& irradianceMap, const Texture& 
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 0, &uavDesc);
 
     Dispatch(Math::DivideByMultiple(cubeMapToIrradianceCB.CubemapSize, 16), Math::DivideByMultiple(cubeMapToIrradianceCB.CubemapSize, 16), 6);
+}
+
+void CommandList::CubemapToEnvMap(Texture& EnvMap, const Texture& cubemap)
+{
+    if (m_d3d12CommandListType == D3D12_COMMAND_LIST_TYPE_COPY)
+    {
+        if (!m_ComputeCommandList)
+        {
+            m_ComputeCommandList = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE)->GetCommandList();
+        }
+        m_ComputeCommandList->CubemapToEnvMap(EnvMap, cubemap);
+        return;
+    }
+
+    if (!m_CubeMapToEnvMapPSO)
+    {
+        m_CubeMapToEnvMapPSO = std::make_unique<CubeMapToEnvMapPSO>();
+    }
+
+    auto device = Application::Get().GetDevice();
+
+    auto envMapResource = EnvMap.GetD3D12Resource();
+    if (!envMapResource) return;
+
+    CD3DX12_RESOURCE_DESC envDesc(envMapResource->GetDesc());
+
+    auto stagingResource = envMapResource;
+    Texture stagingTexture(stagingResource);
+
+    TransitionBarrier(stagingTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    m_d3d12CommandList->SetPipelineState(m_CubeMapToEnvMapPSO->GetPipelineState().Get());
+    SetComputeRootSignature(m_CubeMapToEnvMapPSO->GetRootSignature());
+
+    CubeMapToEnvCB cubeMapToEnvCB;
+    cubeMapToEnvCB.CubemapSize = std::max<uint32_t>(static_cast<uint32_t>(envDesc.Width), envDesc.Height);
+    SetCompute32BitConstants(CubeMapToEnvMapRS::CubeMapToEnvMapCB, cubeMapToEnvCB);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = cubemap.GetD3D12ResourceDesc().Format;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
+    SetShaderResourceView(CubeMapToEnvMapRS::SkyboxCubaMap, 0, cubemap,
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = envDesc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+    uavDesc.Texture2DArray.FirstArraySlice = 0;
+    uavDesc.Texture2DArray.ArraySize = 6;
+    SetUnorderedAccessView(CubeMapToEnvMapRS::DstMip, 0, stagingTexture,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 0, &uavDesc);
+
+    Dispatch(Math::DivideByMultiple(cubeMapToEnvCB.CubemapSize, 16), Math::DivideByMultiple(cubeMapToEnvCB.CubemapSize, 16), 6);
 }
 
 void CommandList::ClearTexture( const Texture& texture, const float clearColor[4])

@@ -88,7 +88,7 @@ void main( ComputeShaderInput IN )
 	float3 right = cross(up, normal);
 	up = cross(normal, right);
 
-	float sampleDelta = 0.05f;
+	float sampleDelta = PI/50.0f;
 	float nrSamples = 0.0f;
 	for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
 	{

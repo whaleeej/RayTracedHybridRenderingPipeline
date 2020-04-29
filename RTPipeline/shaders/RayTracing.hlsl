@@ -1,6 +1,6 @@
 #define DIRECT_SHADOW
-#define AMBIENT_OCCLUSION
-#define INDIRECT_ILLUM
+//#define AMBIENT_OCCLUSION
+//#define INDIRECT_ILLUM
 struct ShadowRayPayload
 {
 	bool hit;
@@ -310,10 +310,10 @@ void rayGen()
 	float3 V = normalize(cameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
-	uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.x)) * hash(P) + frameIndexCB.seed);
-	float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
-	float rnd1 = lowDiscrepSeq.x;
-	float rnd2 = lowDiscrepSeq.y;
+	//uint seed = initRand((launchIndex.x + (launchIndex.y * launchDimension.x)) * hash(P) + frameIndexCB.seed);
+	//float2 lowDiscrepSeq = Hammersley(nextRandomRange(seed, 0, 8192), 8192);
+	//float rnd1 = lowDiscrepSeq.x;
+	//float rnd2 = lowDiscrepSeq.y;
 	
 	float Lo = 0;
 	float La = 0;
@@ -327,15 +327,15 @@ void rayGen()
 	float3 P_biased = P + N * bias;
 	float3 dest = pointLight.PositionWS.xyz;
 	float distan = distance(P_biased, dest);
-	float3 dir = (dest - P_biased) / distan;
-	float sampleDestRadius = pointLight.radius;
-	float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
-	float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
-	float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
+	//float3 dir = (dest - P_biased) / distan;
+	//float sampleDestRadius = pointLight.radius;
+	//float maxCosTheta = distan / sqrt(sampleDestRadius * sampleDestRadius + distan * distan);
+	//float3 distributedSampleAngleinTangentSpace = UniformSampleCone(float2(rnd1, rnd2), maxCosTheta);
+	//float3 distributedDir = SampleTan2W(distributedSampleAngleinTangentSpace, dir);
 	// ray setup
 	ray.Origin = P_biased;
-	ray.Direction = distributedDir;
-	ray.TMax = distan * length(distributedSampleAngleinTangentSpace) / distributedSampleAngleinTangentSpace.z;
+	ray.Direction = normalize(dest - P_biased);
+	ray.TMax = distan;
 	shadowPayload.hit = false;
 	// ray tracing
 	TraceRay(gRtScene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 

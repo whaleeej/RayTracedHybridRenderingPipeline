@@ -58,6 +58,7 @@ class Texture;
 class UploadBuffer;
 class VertexBuffer;
 class CubeMapToIrradianceMapPSO;
+class CubeMapToEnvMapPSO;
 
 class CommandList
 {
@@ -203,6 +204,8 @@ public:
 
 
     void CubemapToIrradianceMap(Texture& irradianceMap, const Texture& cubemap);
+
+    void CubemapToEnvMap(Texture& EnvMap, const Texture& cubemap);
 
     /**
      * Copy subresource data to a texture.
@@ -472,7 +475,7 @@ private:
     // Pipeline state object for converting panorama (equirectangular) to cubemaps
     std::unique_ptr<PanoToCubemapPSO> m_PanoToCubemapPSO;
     std::unique_ptr<CubeMapToIrradianceMapPSO> m_CubemapToIrradianceMapPSO;
-    
+    std::unique_ptr<CubeMapToEnvMapPSO> m_CubeMapToEnvMapPSO;
 
     // Objects that are being tracked by a command list that is "in-flight" on 
     // the command-queue and cannot be deleted. To ensure objects are not deleted 

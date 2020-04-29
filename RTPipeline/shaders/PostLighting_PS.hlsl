@@ -4,7 +4,7 @@ Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSampleShadow : register(t4);
 Texture2D<float4> GSampleReflect : register(t5);
-Texture3D<float> A_tmp_data : register(t6);
+TextureCube<float4> IrradianceMap : register(t6);
 struct PointLight
 {
 	float4 PositionWS;
@@ -23,6 +23,8 @@ struct Camera
 	float3 padding;
 }; // Total:                              16 * 6 = 96 bytes
 ConstantBuffer<Camera> CameraCB : register(b1);
+
+SamplerState LinearClampSampler : register(s0);
 
 float3 LinearToSRGB(float3 x)
 {
@@ -137,8 +139,6 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 emissive = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	float gid = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).w;
 	float visibility = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
-	float ao = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).y;
-	float3 reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	if (hit == 0.0)
 	{
 		if (emissive.x>0||emissive.y>0||emissive.z>0)
@@ -152,18 +152,22 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 N = normalize(normal);
 	
 	// ambient
-	float3 color0 = 0.01 * ao * albedo;
+	float3 color0 = 0.001 * albedo;
 	
 	// direct
 	float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
-	
-	// indirect
-	float3 color2 = 1* ao * reflectivity;
+
+	// ibl pbr
+	float3 F0 = float3(0.04, 0.04, 0.04);
+	F0 = lerp(F0, albedo, metallic);
+	float3 kS = fresnelSchlick(max(dot(N, V), 0.0), F0);
+	float3 kD = 1.0 - kS;
+	float3 irradiance = IrradianceMap.Sample(LinearClampSampler, N).xyz;
+	float3 diffuse = irradiance * albedo;
+	float3 ambient = kD * diffuse;
+	float3 color2 = ambient;
 	
 	// compact
-	float3 color = LinearToSRGB(simpleToneMapping(( color0 +  color1 +  color2)));
+	float3 color = LinearToSRGB(simpleToneMapping((color0 + color1 + color2)));
 	return float4(color, 1);
-	
-	// test
-	//return float4(visibility, visibility, visibility, 0);
 }
