@@ -18,6 +18,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include "Transform.h"
+
 // temporal define for workset dim
 #define LOCAL_WIDTH 8
 #define LOCAL_HEIGHT 8
@@ -78,34 +80,7 @@ private:
 	void updateBuffer();
 
 private:
-	// Transform
-	struct MatCB
-	{
-		XMMATRIX ModelMatrix;
-		XMMATRIX InverseTransposeModelMatrix;
-		XMMATRIX ModelViewProjectionMatrix;
-	};
-	struct Transform
-	{
-		Transform(XMMATRIX trans, XMMATRIX rot, XMMATRIX scale) :
-			translationMatrix(trans), rotationMatrix(rot), scaleMatrix(scale) {};
-		XMMATRIX translationMatrix;
-		XMMATRIX rotationMatrix;
-		XMMATRIX scaleMatrix;
 
-		XMMATRIX ComputeModel()
-		{
-			return scaleMatrix * rotationMatrix * translationMatrix;
-		}
-		MatCB ComputeMatCB(CXMMATRIX view, CXMMATRIX projection)
-		{
-			MatCB matCB;
-			matCB.ModelMatrix = scaleMatrix * rotationMatrix * translationMatrix;
-			matCB.InverseTransposeModelMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, matCB.ModelMatrix));
-			matCB.ModelViewProjectionMatrix = matCB.ModelMatrix * view * projection;
-			return matCB;
-		}
-	};
 	// Material
 	using BaseMaterial = Material;
 	using TextureIndex = std::string;

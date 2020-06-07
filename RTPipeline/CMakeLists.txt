@@ -1,46 +1,24 @@
 cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this file was created.
 
-set( HEADER_FILES
-    inc/Camera.h
-    inc/GameObject.h
-    inc/Light.h
-    inc/Material.h
-    inc/RTPipeline.h
+file(GLOB_RECURSE HEADER_FILES false
+    inc/*.h
 )
 
-set( SRC_FILES
-    src/Camera.cpp
-    src/main.cpp
-    src/Light.cpp
-    src/Material.cpp
-    src/RTPipeline.cpp
+file(GLOB_RECURSE SRC_FILES false
+    src/*.cpp
 )
 
-set( VERTEX_SHADER_FILES 
-    shaders/Deferred_VS.hlsl
-    shaders/PostProcessing_VS.hlsl
-    shaders/Skybox_VS.hlsl
+file(GLOB_RECURSE VERTEX_SHADER_FILES false
+    shaders/*_VS.hlsl
 )
 
-set( PIXEL_SHADER_FILES
-    shaders/Deferred_PS.hlsl
-    shaders/PostLighting_PS.hlsl
-    shaders/Skybox_PS.hlsl
+file(GLOB_RECURSE PIXEL_SHADER_FILES false
+    shaders/*_PS.hlsl
 )
 
-set( COMPUTE_SHADER_FILES 
-#experimental filtering
-#    shaders/PostResampleTemporal_CS.hlsl
- #   shaders/PostResampleSpatial_CS.hlsl
-# SVGF filtering: ta+Atrous
-    shaders/PostSVGFTemporal_CS.hlsl
-    shaders/PostSVGFATrous_CS.hlsl
-# BMFR ta+QR+ back substitution + taa
-    shaders/PostBMFR_1_TemporalNoisy_CS.hlsl
-    shaders/PostBMFR_2_QRFactorization_CS.hlsl
-    shaders/PostBMFR_3_WeightedSum_CS.hlsl
-    shaders/PostBMFR_4_TemporalFiltered_CS.hlsl
-    shaders/PostBMFR_5_TAA_CS.hlsl
+file(GLOB_RECURSE COMPUTE_SHADER_FILES false
+    shaders/*_CS.hlsl
+
 
 )
 
