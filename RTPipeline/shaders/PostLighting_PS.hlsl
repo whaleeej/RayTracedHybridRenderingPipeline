@@ -4,7 +4,8 @@ Texture2D<float4> GNormalRoughness : register(t2);
 Texture2D<float4> GExtra : register(t3);
 Texture2D<float4> GSampleShadow : register(t4);
 Texture2D<float4> GSampleReflect : register(t5);
-Texture3D<float> A_tmp_data : register(t6);
+Texture2D<float4> GFilteredShadow : register(t6);
+Texture2D<float4> GFilteredReflect : register(t7);
 struct PointLight
 {
 	float4 PositionWS;
@@ -23,6 +24,12 @@ struct Camera
 	float3 padding;
 }; // Total:                              16 * 6 = 96 bytes
 ConstantBuffer<Camera> CameraCB : register(b1);
+struct PostTesting
+{
+	int index;
+	float3 padding;
+}; // Total:                              16 * 6 = 96 bytes
+ConstantBuffer<PostTesting> PostTestingCB : register(b2);
 
 float3 LinearToSRGB(float3 x)
 {
@@ -136,9 +143,15 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 normal = GNormalRoughness.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	float3 emissive = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
 	float gid = GExtra.Load(int3(texCoord.x, texCoord.y, 0)).w;
-	float visibility = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
-	float ao = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).y;
-	float3 reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
+	
+	float noise_visibility = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
+	float noise_ao = GSampleShadow.Load(int3(texCoord.x, texCoord.y, 0)).y;
+	float3 noise_reflectivity = GSampleReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
+	
+	float visibility = GFilteredShadow.Load(int3(texCoord.x, texCoord.y, 0)).x;
+	float ao = GFilteredShadow.Load(int3(texCoord.x, texCoord.y, 0)).y;
+	float3 reflectivity = GFilteredReflect.Load(int3(texCoord.x, texCoord.y, 0)).xyz;
+	
 	if (hit == 0.0)
 	{
 		if (emissive.x>0||emissive.y>0||emissive.z>0)
@@ -151,19 +164,77 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
-	// ambient
-	float3 color0 = 0.01 * ao * albedo;
 	
-	// direct
-	float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
-	// indirect
-	float3 color2 = 1* ao * reflectivity;
+	if (PostTestingCB.index == 0)
+	{
+		// ambient
+		float3 color0 = 0.01 * ao * albedo;
 	
-	// compact
-	float3 color = LinearToSRGB(simpleToneMapping(( color0 +  color1 +  color2)));
-	return float4(color, 1);
+		// direct
+		float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
 	
-	// test
-	//return float4(visibility, visibility, visibility, 0);
+		// indirect
+		float3 color2 = 1 * ao * reflectivity;
+	
+		// compact
+		float3 color = LinearToSRGB(simpleToneMapping((color0 + color1 + color2)));
+		
+		return float4(color, 1);
+	}
+	else if (PostTestingCB.index == 1)
+	{
+		return float4(noise_visibility, noise_visibility, noise_visibility,1);
+	}
+	else if (PostTestingCB.index == 2)
+	{
+		return float4(visibility, visibility, visibility, 1);
+	}
+	else if (PostTestingCB.index == 3)
+	{
+		return float4(noise_ao, noise_ao, noise_ao, 1);
+	}
+	else if (PostTestingCB.index == 4)
+	{
+		return float4(ao , ao , ao , 1);
+	}
+	else if (PostTestingCB.index == 5)
+	{
+		// ambient
+		float3 color0 = 0.01 * ao * albedo;
+	
+		// direct
+		float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, visibility);
+	
+		// indirect
+		float3 color2 = 0 * ao * reflectivity;
+	
+		// compact
+		float3 color = LinearToSRGB(simpleToneMapping((color0 + color1 + color2)));
+		
+		return float4(color, 1);
+	}
+	else if (PostTestingCB.index == 6)
+	{
+		// indirect
+		float3 color2 = 1 * ao * noise_reflectivity;
+	
+		// compact
+		float3 color = LinearToSRGB(simpleToneMapping(( color2)));
+		
+		return float4(color, 1);
+	}
+	else if (PostTestingCB.index == 7)
+	{
+		// indirect
+		float3 color2 = 1 * ao * reflectivity;
+	
+		// compact
+		float3 color = LinearToSRGB(simpleToneMapping((color2)));
+		
+		return float4(color, 1);
+	}
+	
+	return 0;
+	
 }

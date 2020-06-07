@@ -195,6 +195,14 @@ private:
 		float index;
 		float padding[3];
 	};
+	// PassTestingIndex
+	struct PassTestingCB {
+		int index=0;
+		float padding[3];
+		void inc() {
+			index = (index + 1) % 8;
+		}
+	};
 	std::string importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo="albedo", std::string metallic="metallic", std::string normal="normal", std::string roughness="roughness");
 
 	/////////////////////////////////////////////// Container
@@ -235,6 +243,7 @@ private:
 	Texture gAlbedoMetallic_prev; //srv
 	Texture gNormalRoughness_prev; //srv
 	Texture gExtra_prev; //srv
+	PassTestingCB postTestingCB;
 
 	// SVGF Post Temporal
 	Texture col_acc; //uav

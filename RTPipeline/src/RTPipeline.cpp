@@ -30,8 +30,8 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE2 1
-#define GLOBAL_BENCHMARK_LIMIT 1*60.0
+#define SCENE1 1
+#define GLOBAL_BENCHMARK_LIMIT 1*120.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
 static uint64_t globalFrameCount = 0;
@@ -477,11 +477,13 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
+		commandList->SetGraphicsDynamicConstantBuffer(3, postTestingCB);
 		commandList->Draw(3);
 	}
 
@@ -581,6 +583,8 @@ void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
 			m_Yaw = 0.0f;
 		}
 		break;
+	case KeyCode::X:
+		postTestingCB.inc();
     case KeyCode::ShiftKey:
         //m_Shift = true;
 		// disable the shift key
@@ -1417,13 +1421,14 @@ void HybridPipeline::loadPipeline() {
 		// Create the PostLighting_PS Root Signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7, 0)
+				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0)
 			};
 
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+			CD3DX12_ROOT_PARAMETER1 rootParameters[4];
 			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
+			rootParameters[3].InitAsConstantBufferView(2, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
 
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
