@@ -745,9 +745,7 @@ void HybridPipeline::transformGameObject() {
 
 	auto device = Application::Get().GetDevice();
 	
-	{/////////////////////////////////// Initial the transform
-		// transform assembling gameobject
-
+	{
 		m_Scene->transformSingleAssembling("Assets/SM_TableRound",
 			XMMatrixTranslation(0, 0.0, 0)
 			, XMMatrixRotationX(-std::_Pi / 2.0f)

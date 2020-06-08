@@ -14,9 +14,7 @@
 #include <Material.h>
 #include <random>
 #include <RenderTarget.h>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+
 
 #include "Transform.h"
 #include "PBRMaterial.h"
