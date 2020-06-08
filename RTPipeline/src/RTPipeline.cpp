@@ -38,7 +38,6 @@ static uint64_t globalFrameCount = 0;
 static double totalTime = 0.0;
 static double globalTime = 0.0;
 static float cameraAnimTime = 0.0f;
-static float gid = 0.0f;
 
 ////////////////////////////////////////////////////////////////////// framework
 
@@ -71,6 +70,8 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     m_pAlignedCameraData->m_InitialCamPos = m_Camera.get_Translation();
     m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
 	m_generatorURNG.seed(1729);
+
+	m_Scene = std::make_shared<Scene>();
 }
 
 HybridPipeline::~HybridPipeline()
@@ -196,7 +197,7 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 		// Setup the lights.
 		const float radius = 6.0f;
-		PointLight& l = m_PointLight;
+		PointLight& l = m_Scene->m_PointLight;
 		l.PositionWS = {
 			static_cast<float>(std::sin(lightAnimTime )) * radius,
 			9,
@@ -210,8 +211,8 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 
 		// Update the pointlight gameobject
 		{
-			gameObjectPool[lightObjectIndex]->Translate(XMMatrixTranslation(l.PositionWS.x, l.PositionWS.y, l.PositionWS.z));
-			gameObjectPool[lightObjectIndex]->Scale(XMMatrixScaling(l.Radius, l.Radius, l.Radius));
+			m_Scene->gameObjectPool[m_Scene->lightObjectIndex]->Translate(XMMatrixTranslation(l.PositionWS.x, l.PositionWS.y, l.PositionWS.z));
+			m_Scene->gameObjectPool[m_Scene->lightObjectIndex]->Scale(XMMatrixScaling(l.Radius, l.Radius, l.Radius));
 		}
 	}
 
@@ -256,7 +257,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetGraphics32BitConstants(0, viewProjMatrix);
 
 		// skybox rendering
-		auto& skybox_texture = texturePool["skybox_cubemap"];
+		auto& skybox_texture = TexturePool::Get().getTexture(m_Scene->cubemap_Index);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -265,7 +266,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		// TODO: Need a better way to bind a cubemap.
 		commandList->SetShaderResourceView(1, 0, skybox_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
 		
-		m_SkyboxMesh->Draw(*commandList);
+		m_Scene->m_SkyboxMesh->Draw(*commandList);
 	}
 
 	// Rasterizing Pipe, G-Buffer-Gen
@@ -276,7 +277,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetPipelineState(m_DeferredPipelineState);
 		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
 
-		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++) {
+		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++) {
 			{
 				// comment the light for pos visualization
 				std::string objIndex = it->first;
@@ -284,7 +285,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 					continue;
 				}
 			}
-			it->second->Draw(*commandList, m_Camera, texturePool, meshPool);
+			it->second->Draw(*commandList, m_Camera);
 		}
 	}
 
@@ -315,7 +316,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		raytraceDesc.MissShaderTable.SizeInBytes = mShaderTableEntrySize * 2;   // Only two
 
 		int objectToRT = 0;
-		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		for (auto it = m_Scene->gameObjectPool.begin(); it !=m_Scene->gameObjectPool.end(); it++)
 		{
 			// 特殊处理剔除光源不加入光追
 			std::string objIndex = it->first;
@@ -323,12 +324,12 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 				continue;
 			}
 			objectToRT++;
-			commandList->TransitionBarrier(texturePool[it->second->material.tex.AlbedoTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(texturePool[it->second->material.tex.MetallicTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(texturePool[it->second->material.tex.NormalTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(texturePool[it->second->material.tex.RoughnessTexture], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(meshPool[it->second->mesh]->getVertexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(meshPool[it->second->mesh]->getIndexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier((it->second)->material.getAlbedoTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier((it->second)->material.getMetallicTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier((it->second)->material.getNormalTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier((it->second)->material.getMetallicTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(MeshPool::Get().getPool()[it->second->mesh]->getVertexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			commandList->TransitionBarrier(MeshPool::Get().getPool()[it->second->mesh]->getIndexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		}
 
 		// Hit is the third entry in the shader-table
@@ -481,7 +482,7 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetGraphicsDynamicConstantBuffer(1, m_PointLight);
+		commandList->SetGraphicsDynamicConstantBuffer(1, m_Scene->m_PointLight);
 		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
 		commandList->SetGraphicsDynamicConstantBuffer(3, postTestingCB);
 		commandList->Draw(3);
@@ -668,173 +669,57 @@ void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 ////////////////////////////////////////////////////////////////////// internal update
 void HybridPipeline::loadResource() {
 	auto device = Application::Get().GetDevice();
-	/////////////////////////////////// Resource Loading
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 	auto commandList = commandQueue->GetCommandList();
+	auto& meshPool = MeshPool::Get(); auto& texturePool = TexturePool::Get();
 
 	// Create a Cube mesh
-	meshPool.emplace("cube", Mesh::CreateCube(*commandList));
-	meshPool.emplace("sphere", Mesh::CreateSphere(*commandList));
-	meshPool.emplace("cone", Mesh::CreateCone(*commandList));
-	meshPool.emplace("torus", Mesh::CreateTorus(*commandList));
-	meshPool.emplace("plane", Mesh::CreatePlane(*commandList));
+	meshPool.addMesh("cube", Mesh::CreateCube(*commandList));
+	meshPool.addMesh("sphere", Mesh::CreateSphere(*commandList));
+	meshPool.addMesh("cone", Mesh::CreateCone(*commandList));
+	meshPool.addMesh("torus", Mesh::CreateTorus(*commandList));
+	meshPool.addMesh("plane", Mesh::CreatePlane(*commandList));
+
 	// Create a skybox mesh
-	m_SkyboxMesh = Mesh::CreateCube(*commandList, 1.0f, true);
-
-	// load PBR textures
-	texturePool.emplace("default_albedo", Texture());
-	commandList->LoadTextureFromFile(texturePool["default_albedo"], L"Assets/Textures/pbr/default/albedo.bmp", TextureUsage::Albedo);
-	texturePool.emplace("default_metallic", Texture());
-	commandList->LoadTextureFromFile(texturePool["default_metallic"], L"Assets/Textures/pbr/default/metallic.bmp", TextureUsage::MetallicMap);
-	texturePool.emplace("default_normal", Texture());
-	commandList->LoadTextureFromFile(texturePool["default_normal"], L"Assets/Textures/pbr/default/normal.bmp", TextureUsage::Normalmap);
-	texturePool.emplace("default_roughness", Texture());
-	commandList->LoadTextureFromFile(texturePool["default_roughness"], L"Assets/Textures/pbr/default/roughness.bmp", TextureUsage::RoughnessMap);
-	//// rusted iron
-	texturePool.emplace("rusted_iron_albedo", Texture());
-	commandList->LoadTextureFromFile(texturePool["rusted_iron_albedo"], L"Assets/Textures/pbr/rusted_iron/albedo.png", TextureUsage::Albedo);
-	texturePool.emplace("rusted_iron_metallic", Texture());
-	commandList->LoadTextureFromFile(texturePool["rusted_iron_metallic"], L"Assets/Textures/pbr/rusted_iron/metallic.png", TextureUsage::MetallicMap);
-	texturePool.emplace("rusted_iron_normal", Texture());
-	commandList->LoadTextureFromFile(texturePool["rusted_iron_normal"], L"Assets/Textures/pbr/rusted_iron/normal.png", TextureUsage::Normalmap);
-	texturePool.emplace("rusted_iron_roughness", Texture());
-	commandList->LoadTextureFromFile(texturePool["rusted_iron_roughness"], L"Assets/Textures/pbr/rusted_iron/roughness.png", TextureUsage::RoughnessMap);
-	//// grid metal
-	texturePool.emplace("grid_metal_albedo", Texture());
-	commandList->LoadTextureFromFile(texturePool["grid_metal_albedo"], L"Assets/Textures/pbr/grid_metal/albedo.png", TextureUsage::Albedo);
-	texturePool.emplace("grid_metal_metallic", Texture());
-	commandList->LoadTextureFromFile(texturePool["grid_metal_metallic"], L"Assets/Textures/pbr/grid_metal/metallic.png", TextureUsage::MetallicMap);
-	texturePool.emplace("grid_metal_normal", Texture());
-	commandList->LoadTextureFromFile(texturePool["grid_metal_normal"], L"Assets/Textures/pbr/grid_metal/normal.png", TextureUsage::Normalmap);
-	texturePool.emplace("grid_metal_roughness", Texture());
-	commandList->LoadTextureFromFile(texturePool["grid_metal_roughness"], L"Assets/Textures/pbr/grid_metal/roughness.png", TextureUsage::RoughnessMap);
-	//// metal
-	texturePool.emplace("metal_albedo", Texture());
-	commandList->LoadTextureFromFile(texturePool["metal_albedo"], L"Assets/Textures/pbr/metal/albedo.png", TextureUsage::Albedo);
-	texturePool.emplace("metal_metallic", Texture());
-	commandList->LoadTextureFromFile(texturePool["metal_metallic"], L"Assets/Textures/pbr/metal/metallic.png", TextureUsage::MetallicMap);
-	texturePool.emplace("metal_normal", Texture());
-	commandList->LoadTextureFromFile(texturePool["metal_normal"], L"Assets/Textures/pbr/metal/normal.png", TextureUsage::Normalmap);
-	texturePool.emplace("metal_roughness", Texture());
-	commandList->LoadTextureFromFile(texturePool["metal_roughness"], L"Assets/Textures/pbr/metal/roughness.png", TextureUsage::RoughnessMap);
-
+	m_Scene->setSkybox("skybox_cubemap", Mesh::CreateCube(*commandList, 1.0f, true));
 	// load cubemap
-	texturePool.emplace("skybox_pano", Texture());
 #ifdef SCENE1
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/skybox_default.hdr", TextureUsage::Albedo);
+	texturePool.loadTexture("skybox_pano", "Assets/HDR/skybox_default.hdr", TextureUsage::Albedo, *commandList);
 #elif SCENE2
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Milkyway_BG.hdr", TextureUsage::Albedo);
+	texturePool.loadTexture("skybox_pano", "Assets/HDR/Milkyway_BG.hdr", TextureUsage::Albedo, *commandList);
 #else
-	commandList->LoadTextureFromFile(texturePool["skybox_pano"], L"Assets/HDR/Ice_Lake_HiRes_TMap_2.hdr", TextureUsage::Albedo);
+	texturePool.loadTexture("skybox_pano", "Assets/HDR/Ice_Lake_HiRes_TMap_2.hdr", TextureUsage::Albedo, *commandList);
 #endif
-	auto skyboxCubemapDesc = texturePool["skybox_pano"].GetD3D12ResourceDesc();
-	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = 1024*1;
-	skyboxCubemapDesc.DepthOrArraySize = 6;
-	skyboxCubemapDesc.MipLevels = 1;
-	texturePool.emplace("skybox_cubemap", Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, L"Skybox Cubemap"));
-	commandList->PanoToCubemap(texturePool["skybox_cubemap"], texturePool["skybox_pano"]);
+	texturePool.loadCubemap(1024, "skybox_pano", "skybox_cubemap", *commandList);
+	// load PBR textures
+	
+	texturePool.loadPBRSeriesTexture(DEFAULT_PBR_HEADER, "Assets/Textures/pbr/default/albedo.bmp", *commandList);
+	texturePool.loadPBRSeriesTexture("rusted_iron", "Assets/Textures/pbr/rusted_iron/albedo.png", *commandList);
+	texturePool.loadPBRSeriesTexture("grid_metal", "Assets/Textures/pbr/grid_metal/albedo.png", *commandList);
+	texturePool.loadPBRSeriesTexture("metal", "Assets/Textures/pbr/metal/albedo.png", *commandList);
 
 	// run ocmmandlist
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
 }
 void HybridPipeline::loadGameObject() {
-	auto copy_Gameobject_assembling = [&](std::string from, std::string to) {
-		auto objAssemble = gameObjectAssembling.equal_range(from);
-		std::vector<GameObjectIndex> indices;
-		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
-			std::shared_ptr<GameObject> localGo = std::make_shared<GameObject>();
-			localGo->gid = gid++;
-			localGo->mesh = gameObjectPool[k->second]->mesh;
-			localGo->transform = gameObjectPool[k->second]->transform;
-			localGo->material = gameObjectPool[k->second]->material;
-			gameObjectPool.emplace(k->second + to, localGo);
-			indices.push_back(k->second + to);
-		}
-		for (size_t i = 0; i < indices.size(); i++)
-		{
-			gameObjectAssembling.emplace(to, indices[i]);
-		}
-
-	};
+	
 	auto device = Application::Get().GetDevice();
-	/////////////////////////////////// Resource Loading
 	auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 	auto commandList = commandQueue->GetCommandList();
-	/////////////////////////////////// GameObject Gen
 
-	gameObjectPool.emplace("Floor plane", std::make_shared<GameObject>()); //1
-	gameObjectPool["Floor plane"]->gid = gid++;
-	gameObjectPool["Floor plane"]->mesh = "plane";
-	gameObjectPool["Floor plane"]->material.base = Material::White;
-	gameObjectPool["Floor plane"]->material.pbr = PBRMaterial(0.5f, 0.4f);
-	gameObjectPool["Floor plane"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Floor plane", "Floor plane");
+
+	m_Scene->addSingleGameObject("plane", { 0.5f, 0.4f, Material::White }, "Floor plane");
 
 #ifdef SCENE1
-	gameObjectPool.emplace("Ceiling plane", std::make_shared<GameObject>());//3
-	gameObjectPool["Ceiling plane"]->gid = gid++;
-	gameObjectPool["Ceiling plane"]->mesh = "plane";
-	gameObjectPool["Ceiling plane"]->material.base = Material::White;
-	gameObjectPool["Ceiling plane"]->material.pbr = PBRMaterial(0.5f, 0.5f);
-	gameObjectPool["Ceiling plane"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Ceiling plane", "Ceiling plane");
-
-	gameObjectPool.emplace("Back wall", std::make_shared<GameObject>());//2
-	gameObjectPool["Back wall"]->gid = gid++;
-	gameObjectPool["Back wall"]->mesh = "plane";
-	gameObjectPool["Back wall"]->material.base = Material::Pearl;
-	gameObjectPool["Back wall"]->material.pbr = PBRMaterial(0.4f, 0.1f);
-	gameObjectPool["Back wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Back wall", "Back wall");
-
-	gameObjectPool.emplace("Front wall", std::make_shared<GameObject>());//4
-	gameObjectPool["Front wall"]->gid = gid++;
-	gameObjectPool["Front wall"]->mesh = "plane";
-	gameObjectPool["Front wall"]->material.base = Material::Copper;
-	gameObjectPool["Front wall"]->material.pbr = PBRMaterial(0.4f, 0.4f);
-	gameObjectPool["Front wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Front wall", "Front wall");
-
-	gameObjectPool.emplace("Left wall", std::make_shared<GameObject>());//5
-	gameObjectPool["Left wall"]->gid = gid++;
-	gameObjectPool["Left wall"]->mesh = "plane";
-	gameObjectPool["Left wall"]->material.base = Material::Jade;
-	gameObjectPool["Left wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Left wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Left wall", "Left wall");
-
-	gameObjectPool.emplace("Right wall", std::make_shared<GameObject>());//6
-	gameObjectPool["Right wall"]->gid = gid++;
-	gameObjectPool["Right wall"]->mesh = "plane";
-	gameObjectPool["Right wall"]->material.base = Material::Ruby;
-	gameObjectPool["Right wall"]->material.pbr = PBRMaterial(0.4f, 0.3f);
-	gameObjectPool["Right wall"]->material.tex = TextureMaterial("default");
-	gameObjectAssembling.emplace("Right wall", "Right wall");
-
-	gameObjectPool.emplace("sphere", std::make_shared<GameObject>());
-	gameObjectPool["sphere"]->gid = gid++;
-	gameObjectPool["sphere"]->mesh = "sphere";
-	gameObjectPool["sphere"]->material.base = Material::White;
-	gameObjectPool["sphere"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["sphere"]->material.tex = TextureMaterial("rusted_iron");
-	gameObjectAssembling.emplace("sphere", "sphere");
-
-	gameObjectPool.emplace("cube", std::make_shared<GameObject>());
-	gameObjectPool["cube"]->gid = gid++;
-	gameObjectPool["cube"]->mesh = "cube";
-	gameObjectPool["cube"]->material.base = Material::White;
-	gameObjectPool["cube"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["cube"]->material.tex = TextureMaterial("grid_metal");
-	gameObjectAssembling.emplace("cube", "cube");
-
-	gameObjectPool.emplace("torus", std::make_shared<GameObject>());
-	gameObjectPool["torus"]->gid = gid++;
-	gameObjectPool["torus"]->mesh = "torus";
-	gameObjectPool["torus"]->material.base = Material::White;
-	gameObjectPool["torus"]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool["torus"]->material.tex = TextureMaterial("metal");
-	gameObjectAssembling.emplace("torus", "torus");
+	m_Scene->addSingleGameObject( "plane", { 0.5f, 0.5f, Material::White }, "Ceiling plane");
+	m_Scene->addSingleGameObject( "plane", { 0.4f, 0.1f, Material::Pearl }, "Back wall");
+	m_Scene->addSingleGameObject( "plane", { 0.4f, 0.4f, Material::Copper }, "Front wall");
+	m_Scene->addSingleGameObject( "plane", { 0.4f, 0.3f, Material::Jade }, "Left wall");
+	m_Scene->addSingleGameObject( "plane", { 0.4f, 0.3f, Material::Ruby }, "Right wall");
+	m_Scene->addSingleGameObject( "sphere", { "rusted_iron" }, "sphere");
+	m_Scene->addSingleGameObject("cube", { "grid_metal" }, "cube");
+	m_Scene->addSingleGameObject( "torus", { "metal" }, "torus");
 #endif
 #ifdef SCENE2
 	//load external object
@@ -851,13 +736,7 @@ void HybridPipeline::loadGameObject() {
 	copy_Gameobject_assembling("Assets/SM_Chair", "Assets/SM_Chair_copy");
 #endif
 	// light object
-	lightObjectIndex = "sphere light";
-	gameObjectPool.emplace(lightObjectIndex, std::make_shared<GameObject>());//7
-	gameObjectPool[lightObjectIndex]->gid = gid++;
-	gameObjectPool[lightObjectIndex]->mesh = "sphere";
-	gameObjectPool[lightObjectIndex]->material.base = Material::EmissiveWhite;
-	gameObjectPool[lightObjectIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
-	gameObjectPool[lightObjectIndex]->material.tex = TextureMaterial("default");
+	m_Scene->addSingleLight("sphere", Material::EmissiveWhite, "sphere light");
 
 	auto fenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(fenceValue);
@@ -865,75 +744,66 @@ void HybridPipeline::loadGameObject() {
 void HybridPipeline::transformGameObject() {
 
 	auto device = Application::Get().GetDevice();
-	auto transform_a_object_assembling = [&](std::string name, XMMATRIX translation, XMMATRIX rotation, XMMATRIX scaling) {
-		auto objAssemble = gameObjectAssembling.equal_range(name);
-		for (auto k = objAssemble.first; k != objAssemble.second; k++) {
-			gameObjectPool[k->second]->Translate(translation);
-			gameObjectPool[k->second]->Rotate(rotation);
-			gameObjectPool[k->second]->Scale(scaling);
-		}
-	};
-
 	
 	{/////////////////////////////////// Initial the transform
 		// transform assembling gameobject
 
-		transform_a_object_assembling("Assets/SM_TableRound",
+		m_Scene->transformSingleAssembling("Assets/SM_TableRound",
 			XMMatrixTranslation(0, 0.0, 0)
 			, XMMatrixRotationX(-std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
-		transform_a_object_assembling("Assets/SM_Chair",
+		m_Scene->transformSingleAssembling("Assets/SM_Chair",
 			XMMatrixTranslation(-10, 0.0, -6)
 			, XMMatrixRotationZ(-std::_Pi / 4.0f) * XMMatrixRotationX(-std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
-		transform_a_object_assembling("Assets/SM_Chair_copy",
+		m_Scene->transformSingleAssembling("Assets/SM_Chair_copy",
 			XMMatrixTranslation(-4, 0.0, 6)
 			, XMMatrixRotationZ(std::_Pi / 3.0f)*XMMatrixRotationX(-std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
-		transform_a_object_assembling("Assets/SM_Couch",
+		m_Scene->transformSingleAssembling("Assets/SM_Couch",
 			XMMatrixTranslation(8, 0.0, 0)
 			, XMMatrixRotationZ(-std::_Pi ) *XMMatrixRotationX(-std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
-		transform_a_object_assembling("Assets/SM_Lamp_Ceiling",
+		m_Scene->transformSingleAssembling("Assets/SM_Lamp_Ceiling",
 			XMMatrixTranslation(2, 0.0, 14)
 			,  XMMatrixRotationX(std::_Pi / 2.0f)
 			, XMMatrixScaling(0.12f, 0.12f, 0.12f));
 
-		transform_a_object_assembling("Assets/SM_MatPreviewMesh",
+		m_Scene->transformSingleAssembling("Assets/SM_MatPreviewMesh",
 			XMMatrixTranslation(0, 5.5,0)
 			, XMMatrixRotationX(-std::_Pi / 2.0f)
 			, XMMatrixScaling(0.01f, 0.01f, 0.01f));
 
-		transform_a_object_assembling("Assets/Cerberus", 
+		m_Scene->transformSingleAssembling("Assets/Cerberus",
 			XMMatrixTranslation(-1.2f, 10.0f, -1.6f)
 			, XMMatrixRotationX(-std::_Pi/3.0f*2.0f)
 			, XMMatrixScaling(0.02f, 0.02f, 0.02f));
 
-		transform_a_object_assembling("Assets/Unreal-actor",
+		m_Scene->transformSingleAssembling("Assets/Unreal-actor",
 			XMMatrixTranslation(0.0f, 10.0f, 0.0f)
 			, XMMatrixRotationY( std::_Pi)
 			, XMMatrixScaling(6.f, 6.f, 6.0f));
 
-		transform_a_object_assembling("Assets/Sci-fi-Biolab/source",
+		m_Scene->transformSingleAssembling("Assets/Sci-fi-Biolab/source",
 			XMMatrixTranslation(0.0f, 0.0f, 0.0f)
 			, XMMatrixRotationX(-std::_Pi/2.0)
 			, XMMatrixScaling(8.f, 8.f, 8.0f));
 
-		transform_a_object_assembling("sphere"
+		m_Scene->transformSingleAssembling("sphere"
 			, XMMatrixTranslation(4.0f, 3.0f, 2.0f)
 			, XMMatrixIdentity()
 			, XMMatrixScaling(6.0f, 6.0f, 6.0f));
 
-		transform_a_object_assembling("cube"
+		m_Scene->transformSingleAssembling("cube"
 			, XMMatrixTranslation(-4.0f, 3.0f, -2.0f)
 			, XMMatrixRotationY(XMConvertToRadians(45.0f))
 			, XMMatrixScaling(6.0f, 6.0f, 6.0f));
 
-		transform_a_object_assembling("torus"
+		m_Scene->transformSingleAssembling("torus"
 			, XMMatrixTranslation(4.0f, 0.6f, -6.0f)
 			, XMMatrixRotationY(XMConvertToRadians(45.0f))
 			, XMMatrixScaling(4.0f, 4.0f, 4.0f));
@@ -941,32 +811,32 @@ void HybridPipeline::transformGameObject() {
 		float scalePlane = 20.0f;
 		float translateOffset = scalePlane / 2.0f;
 
-		transform_a_object_assembling("Floor plane"
+		m_Scene->transformSingleAssembling("Floor plane"
 			, XMMatrixTranslation(0.0f, 0.0f, 0.0f)
 			, XMMatrixIdentity()
 			, XMMatrixScaling(scalePlane*10, 1.0f, scalePlane*10));
 
-		transform_a_object_assembling("Back wall"
+		m_Scene->transformSingleAssembling("Back wall"
 			, XMMatrixTranslation(0.0f, translateOffset, translateOffset)
 			, XMMatrixRotationX(XMConvertToRadians(-90))
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		transform_a_object_assembling("Ceiling plane"
+		m_Scene->transformSingleAssembling("Ceiling plane"
 			, XMMatrixTranslation(0.0f, translateOffset * 2.0f, 0)
 			, XMMatrixRotationX(XMConvertToRadians(180))
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		transform_a_object_assembling("Front wall"
+		m_Scene->transformSingleAssembling("Front wall"
 			, XMMatrixTranslation(0, translateOffset, -translateOffset)
 			, XMMatrixRotationX(XMConvertToRadians(90))
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		transform_a_object_assembling("Left wall"
+		m_Scene->transformSingleAssembling("Left wall"
 			, XMMatrixTranslation(-translateOffset, translateOffset, 0)
 			, XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(-90))
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 
-		transform_a_object_assembling("Right wall"
+		m_Scene->transformSingleAssembling("Right wall"
 			, XMMatrixTranslation(translateOffset, translateOffset, 0)
 			, XMMatrixRotationX(XMConvertToRadians(-90)) * XMMatrixRotationY(XMConvertToRadians(90))
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
@@ -1498,218 +1368,201 @@ void HybridPipeline::updateBuffer()
 	{
 		void* pData;
 		mpRTPointLightCB->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, &(m_PointLight), sizeof(PointLight));
+		memcpy(pData, &(m_Scene->m_PointLight), sizeof(PointLight));
 		mpRTPointLightCB->Unmap(0, nullptr);
 	}
 }
-
-void HybridPipeline::GameObject::Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool)
-{
-	commandList.SetGraphicsDynamicConstantBuffer(0, transform.ComputeMatCB(camera.get_ViewMatrix(), camera.get_ProjectionMatrix()));
-	commandList.SetGraphicsDynamicConstantBuffer(1, material.base);
-	commandList.SetGraphicsDynamicConstantBuffer(2, material.pbr);
-	commandList.SetGraphics32BitConstants(3, gid);
-	commandList.SetShaderResourceView(4, 0, (texturePool.find(material.tex.AlbedoTexture) != texturePool.end()) ? texturePool[material.tex.AlbedoTexture] : texturePool["default_albedo"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(4, 1, (texturePool.find(material.tex.MetallicTexture) != texturePool.end()) ? texturePool[material.tex.MetallicTexture] : texturePool["default_metallic"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(4, 2, (texturePool.find(material.tex.NormalTexture) != texturePool.end()) ? texturePool[material.tex.NormalTexture] : texturePool["default_normal"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	commandList.SetShaderResourceView(4, 3, (texturePool.find(material.tex.RoughnessTexture) != texturePool.end()) ? texturePool[material.tex.RoughnessTexture] : texturePool["default_roughness"], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-	if (meshPool.find(mesh) != meshPool.end()) {
-		meshPool[mesh]->Draw(commandList);
-	}
-}
-
-std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo, std::string metallic, std::string normal, std::string roughness) {
-	std::string rootPath = path.substr(0, path.find_last_of('/'));
-
-	// 获得同目录下的同名的其他贴图的转换函数
-	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
-		size_t start = albedoName.find_last_of(replace_from) ;
-		size_t length = replace_from.size();
-		start -= length;
-		std::string ret = albedoName.substr(0, start+1) + replace_to + albedoName.substr(start + length+1, albedoName.length());
-		return ret;
-	};
-
-	// processMesh
-	auto processMesh = [&](aiMesh* mesh, const aiScene* scene, std::shared_ptr<CommandList> commandList){
-		VertexCollection vertices;
-		IndexCollection indices;
-		// 构建vertex
-		for (size_t i = 0; i < mesh->mNumVertices; i++)
-		{
-			VertexPositionNormalTexture vnt;
-			vnt.position.x = mesh->mVertices[i].x;
-			vnt.position.y = mesh->mVertices[i].y;
-			vnt.position.z = mesh->mVertices[i].z;
-			vnt.normal.x = mesh->mNormals[i].x;
-			vnt.normal.y = mesh->mNormals[i].y;
-			vnt.normal.z = mesh->mNormals[i].z;
-			if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
-			{
-				vnt.textureCoordinate.x = mesh->mTextureCoords[0][i].x;
-				vnt.textureCoordinate.y = 1.0f - mesh->mTextureCoords[0][i].y;
-			}
-			else {
-				vnt.textureCoordinate.x = 0.0f;
-				vnt.textureCoordinate.y = 0.0f;
-			}
-			vertices.push_back(vnt);
-		}
-		// 构建indices
-		for (size_t i = 0; i < mesh->mNumFaces; i++)
-		{
-			aiFace face = mesh->mFaces[i];
-			for (size_t j = 0; j < face.mNumIndices; j++)
-			{
-				indices.push_back(face.mIndices[j]);
-			}
-		}
-
-		TextureIndex albedoIndex;
-		TextureIndex metallicIndex;
-		TextureIndex normalIndex;
-		TextureIndex roughnessIndex;
-		// 加载贴图
-		if (mesh->mMaterialIndex >= 0)
-		{
-			aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-			//加载模型内的albedo贴图 顺带加载同目录下的Metallic，Normal，Roughness
-			unsigned int count = material->GetTextureCount(aiTextureType_DIFFUSE);
-			aiString str;
-			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
-			albedoIndex = str.data;
-			if ((int)albedoIndex.find_first_of(':') < 0) {
-				albedoIndex = rootPath + "/" + albedoIndex;
-			}
-			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-		}
-		if (texturePool.find(albedoIndex) == texturePool.end()//错误检查
-			|| texturePool.find(metallicIndex) == texturePool.end()
-			|| texturePool.find(normalIndex) == texturePool.end()
-			|| texturePool.find(roughnessIndex) == texturePool.end()
-			) {
-			albedoIndex = rootPath + "/" + "default_albedo.jpg";
-			albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
-			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-		}
-
-		////生成mesh //因为index是int32 所以可能要分多批mesh填装
-		size_t slot_size = 0xffffffff - 3;
-		for (size_t i = 0; i < (int)std::ceil((float)indices.size()/slot_size); i++)
-		{
-			VertexCollection localVetices;
-			IndexCollection localIndices;
-			size_t start = i * slot_size;
-			size_t end = std::min(start+slot_size, indices.size() );
-			for (size_t j = 0; j < vertices.size(); j++)
-			{
-				localVetices.push_back(vertices[j]);
-			}
-			for (size_t j = start; j < end; j++)
-			{
-					localIndices.push_back(indices[j]);
-			}
-			MeshIndex meshIndex;
-			meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh)+"_"+std::to_string(i);
-			std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
-			dxMesh->Initialize(*commandList, localVetices, localIndices, true);
-			meshPool.emplace(meshIndex, dxMesh);
-
-			//缓存gameobject
-			gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
-			gameObjectPool[meshIndex]->gid = gid++;
-			gameObjectPool[meshIndex]->mesh = meshIndex;
-			gameObjectPool[meshIndex]->material.base = Material::White;
-			gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
-			gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
-
-			//组装gameobject
-			gameObjectAssembling.emplace(rootPath, meshIndex);
-		}
-	};
-	// processNode
-	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
-
-		// processNodes
-		for (unsigned int i = 0; i < node->mNumMeshes; i++)
-		{
-			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-			processMesh(mesh, scene, commandList);
-		}
-		// then do the same for each of its children
-		for (unsigned int i = 0; i < node->mNumChildren; i++)
-		{
-			processNode(node->mChildren[i], scene, commandList);
-		}
-	};
-
-	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals /* | aiProcess_FlipUVs*/);
-	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
-	{
-		ThrowIfFailed(-1);
-	}
-	//先缓存所有的texture
-	bool isLoaded = false;
-	for (size_t i = 0; i < scene->mNumMaterials; i++)
-	{
-		aiMaterial* material = scene->mMaterials[i];
-		int count = material->GetTextureCount(aiTextureType_DIFFUSE);
-		if (count <= 0) {
-			continue;
-		}
-		aiString str;
-		//默认的diffuse贴图
-		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
-		TextureIndex albedoIndex;
-		albedoIndex = str.data;
-		int a = albedoIndex.find_first_of(':');
-		if((int)albedoIndex.find_first_of(':') <0){
-			albedoIndex = rootPath + "/" + albedoIndex;
-		}
-		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-		texturePool.emplace(albedoIndex, Texture());//albedo
-		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring( albedoIndex), TextureUsage::Albedo);
-		texturePool.emplace(metallicIndex, Texture());//metallic
-		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
-		texturePool.emplace(normalIndex, Texture());//normal
-		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring( normalIndex), TextureUsage::Normalmap);
-		texturePool.emplace(roughnessIndex, Texture());//roughness
-		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring( roughnessIndex), TextureUsage::RoughnessMap);
-		isLoaded = true;
-	}
-	TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
-	albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
-	TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-	TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-	TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-	if (_access(albedoIndex.c_str(), 0) >= 0) {
-		texturePool.emplace(albedoIndex, Texture());//albedo
-		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(albedoIndex), TextureUsage::Albedo);
-	}
-	if (_access(metallicIndex.c_str(), 0) >= 0) {
-		texturePool.emplace(metallicIndex, Texture());//metallic
-		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
-	}
-	if (_access(normalIndex.c_str(), 0) >= 0) {
-		texturePool.emplace(normalIndex, Texture());//normal
-		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(normalIndex), TextureUsage::Normalmap);
-	}
-	if (_access(roughnessIndex.c_str(), 0) >= 0) {
-		texturePool.emplace(roughnessIndex, Texture());//roughness
-		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(roughnessIndex), TextureUsage::RoughnessMap);
-	}
-	//随后load mesh并且绑定贴图加载入
-	processNode(scene->mRootNode, scene, commandList);
-	return rootPath;
-}
+//std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo, std::string metallic, std::string normal, std::string roughness) {
+//	std::string rootPath = path.substr(0, path.find_last_of('/'));
+//
+//	// 获得同目录下的同名的其他贴图的转换函数
+//	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
+//		size_t start = albedoName.find_last_of(replace_from) ;
+//		size_t length = replace_from.size();
+//		start -= length;
+//		std::string ret = albedoName.substr(0, start+1) + replace_to + albedoName.substr(start + length+1, albedoName.length());
+//		return ret;
+//	};
+//
+//	// processMesh
+//	auto processMesh = [&](aiMesh* mesh, const aiScene* scene, std::shared_ptr<CommandList> commandList){
+//		VertexCollection vertices;
+//		IndexCollection indices;
+//		// 构建vertex
+//		for (size_t i = 0; i < mesh->mNumVertices; i++)
+//		{
+//			VertexPositionNormalTexture vnt;
+//			vnt.position.x = mesh->mVertices[i].x;
+//			vnt.position.y = mesh->mVertices[i].y;
+//			vnt.position.z = mesh->mVertices[i].z;
+//			vnt.normal.x = mesh->mNormals[i].x;
+//			vnt.normal.y = mesh->mNormals[i].y;
+//			vnt.normal.z = mesh->mNormals[i].z;
+//			if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
+//			{
+//				vnt.textureCoordinate.x = mesh->mTextureCoords[0][i].x;
+//				vnt.textureCoordinate.y = 1.0f - mesh->mTextureCoords[0][i].y;
+//			}
+//			else {
+//				vnt.textureCoordinate.x = 0.0f;
+//				vnt.textureCoordinate.y = 0.0f;
+//			}
+//			vertices.push_back(vnt);
+//		}
+//		// 构建indices
+//		for (size_t i = 0; i < mesh->mNumFaces; i++)
+//		{
+//			aiFace face = mesh->mFaces[i];
+//			for (size_t j = 0; j < face.mNumIndices; j++)
+//			{
+//				indices.push_back(face.mIndices[j]);
+//			}
+//		}
+//
+//		TextureIndex albedoIndex;
+//		TextureIndex metallicIndex;
+//		TextureIndex normalIndex;
+//		TextureIndex roughnessIndex;
+//		// 加载贴图
+//		if (mesh->mMaterialIndex >= 0)
+//		{
+//			aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+//			//加载模型内的albedo贴图 顺带加载同目录下的Metallic，Normal，Roughness
+//			unsigned int count = material->GetTextureCount(aiTextureType_DIFFUSE);
+//			aiString str;
+//			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
+//			albedoIndex = str.data;
+//			if ((int)albedoIndex.find_first_of(':') < 0) {
+//				albedoIndex = rootPath + "/" + albedoIndex;
+//			}
+//			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+//			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+//			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+//		}
+//		if (texturePool.find(albedoIndex) == texturePool.end()//错误检查
+//			|| texturePool.find(metallicIndex) == texturePool.end()
+//			|| texturePool.find(normalIndex) == texturePool.end()
+//			|| texturePool.find(roughnessIndex) == texturePool.end()
+//			) {
+//			albedoIndex = rootPath + "/" + "default_albedo.jpg";
+//			albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
+//			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+//			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+//			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+//		}
+//
+//		////生成mesh //因为index是int32 所以可能要分多批mesh填装
+//		size_t slot_size = 0xffffffff - 3;
+//		for (size_t i = 0; i < (int)std::ceil((float)indices.size()/slot_size); i++)
+//		{
+//			VertexCollection localVetices;
+//			IndexCollection localIndices;
+//			size_t start = i * slot_size;
+//			size_t end = std::min(start+slot_size, indices.size() );
+//			for (size_t j = 0; j < vertices.size(); j++)
+//			{
+//				localVetices.push_back(vertices[j]);
+//			}
+//			for (size_t j = start; j < end; j++)
+//			{
+//					localIndices.push_back(indices[j]);
+//			}
+//			MeshIndex meshIndex;
+//			meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh)+"_"+std::to_string(i);
+//			std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
+//			dxMesh->Initialize(*commandList, localVetices, localIndices, true);
+//			meshPool.emplace(meshIndex, dxMesh);
+//
+//			//缓存gameobject
+//			gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
+//			gameObjectPool[meshIndex]->gid = gid++;
+//			gameObjectPool[meshIndex]->mesh = meshIndex;
+//			gameObjectPool[meshIndex]->material.base = Material::White;
+//			gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
+//			gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
+//
+//			//组装gameobject
+//			gameObjectAssembling.emplace(rootPath, meshIndex);
+//		}
+//	};
+//	// processNode
+//	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
+//
+//		// processNodes
+//		for (unsigned int i = 0; i < node->mNumMeshes; i++)
+//		{
+//			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+//			processMesh(mesh, scene, commandList);
+//		}
+//		// then do the same for each of its children
+//		for (unsigned int i = 0; i < node->mNumChildren; i++)
+//		{
+//			processNode(node->mChildren[i], scene, commandList);
+//		}
+//	};
+//
+//	Assimp::Importer importer;
+//	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals /* | aiProcess_FlipUVs*/);
+//	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+//	{
+//		ThrowIfFailed(-1);
+//	}
+//	//先缓存所有的texture
+//	bool isLoaded = false;
+//	for (size_t i = 0; i < scene->mNumMaterials; i++)
+//	{
+//		aiMaterial* material = scene->mMaterials[i];
+//		int count = material->GetTextureCount(aiTextureType_DIFFUSE);
+//		if (count <= 0) {
+//			continue;
+//		}
+//		aiString str;
+//		//默认的diffuse贴图
+//		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
+//		TextureIndex albedoIndex;
+//		albedoIndex = str.data;
+//		int a = albedoIndex.find_first_of(':');
+//		if((int)albedoIndex.find_first_of(':') <0){
+//			albedoIndex = rootPath + "/" + albedoIndex;
+//		}
+//		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+//		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+//		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+//		texturePool.emplace(albedoIndex, Texture());//albedo
+//		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring( albedoIndex), TextureUsage::Albedo);
+//		texturePool.emplace(metallicIndex, Texture());//metallic
+//		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
+//		texturePool.emplace(normalIndex, Texture());//normal
+//		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring( normalIndex), TextureUsage::Normalmap);
+//		texturePool.emplace(roughnessIndex, Texture());//roughness
+//		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring( roughnessIndex), TextureUsage::RoughnessMap);
+//		isLoaded = true;
+//	}
+//	TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
+//	albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
+//	TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
+//	TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
+//	TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
+//	if (_access(albedoIndex.c_str(), 0) >= 0) {
+//		texturePool.emplace(albedoIndex, Texture());//albedo
+//		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(albedoIndex), TextureUsage::Albedo);
+//	}
+//	if (_access(metallicIndex.c_str(), 0) >= 0) {
+//		texturePool.emplace(metallicIndex, Texture());//metallic
+//		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
+//	}
+//	if (_access(normalIndex.c_str(), 0) >= 0) {
+//		texturePool.emplace(normalIndex, Texture());//normal
+//		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(normalIndex), TextureUsage::Normalmap);
+//	}
+//	if (_access(roughnessIndex.c_str(), 0) >= 0) {
+//		texturePool.emplace(roughnessIndex, Texture());//roughness
+//		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(roughnessIndex), TextureUsage::RoughnessMap);
+//	}
+//	//随后load mesh并且绑定贴图加载入
+//	processNode(scene->mRootNode, scene, commandList);
+//	return rootPath;
+//}
 
 ////////////////////////////////////////////////////////////////////// RT Object 
 void HybridPipeline::createAccelerationStructures()
@@ -1737,12 +1590,12 @@ void HybridPipeline::createAccelerationStructures()
 	auto commandList = commandQueue->GetCommandList();
 	
 	std::vector<AccelerationStructureBuffers> bottomLevelBuffers;
-	mpBottomLevelASes.resize(meshPool.size()); 
-	bottomLevelBuffers.resize(meshPool.size());//Before the commandQueue finishes its execution of AS creation, these resources' lifecycle have to be held
+	mpBottomLevelASes.resize(MeshPool::Get().size()); 
+	bottomLevelBuffers.resize(MeshPool::Get().size());//Before the commandQueue finishes its execution of AS creation, these resources' lifecycle have to be held
 	std::map<MeshIndex, int> MeshIndex2blasSeqCache; // Record MeshIndex to the sequence of mesh in mpBottomLevelASes
 
 	int blasSeqCount=0;
-	for (auto it = meshPool.begin(); it != meshPool.end(); it++) { //mpBottomLevelASes
+	for (auto it = MeshPool::Get().getPool().begin(); it != MeshPool::Get().getPool().end(); it++) { //mpBottomLevelASes
 
 		MeshIndex2blasSeqCache.emplace(it->first, blasSeqCount);
 		auto pMesh = it->second;
@@ -1802,7 +1655,7 @@ void HybridPipeline::createAccelerationStructures()
 	AccelerationStructureBuffers topLevelBuffers; //构建GameObject
 	{ // topLevelBuffers
 		uint32_t nonLightCount = 0;
-		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 		{
 			std::string objIndex = it->first;
 			if (objIndex.find("light") != std::string::npos) {
@@ -1810,7 +1663,7 @@ void HybridPipeline::createAccelerationStructures()
 			}
 			nonLightCount++;
 		}
-		int gameObjectCount = gameObjectPool.size();
+		int gameObjectCount = m_Scene->gameObjectPool.size();
 		// First, get the size of the TLAS buffers and create them
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
@@ -1841,7 +1694,7 @@ void HybridPipeline::createAccelerationStructures()
 		ZeroMemory(pInstanceDesc, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * nonLightCount);
 
 		int tlasGoCount=0;
-		for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 		{
 			// 特殊处理剔除光源不加入光追
 			std::string objIndex = it->first;
@@ -2088,7 +1941,7 @@ void HybridPipeline::createShaderResources()
 
 	//****************************CBV for per object 
 	int objectToRT = 0;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;
@@ -2101,7 +1954,7 @@ void HybridPipeline::createShaderResources()
 	mpRTPBRMaterialCBList.resize(objectToRT);
 	mpRTGameObjectIndexCBList.resize(objectToRT);
 	objectToRT = 0;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;
@@ -2111,14 +1964,14 @@ void HybridPipeline::createShaderResources()
 
 		void* pData = 0;
 		// base material
-		mpRTMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(BaseMaterial), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		mpRTMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(Material::MaterialCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 		mpRTMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &it->second->material.base, sizeof(BaseMaterial));
+		memcpy(pData, &it->second->material.computeMaterialCB(), sizeof(Material::MaterialCB));
 		mpRTMaterialCBList[objectToRT]->Unmap(0, nullptr);
 		// pbr material
-		mpRTPBRMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(PBRMaterial), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
+		mpRTPBRMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(PBRMaterial::PBRMaterialCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
 		mpRTPBRMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &it->second->material.pbr, sizeof(PBRMaterial));
+		memcpy(pData, &it->second->material.computePBRMaterialCB(), sizeof(PBRMaterial::PBRMaterialCB));
 		mpRTPBRMaterialCBList[objectToRT]->Unmap(0, nullptr);
 		// rt go index
 		mpRTGameObjectIndexCBList[objectToRT] = createBuffer(pDevice, sizeof(ObjectIndexRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
@@ -2135,7 +1988,7 @@ void HybridPipeline::createSrvUavHeap() {
 	auto pDevice = Application::Get().GetDevice();
 
 	int objectToRT = 0;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;
@@ -2184,7 +2037,7 @@ void HybridPipeline::createSrvUavHeap() {
 	}
 
 	// skybox
-	auto& skybox_texture = texturePool["skybox_cubemap"];
+	auto& skybox_texture = TexturePool::Get().getTexture("skybox_cubemap");
 	D3D12_SHADER_RESOURCE_VIEW_DESC skyboxSrvDesc = {};
 	skyboxSrvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
 	skyboxSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -2195,7 +2048,7 @@ void HybridPipeline::createSrvUavHeap() {
 	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	objectToRT = 0;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;
@@ -2219,9 +2072,9 @@ void HybridPipeline::createSrvUavHeap() {
 		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		indexSrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 		indexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		indexSrvDesc.Buffer.NumElements = (UINT)((meshPool[pLobject->mesh]->getIndexCount()/*+1*/)/*/2*/); // 修改为32bit的index
+		indexSrvDesc.Buffer.NumElements = (UINT)((MeshPool::Get().getPool()[pLobject->mesh]->getIndexCount()/*+1*/)/*/2*/); // 修改为32bit的index
 		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
+		pDevice->CreateShaderResourceView(MeshPool::Get().getPool()[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		// vetices 2
 		D3D12_SHADER_RESOURCE_VIEW_DESC vertexSrvDesc = {};
@@ -2229,28 +2082,28 @@ void HybridPipeline::createSrvUavHeap() {
 		vertexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		vertexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		vertexSrvDesc.Buffer.FirstElement = 0;
-		vertexSrvDesc.Buffer.NumElements = meshPool[pLobject->mesh]->getVertexCount();
+		vertexSrvDesc.Buffer.NumElements = MeshPool::Get().getPool()[pLobject->mesh]->getVertexCount();
 		vertexSrvDesc.Buffer.StructureByteStride = sizeof(VertexPositionNormalTexture);
-		pDevice->CreateShaderResourceView(meshPool[pLobject->mesh]->getVertexBuffer().GetD3D12Resource().Get(), &vertexSrvDesc, uavSrvHandle);
+		pDevice->CreateShaderResourceView(MeshPool::Get().getPool()[pLobject->mesh]->getVertexBuffer().GetD3D12Resource().Get(), &vertexSrvDesc, uavSrvHandle);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//albedo 3
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &texturePool[pLobject->material.tex.AlbedoTexture].GetShaderResourceView() , pDestDescriptorRangeSizes,
+			1, &pLobject->material.getAlbedoTexture().GetShaderResourceView() , pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//metallic 4
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &texturePool[pLobject->material.tex.MetallicTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			1, &pLobject->material.getMetallicTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//normal 5
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &texturePool[pLobject->material.tex.NormalTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			1, &pLobject->material.getNormalTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//roughness 6
 		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &texturePool[pLobject->material.tex.RoughnessTexture].GetShaderResourceView(), pDestDescriptorRangeSizes,
+			1, &pLobject->material.getRoughnessTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
 			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -2296,7 +2149,7 @@ void HybridPipeline::createShaderTable()
 	auto mpDevice = Application::Get().GetDevice();
 
 	int objectToRT = 0;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;
@@ -2344,7 +2197,7 @@ void HybridPipeline::createShaderTable()
 	objectToRT = 0;
 	uint32_t srvuavBias = 8;
 	uint32_t srvuavPerHitSize = 7;
-	for (auto it = gameObjectPool.begin(); it != gameObjectPool.end(); it++)
+	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
 	{
 		// 特殊处理剔除光源不加入光追
 		std::string objIndex = it->first;

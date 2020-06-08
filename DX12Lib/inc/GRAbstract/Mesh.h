@@ -1,33 +1,5 @@
 #pragma once
-/*
- *  Copyright(c) 2018 Jeremiah van Oosten
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files(the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions :
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *  IN THE SOFTWARE.
- */
 
-/**
- *  @file Mesh.h
- *  @date October 24, 2018
- *  @author Jeremiah van Oosten
- *
- *  @brief A mesh class encapsulates the index and vertex buffers for a geometric primitive.
- */
 
 #include <CommandList.h>
 #include <VertexBuffer.h>
@@ -79,6 +51,15 @@ public:
     Mesh(const Mesh& copy) = delete;
 
     void Draw(CommandList& commandList);
+
+    enum Buildin{
+        CUBE = 0,
+        SPHERE,
+        CONE,
+        TORUS,
+        PLANE,
+        BUILDINEND
+    };
 
     static std::unique_ptr<Mesh> CreateCube(CommandList& commandList, float size = 1, bool rhcoords = false);
     static std::unique_ptr<Mesh> CreateSphere(CommandList& commandList, float diameter = 1, size_t tessellation = 16, bool rhcoords = false);

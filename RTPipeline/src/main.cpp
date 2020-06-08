@@ -44,6 +44,8 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
         std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"RTPipeline", 960, 960);
         retCode = Application::Get().Run(demo);
     }
+    TexturePool::Get().clear();
+    MeshPool::Get().clear();
     Application::Destroy();
 
     atexit(&ReportLiveObjects);

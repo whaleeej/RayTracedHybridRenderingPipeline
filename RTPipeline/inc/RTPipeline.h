@@ -19,6 +19,10 @@
 #include <assimp/postprocess.h>
 
 #include "Transform.h"
+#include "PBRMaterial.h"
+#include "TexturePool.h"
+#include "MeshPool.h"
+#include "Scene.h"
 
 // temporal define for workset dim
 #define LOCAL_WIDTH 8
@@ -80,71 +84,6 @@ private:
 	void updateBuffer();
 
 private:
-
-	// Material
-	using BaseMaterial = Material;
-	using TextureIndex = std::string;
-	struct PBRMaterial
-	{
-		float metallic;
-		float roughness;
-		uint32_t  Padding[2];
-		PBRMaterial(float m, float r) :metallic(m), roughness(r), Padding{ 0 } {};
-	};
-	struct TextureMaterial
-	{
-		TextureMaterial(TextureIndex index_leading) {
-			AlbedoTexture = index_leading + "_albedo";
-			MetallicTexture = index_leading + "_metallic";
-			NormalTexture = index_leading + "_normal";
-			RoughnessTexture = index_leading + "_roughness";
-		}
-		TextureMaterial(TextureIndex albedo, TextureIndex metallic, TextureIndex normal, TextureIndex roughness) {
-			AlbedoTexture = albedo;
-			MetallicTexture = metallic;
-			NormalTexture = normal;
-			RoughnessTexture =roughness;
-		}
-		TextureIndex AlbedoTexture;
-		TextureIndex MetallicTexture;
-		TextureIndex NormalTexture;
-		TextureIndex RoughnessTexture;
-	};
-	struct HybridMaterial
-	{
-		HybridMaterial(TextureIndex index_leading) 
-			:base{ Material::White }, pbr{ 1.0f, 1.0f }, tex(index_leading){}
-		BaseMaterial base;
-		PBRMaterial pbr;
-		TextureMaterial tex;
-	};
-	// Mesh
-	using MeshIndex = std::string;
-	// GameObject
-	using GameObjectIndex = std::string;
-	class GameObject 
-	{
-	public:
-		float gid;
-		MeshIndex mesh;
-		Transform transform;
-		HybridMaterial material;
-
-		GameObject() :
-			mesh(""),
-			transform(XMMatrixTranslation(0, 0, 0), XMMatrixIdentity(), XMMatrixScaling(1.0f, 1.0f, 1.0f)),
-			material("default") {}
-		void Translate(XMMATRIX translationMatrix) {
-			transform.translationMatrix = translationMatrix;
-		}
-		void Rotate(XMMATRIX rotationMatrix) {
-			transform.rotationMatrix = rotationMatrix;
-		}
-		void Scale(XMMATRIX scaleMatrix) {
-			transform.scaleMatrix = scaleMatrix;
-		}
-		void Draw(CommandList& commandList, Camera& camera, std::map<TextureIndex, Texture>& texturePool, std::map<MeshIndex, std::shared_ptr<Mesh>>& meshPool);
-	};
 	//Camera
 	struct CameraRTCB
 	{
@@ -178,16 +117,12 @@ private:
 			index = (index + 1) % 8;
 		}
 	};
-	std::string importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo="albedo", std::string metallic="metallic", std::string normal="normal", std::string roughness="roughness");
+	//std::string importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo="albedo", std::string metallic="metallic", std::string normal="normal", std::string roughness="roughness");
 
-	/////////////////////////////////////////////// Container
-	std::map<MeshIndex, std::shared_ptr<Mesh>> meshPool;
-	std::map<TextureIndex, Texture> texturePool;
-	std::map<GameObjectIndex, std::shared_ptr<GameObject>> gameObjectPool;
-	std::multimap<GameObjectIndex, GameObjectIndex> gameObjectAssembling;
-	PointLight m_PointLight;
-	GameObjectIndex lightObjectIndex;
-	std::unique_ptr<Mesh> m_SkyboxMesh;
+	
+	/////////////////////////////////////////////// Camera controller
+	std::shared_ptr<Scene> m_Scene;
+
 
 	/////////////////////////////////////////////// Camera controller
 	Camera m_Camera;

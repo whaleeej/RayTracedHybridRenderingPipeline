@@ -1,8 +1,19 @@
 #pragma once
 #include <DX12LibPCH.h>
 
-struct Material
+class Material
 {
+public:
+    struct MaterialCB {
+        DirectX::XMFLOAT4 Emissive;
+        DirectX::XMFLOAT4 Ambient;
+        DirectX::XMFLOAT4 Diffuse;
+        DirectX::XMFLOAT4 Specular;
+        float SpecularPower;
+        float padding[3];
+    };
+
+public:
     Material(
         DirectX::XMFLOAT4 emissive = { 0.0f, 0.0f, 0.0f, 1.0f },
         DirectX::XMFLOAT4 ambient = { 0.1f, 0.1f, 0.1f, 1.0f },
@@ -17,18 +28,23 @@ struct Material
         , SpecularPower( specularPower ) 
     {}
 
+    Material(const Material& mat)
+        : Emissive(mat.Emissive)
+        , Ambient(mat.Ambient)
+        , Diffuse(mat.Diffuse)
+        , Specular(mat.Specular)
+        , SpecularPower(mat.SpecularPower)
+    {}
+
+    MaterialCB computeMaterialCB(){
+        return { Emissive , Ambient , Diffuse, Specular , SpecularPower };
+    }
+
     DirectX::XMFLOAT4 Emissive;
-    //----------------------------------- (16 byte boundary)
     DirectX::XMFLOAT4 Ambient;
-    //----------------------------------- (16 byte boundary)
     DirectX::XMFLOAT4 Diffuse;
-    //----------------------------------- (16 byte boundary)
     DirectX::XMFLOAT4 Specular;
-    //----------------------------------- (16 byte boundary)
-    float             SpecularPower;
-    uint32_t          Padding[3];
-    //----------------------------------- (16 byte boundary)
-    // Total:                              16 * 5 = 80 bytes
+    float SpecularPower;
     
     // Define some interesting materials.
     static const Material Red;

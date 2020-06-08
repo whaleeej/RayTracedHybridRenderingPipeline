@@ -2,9 +2,6 @@
 
 #include <DirectXMath.h>
 
-// When performing transformations on the camera, 
-// it is sometimes useful to express which space this 
-// transformation should be applied.
 enum class Space
 {
     Local,
@@ -22,42 +19,17 @@ public:
     DirectX::XMMATRIX get_ViewMatrix() const;
     DirectX::XMMATRIX get_InverseViewMatrix() const;
 
-    /**
-     * Set the camera to a perspective projection matrix.
-     * @param fovy The vertical field of view in degrees.
-     * @param aspect The aspect ratio of the screen.
-     * @param zNear The distance to the near clipping plane.
-     * @param zFar The distance to the far clipping plane.
-     */
     void set_Projection( float fovy, float aspect, float zNear, float zFar );
     DirectX::XMMATRIX get_ProjectionMatrix() const;
     DirectX::XMMATRIX get_InverseProjectionMatrix() const;
 
-    /**
-     * Set the field of view in degrees.
-     */
     void set_FoV(float fovy);
 
-    /**
-     * Get the field of view in degrees.
-     */
     float get_FoV() const;
 
-    /**
-     * Set the camera's position in world-space.
-     */
     void XM_CALLCONV set_Translation( DirectX::FXMVECTOR translation );
     DirectX::XMVECTOR get_Translation() const;
-
-    /**
-     * Set the camera's rotation in world-space.
-     * @param rotation The rotation quaternion.
-     */
     void XM_CALLCONV set_Rotation( DirectX::FXMVECTOR rotation );
-    /**
-     * Query the camera's rotation.
-     * @returns The camera's rotation quaternion.
-     */
     DirectX::XMVECTOR get_Rotation() const;
 
     void XM_CALLCONV Translate( DirectX::FXMVECTOR translation, Space space = Space::Local );

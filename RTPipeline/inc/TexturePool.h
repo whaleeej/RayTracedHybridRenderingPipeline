@@ -15,12 +15,19 @@ using TextureIndex = std::string;
 class TexturePool {
 public:
 	static TexturePool& Get();
+	
+	void clear();
 
 	Texture getTexture(TextureIndex name);
 
 	void addTexture(TextureIndex name, Texture& tex);
 
+	void loadTexture(TextureIndex name, std::string path, TextureUsage ussage, CommandList& commandList);
+	
 	void loadPBRSeriesTexture(TextureIndex pbr_header, std::string albedo_directory, CommandList& commandList);
+
+	void loadCubemap(UINT size,TextureIndex pano_name, TextureIndex cubemap_name, CommandList& commandList);
+
 
 private:
 	std::map<TextureIndex, Texture> texturePool;
