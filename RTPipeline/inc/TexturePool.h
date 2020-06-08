@@ -14,9 +14,14 @@ using TextureIndex = std::string;
 
 class TexturePool {
 public:
+	static std::string TexturePool::albedoStrToDefined(std::string albedoName, std::string replace_from, std::string replace_to);
+
+public:
 	static TexturePool& Get();
 	
 	void clear();
+
+	bool exist(TextureIndex name);
 
 	Texture getTexture(TextureIndex name);
 

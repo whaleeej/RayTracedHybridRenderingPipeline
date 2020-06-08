@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE1 1
+#define SCENE3 1
 #define GLOBAL_BENCHMARK_LIMIT 1*120.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -723,17 +723,17 @@ void HybridPipeline::loadGameObject() {
 #endif
 #ifdef SCENE2
 	//load external object
-	importModel("Assets/Cerberus/Cerberus_LP.FBX", commandList, "A.tga", "M.tga", "N.tga", "R.tga");
-	importModel("Assets/Unreal-actor/model.dae", commandList);
-	importModel("Assets/Sci-fi-Biolab/source/SciFiBiolab.fbx", commandList, "COLOR","METALLIC","NORMAL","ROUGHNESS");
+	m_Scene->importModel(commandList, "Assets/Cerberus/Cerberus_LP.FBX", "A.tga", "M.tga", "N.tga", "R.tga");
+	m_Scene->importModel(commandList, "Assets/Unreal-actor/model.dae");
+	m_Scene->importModel(commandList, "Assets/Sci-fi-Biolab/source/SciFiBiolab.fbx", "COLOR","METALLIC","NORMAL","ROUGHNESS");
 #endif
 #ifdef SCENE3
-	importModel("Assets/SM_Chair/SM_Chair.FBX", commandList);
-	importModel("Assets/SM_TableRound/SM_TableRound.FBX", commandList);
-	importModel("Assets/SM_Couch/SM_Couch.FBX", commandList);
-	importModel("Assets/SM_Lamp_Ceiling/SM_Lamp_Ceiling.FBX", commandList);
-	importModel("Assets/SM_MatPreviewMesh/SM_MatPreviewMesh.FBX", commandList);
-	copy_Gameobject_assembling("Assets/SM_Chair", "Assets/SM_Chair_copy");
+	m_Scene->importModel(commandList, "Assets/SM_Chair/SM_Chair.FBX");
+	m_Scene->importModel(commandList, "Assets/SM_TableRound/SM_TableRound.FBX");
+	m_Scene->importModel(commandList, "Assets/SM_Couch/SM_Couch.FBX");
+	m_Scene->importModel(commandList, "Assets/SM_Lamp_Ceiling/SM_Lamp_Ceiling.FBX");
+	m_Scene->importModel(commandList, "Assets/SM_MatPreviewMesh/SM_MatPreviewMesh.FBX");
+	m_Scene->copyGameObjectAssembling("Assets/SM_Chair", "Assets/SM_Chair_copy");
 #endif
 	// light object
 	m_Scene->addSingleLight("sphere", Material::EmissiveWhite, "sphere light");
@@ -1372,197 +1372,7 @@ void HybridPipeline::updateBuffer()
 		mpRTPointLightCB->Unmap(0, nullptr);
 	}
 }
-//std::string HybridPipeline::importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo, std::string metallic, std::string normal, std::string roughness) {
-//	std::string rootPath = path.substr(0, path.find_last_of('/'));
-//
-//	// 获得同目录下的同名的其他贴图的转换函数
-//	auto albedoStrToDefined = [&](std::string albedoName, std::string replace_from, std::string replace_to) {
-//		size_t start = albedoName.find_last_of(replace_from) ;
-//		size_t length = replace_from.size();
-//		start -= length;
-//		std::string ret = albedoName.substr(0, start+1) + replace_to + albedoName.substr(start + length+1, albedoName.length());
-//		return ret;
-//	};
-//
-//	// processMesh
-//	auto processMesh = [&](aiMesh* mesh, const aiScene* scene, std::shared_ptr<CommandList> commandList){
-//		VertexCollection vertices;
-//		IndexCollection indices;
-//		// 构建vertex
-//		for (size_t i = 0; i < mesh->mNumVertices; i++)
-//		{
-//			VertexPositionNormalTexture vnt;
-//			vnt.position.x = mesh->mVertices[i].x;
-//			vnt.position.y = mesh->mVertices[i].y;
-//			vnt.position.z = mesh->mVertices[i].z;
-//			vnt.normal.x = mesh->mNormals[i].x;
-//			vnt.normal.y = mesh->mNormals[i].y;
-//			vnt.normal.z = mesh->mNormals[i].z;
-//			if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
-//			{
-//				vnt.textureCoordinate.x = mesh->mTextureCoords[0][i].x;
-//				vnt.textureCoordinate.y = 1.0f - mesh->mTextureCoords[0][i].y;
-//			}
-//			else {
-//				vnt.textureCoordinate.x = 0.0f;
-//				vnt.textureCoordinate.y = 0.0f;
-//			}
-//			vertices.push_back(vnt);
-//		}
-//		// 构建indices
-//		for (size_t i = 0; i < mesh->mNumFaces; i++)
-//		{
-//			aiFace face = mesh->mFaces[i];
-//			for (size_t j = 0; j < face.mNumIndices; j++)
-//			{
-//				indices.push_back(face.mIndices[j]);
-//			}
-//		}
-//
-//		TextureIndex albedoIndex;
-//		TextureIndex metallicIndex;
-//		TextureIndex normalIndex;
-//		TextureIndex roughnessIndex;
-//		// 加载贴图
-//		if (mesh->mMaterialIndex >= 0)
-//		{
-//			aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-//			//加载模型内的albedo贴图 顺带加载同目录下的Metallic，Normal，Roughness
-//			unsigned int count = material->GetTextureCount(aiTextureType_DIFFUSE);
-//			aiString str;
-//			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);//默认第一个
-//			albedoIndex = str.data;
-//			if ((int)albedoIndex.find_first_of(':') < 0) {
-//				albedoIndex = rootPath + "/" + albedoIndex;
-//			}
-//			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-//			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-//			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-//		}
-//		if (texturePool.find(albedoIndex) == texturePool.end()//错误检查
-//			|| texturePool.find(metallicIndex) == texturePool.end()
-//			|| texturePool.find(normalIndex) == texturePool.end()
-//			|| texturePool.find(roughnessIndex) == texturePool.end()
-//			) {
-//			albedoIndex = rootPath + "/" + "default_albedo.jpg";
-//			albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
-//			metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-//			normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-//			roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-//		}
-//
-//		////生成mesh //因为index是int32 所以可能要分多批mesh填装
-//		size_t slot_size = 0xffffffff - 3;
-//		for (size_t i = 0; i < (int)std::ceil((float)indices.size()/slot_size); i++)
-//		{
-//			VertexCollection localVetices;
-//			IndexCollection localIndices;
-//			size_t start = i * slot_size;
-//			size_t end = std::min(start+slot_size, indices.size() );
-//			for (size_t j = 0; j < vertices.size(); j++)
-//			{
-//				localVetices.push_back(vertices[j]);
-//			}
-//			for (size_t j = start; j < end; j++)
-//			{
-//					localIndices.push_back(indices[j]);
-//			}
-//			MeshIndex meshIndex;
-//			meshIndex = meshIndex + "scene_" + std::to_string((uint64_t)scene) + "_mesh_" + std::to_string((uint64_t)mesh)+"_"+std::to_string(i);
-//			std::shared_ptr<Mesh> dxMesh = std::make_shared<Mesh>();
-//			dxMesh->Initialize(*commandList, localVetices, localIndices, true);
-//			meshPool.emplace(meshIndex, dxMesh);
-//
-//			//缓存gameobject
-//			gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
-//			gameObjectPool[meshIndex]->gid = gid++;
-//			gameObjectPool[meshIndex]->mesh = meshIndex;
-//			gameObjectPool[meshIndex]->material.base = Material::White;
-//			gameObjectPool[meshIndex]->material.pbr = PBRMaterial(1.0f, 1.0f);
-//			gameObjectPool[meshIndex]->material.tex = TextureMaterial(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
-//
-//			//组装gameobject
-//			gameObjectAssembling.emplace(rootPath, meshIndex);
-//		}
-//	};
-//	// processNode
-//	std::function<void(aiNode*, const aiScene*, std::shared_ptr<CommandList>)> processNode = [&](aiNode* node, const aiScene* scene, std::shared_ptr<CommandList> commandList) {
-//
-//		// processNodes
-//		for (unsigned int i = 0; i < node->mNumMeshes; i++)
-//		{
-//			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-//			processMesh(mesh, scene, commandList);
-//		}
-//		// then do the same for each of its children
-//		for (unsigned int i = 0; i < node->mNumChildren; i++)
-//		{
-//			processNode(node->mChildren[i], scene, commandList);
-//		}
-//	};
-//
-//	Assimp::Importer importer;
-//	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals /* | aiProcess_FlipUVs*/);
-//	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
-//	{
-//		ThrowIfFailed(-1);
-//	}
-//	//先缓存所有的texture
-//	bool isLoaded = false;
-//	for (size_t i = 0; i < scene->mNumMaterials; i++)
-//	{
-//		aiMaterial* material = scene->mMaterials[i];
-//		int count = material->GetTextureCount(aiTextureType_DIFFUSE);
-//		if (count <= 0) {
-//			continue;
-//		}
-//		aiString str;
-//		//默认的diffuse贴图
-//		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
-//		TextureIndex albedoIndex;
-//		albedoIndex = str.data;
-//		int a = albedoIndex.find_first_of(':');
-//		if((int)albedoIndex.find_first_of(':') <0){
-//			albedoIndex = rootPath + "/" + albedoIndex;
-//		}
-//		TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-//		TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-//		TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-//		texturePool.emplace(albedoIndex, Texture());//albedo
-//		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring( albedoIndex), TextureUsage::Albedo);
-//		texturePool.emplace(metallicIndex, Texture());//metallic
-//		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
-//		texturePool.emplace(normalIndex, Texture());//normal
-//		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring( normalIndex), TextureUsage::Normalmap);
-//		texturePool.emplace(roughnessIndex, Texture());//roughness
-//		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring( roughnessIndex), TextureUsage::RoughnessMap);
-//		isLoaded = true;
-//	}
-//	TextureIndex albedoIndex = rootPath + "/" + "default_albedo.jpg";
-//	albedoIndex = albedoStrToDefined(albedoIndex, "albedo", albedo);
-//	TextureIndex metallicIndex = albedoStrToDefined(albedoIndex, albedo, metallic);
-//	TextureIndex normalIndex = albedoStrToDefined(albedoIndex, albedo, normal);
-//	TextureIndex roughnessIndex = albedoStrToDefined(albedoIndex, albedo, roughness);
-//	if (_access(albedoIndex.c_str(), 0) >= 0) {
-//		texturePool.emplace(albedoIndex, Texture());//albedo
-//		commandList->LoadTextureFromFile(texturePool[albedoIndex], string_2_wstring(albedoIndex), TextureUsage::Albedo);
-//	}
-//	if (_access(metallicIndex.c_str(), 0) >= 0) {
-//		texturePool.emplace(metallicIndex, Texture());//metallic
-//		commandList->LoadTextureFromFile(texturePool[metallicIndex], string_2_wstring(metallicIndex), TextureUsage::MetallicMap);
-//	}
-//	if (_access(normalIndex.c_str(), 0) >= 0) {
-//		texturePool.emplace(normalIndex, Texture());//normal
-//		commandList->LoadTextureFromFile(texturePool[normalIndex], string_2_wstring(normalIndex), TextureUsage::Normalmap);
-//	}
-//	if (_access(roughnessIndex.c_str(), 0) >= 0) {
-//		texturePool.emplace(roughnessIndex, Texture());//roughness
-//		commandList->LoadTextureFromFile(texturePool[roughnessIndex], string_2_wstring(roughnessIndex), TextureUsage::RoughnessMap);
-//	}
-//	//随后load mesh并且绑定贴图加载入
-//	processNode(scene->mRootNode, scene, commandList);
-//	return rootPath;
-//}
+
 
 ////////////////////////////////////////////////////////////////////// RT Object 
 void HybridPipeline::createAccelerationStructures()

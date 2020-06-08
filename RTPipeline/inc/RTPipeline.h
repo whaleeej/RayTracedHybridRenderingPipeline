@@ -117,9 +117,7 @@ private:
 			index = (index + 1) % 8;
 		}
 	};
-	//std::string importModel(std::string path, std::shared_ptr<CommandList> commandList, std::string albedo="albedo", std::string metallic="metallic", std::string normal="normal", std::string roughness="roughness");
 
-	
 	/////////////////////////////////////////////// Camera controller
 	std::shared_ptr<Scene> m_Scene;
 
