@@ -23,9 +23,9 @@ public:
 
 	bool exist(TextureIndex name);
 
-	Texture getTexture(TextureIndex name);
+	std::shared_ptr<Texture> getTexture(TextureIndex name);
 
-	void addTexture(TextureIndex name, Texture& tex);
+	void addTexture(TextureIndex name, std::shared_ptr<Texture> tex);
 
 	void loadTexture(TextureIndex name, std::string path, TextureUsage ussage, CommandList& commandList);
 	
@@ -35,5 +35,5 @@ public:
 
 
 private:
-	std::map<TextureIndex, Texture> texturePool;
+	std::map<TextureIndex, std::shared_ptr<Texture>> texturePool;
 };

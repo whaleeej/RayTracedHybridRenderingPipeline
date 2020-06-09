@@ -21,38 +21,8 @@
 #include "TexturePool.h"
 #include "MeshPool.h"
 #include "Scene.h"
+#include "SkyboxRenderer.h"
 
-// temporal define for workset dim
-#define LOCAL_WIDTH 8
-#define LOCAL_HEIGHT 8
-#define BLOCK_EDGE_LENGTH 32
-#define BLOCK_PIXELS BLOCK_EDGE_LENGTH*BLOCK_EDGE_LENGTH
-#define BLOCK_EDGE_HALF (BLOCK_EDGE_LENGTH / 2)
-#define WORKSET_WIDTH (BLOCK_EDGE_LENGTH * ((m_Width + BLOCK_EDGE_LENGTH - 1) / BLOCK_EDGE_LENGTH))
-#define WORKSET_HEIGHT (BLOCK_EDGE_LENGTH *  ((m_Height + BLOCK_EDGE_LENGTH - 1) / BLOCK_EDGE_LENGTH))
-#define WORKSET_WITH_MARGINS_WIDTH (WORKSET_WIDTH + BLOCK_EDGE_LENGTH)
-#define WORKSET_WITH_MARGINS_HEIGHT (WORKSET_HEIGHT + BLOCK_EDGE_LENGTH)
-#define OUTPUT_SIZE (WORKSET_WIDTH * WORKSET_HEIGHT)
-#define LOCAL_SIZE 256
-#define FITTER_GLOBAL (LOCAL_SIZE * ((WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH) * (WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH)))
-// feature buffer define
-#define BUFFER_COUNT 15
-#define FEATURES_NOT_SCALED 6
-#define FEATURES_SCALED 6
-#define NOT_SCALED_FEATURE_BUFFERS \
-1.f,\
-normal.x,\
-normal.y,\
-normal.z,\
-metallic.x,\
-roughness.x,
-#define SCALED_FEATURE_BUFFERS \
-world_position.x,\
-world_position.y,\
-world_position.z,\
-world_position.x*world_position.x,\
-world_position.y*world_position.y,\
-world_position.z*world_position.z
 
 class HybridPipeline : public Game
 {
@@ -77,52 +47,16 @@ private:
 	void loadResource();
 	void loadGameObject();
 	void transformGameObject();
-	void loadDXResource();
-	void loadPipeline();
-	void updateBuffer();
 
 private:
-	//Camera
-	struct CameraRTCB
-	{
-		XMVECTOR PositionWS;
-		XMMATRIX InverseViewMatrix;
-		float fov;
-		float padding[3];
-	};
-	struct alignas(16) CameraData
-	{
-		DirectX::XMVECTOR m_InitialCamPos;
-		DirectX::XMVECTOR m_InitialCamRot;
-	};
-	// Frame
-	struct FrameIndexCB
-	{
-		uint32_t FrameIndex;
-		uint32_t seed;
-		float padding[2];
-	};
-	// ObjectIndex
-	struct ObjectIndexRTCB {
-		float index;
-		float padding[3];
-	};
-	// PassTestingIndex
-	struct PassTestingCB {
-		int index=0;
-		float padding[3];
-		void inc() {
-			index = (index + 1) % 8;
-		}
-	};
-
-	/////////////////////////////////////////////// Camera controller
 	std::shared_ptr<Scene> m_Scene;
-
+	std::vector<std::shared_ptr<Renderer>> m_Renderers;
+	RenderResourceMap m_RenderResourceMap;
+	
+	int m_Width;
+	int m_Height;
 
 	/////////////////////////////////////////////// Camera controller
-	Camera m_Camera;
-	CameraData* m_pAlignedCameraData;
     float m_Forward;
     float m_Backward;
     float m_Left;
@@ -132,132 +66,5 @@ private:
     float m_Pitch;
     float m_Yaw;
 	bool m_AnimateCamera;
-    // Rotate the lights in a circle.
     bool m_AnimateLights;
-    // Set to true if the Shift key is pressed.
-    bool m_Shift;
-	std::mt19937 m_generatorURNG;
-
-	/////////////////////////////////////////////// Raster  Object 
-	// Deferred gbuffer gen
-	RenderTarget m_GBuffer;
-	Texture gPosition; //srv
-	Texture gAlbedoMetallic; //srv
-	Texture gNormalRoughness; //srv
-	Texture gExtra; //srv
-	Texture gPosition_prev; //srv
-	Texture gAlbedoMetallic_prev; //srv
-	Texture gNormalRoughness_prev; //srv
-	Texture gExtra_prev; //srv
-	PassTestingCB postTestingCB;
-
-	// SVGF Post Temporal
-	Texture col_acc; //uav
-	Texture moment_acc; //uav
-	Texture his_length; //uav
-	Texture col_acc_prev; //srv
-	Texture moment_acc_prev; //srv
-	Texture his_length_prev; //srv
-
-	XMMATRIX viewProjectMatrix_prev;
-
-	// SVGF PostATrous
-	Texture color_inout[2];
-	Texture variance_inout[2];
-
-	uint32_t ATrous_Level_Max = 3;
-
-	// BMFR_1_TemporalNoisy
-	Texture noisy_curr;
-	Texture noisy_prev;
-	Texture spp_curr;
-	Texture spp_prev;
-	Texture pixel_reproject;
-	Texture pixel_accept;
-	Texture A_LSQ_matrix;
-
-	// BMFR_2_QRFactorization
-	Texture lsq_weights;
-	Texture feature_scale_minmax;
-
-	// BMFR_3_WeightedSUm
-	Texture weighted_sum;
-
-	// BMFR_4_TemporalFilterd
-	Texture filtered_curr;
-	Texture filtered_prev;
-
-	// Root signatures
-	RootSignature m_SkyboxSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_SkyboxPipelineState;
-
-	RootSignature m_DeferredRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
-
-	RootSignature m_PostSVGFTemporalRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSVGFTemporalPipelineState;
-
-	RootSignature m_PostSVGFATrousRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostSVGFATrousPipelineState;
-
-	RootSignature m_PostLightingRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;
-
-	RootSignature m_PostBMFRTemporalNoisyRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRTemporalNoisyPipelineState;
-
-	RootSignature m_PostBMFRQRFactorizationRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRQRFactorizationPipelineState;
-	
-	RootSignature m_PostBMFRWeightedSumRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRWeightedSumPipelineState;
-
-	RootSignature m_PostBMFRTemporalFilteredRootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostBMFRTemporalFilteredPipelineState;
-
-	D3D12_VIEWPORT m_Viewport;
-	D3D12_RECT m_ScissorRect;
-	int m_Width;
-	int m_Height;
-	int local_width= LOCAL_WIDTH;
-	int local_height= LOCAL_HEIGHT;
-
-	/////////////////////////////////////////////// RT Object 
-	void createAccelerationStructures();
-	Microsoft::WRL::ComPtr < ID3D12Resource > mpTopLevelAS;
-	std::vector<Microsoft::WRL::ComPtr < ID3D12Resource>> mpBottomLevelASes;
-	uint64_t mTlasSize = 0;
-
-	void createRtPipelineState();
-	RootSignatureDesc createLocalRootDesc(int uav_num, int srv_num, int sampler_num, const D3D12_STATIC_SAMPLER_DESC* pStaticSamplers, int cbv_num, int c32_num, int space=0);
-	Microsoft::WRL::ComPtr < ID3D12StateObject > mpPipelineState;
-	Microsoft::WRL::ComPtr < ID3D12RootSignature > mpEmptyRootSig;
-
-	void createShaderResources();
-	void createSrvUavHeap();
-	void updateSrvUavHeap();
-	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap > mpSrvUavHeap;
-	Texture mRtShadowOutputTexture;
-	Texture mRtReflectOutputTexture;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTPointLightCB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTCameraCB;
-	Microsoft::WRL::ComPtr <ID3D12Resource> mpRTFrameIndexCB;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTMaterialCBList;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTPBRMaterialCBList;
-	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> mpRTGameObjectIndexCBList;
-
-	void createShaderTable();
-	Microsoft::WRL::ComPtr < ID3D12Resource> mpShaderTable;
-	uint32_t mShaderTableEntrySize = 0;
-
-	/*|-rayGen-|-shadowMiss-|-secondaryMiss-|-......-|-shadowChs-|-secondaryChs-|-......-|*/
-	const WCHAR* kRayGenShader = L"rayGen";
-
-	const WCHAR* kShadowMissShader = L"shadowMiss";
-	const WCHAR* kShadwoClosestHitShader = L"shadowChs";
-	const WCHAR* kShadowHitGroup = L"ShadowHitGroup";
-
-	const WCHAR* kSecondaryMissShader = L"secondaryMiss";
-	const WCHAR* kSecondaryClosestHitShader = L"secondaryChs";
-	const WCHAR* kSecondaryHitGroup = L"SecondaryHitGroup";
 };

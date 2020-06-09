@@ -2,6 +2,24 @@
 
 #include <io.h>
 
+Scene::Scene()
+{
+	XMVECTOR cameraPos = XMVectorSet(0, 10, -35, 1);
+	XMVECTOR cameraTarget = XMVectorSet(0, 5, 0, 1);
+	XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
+
+	m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+
+	m_pAlignedCameraData = (CameraData*)_aligned_malloc(sizeof(CameraData), 16);
+	m_pAlignedCameraData->m_InitialCamPos = m_Camera.get_Translation();
+	m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
+}
+
+Scene::~Scene()
+{
+	_aligned_free(m_pAlignedCameraData);
+}
+
 void Scene::copyGameObjectAssembling(GameObjectIndex from, GameObjectIndex to) {
 	auto objAssemble = gameObjectAssembling.equal_range(from);
 	std::vector<GameObjectIndex> indices;

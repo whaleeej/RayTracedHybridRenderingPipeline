@@ -1,4 +1,4 @@
-#include "..\inc\TexturePool.h"
+#include "TexturePool.h"
 
 static TexturePool* gIns_TexturePool = nullptr;
 
@@ -19,14 +19,14 @@ bool TexturePool::exist(TextureIndex name)
 	return texturePool.find(name) != texturePool.end();
 }
 
-Texture TexturePool::getTexture(TextureIndex name)
+std::shared_ptr<Texture> TexturePool::getTexture(TextureIndex name)
 {
 	auto it = texturePool.find(name);
 	if (it != texturePool.end()) return it->second;
-	else return Texture();
+	else return std::make_shared<Texture>();
 }
 
-void TexturePool::addTexture(TextureIndex name ,Texture& tex)
+void TexturePool::addTexture(TextureIndex name , std::shared_ptr<Texture> tex)
 {
 	auto pair = texturePool.emplace(name, tex);
 	assert(pair.second == true);
@@ -34,8 +34,8 @@ void TexturePool::addTexture(TextureIndex name ,Texture& tex)
 
 void TexturePool::loadTexture(TextureIndex name, std::string path, TextureUsage ussage, CommandList& commandList)
 {
-	texturePool.emplace(name, Texture());
-	commandList.LoadTextureFromFile(texturePool[name], string_2_wstring(path), ussage);
+	texturePool.emplace(name, std::make_shared<Texture>());
+	commandList.LoadTextureFromFile(*texturePool[name], string_2_wstring(path), ussage);
 }
 
 std::string TexturePool::albedoStrToDefined (std::string albedoName, std::string replace_from, std::string replace_to) {
@@ -52,23 +52,23 @@ std::string TexturePool::albedoStrToDefined (std::string albedoName, std::string
 
 void TexturePool::loadPBRSeriesTexture(TextureIndex pbr_header, std::string albedo_directory, CommandList& commandList)
 {
-	texturePool.emplace(EXTEND_ALBEDO_HEADER(pbr_header), Texture());
-	commandList.LoadTextureFromFile(texturePool[EXTEND_ALBEDO_HEADER(pbr_header)],string_2_wstring(albedo_directory), TextureUsage::Albedo);
-	texturePool.emplace(EXTEND_METALLIC_HEADER(pbr_header), Texture());
-	commandList.LoadTextureFromFile(texturePool[EXTEND_METALLIC_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "metallic")), TextureUsage::MetallicMap);
-	texturePool.emplace(EXTEND_NORMAL_HEADER(pbr_header), Texture());
-	commandList.LoadTextureFromFile(texturePool[EXTEND_NORMAL_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "normal")), TextureUsage::Normalmap);
-	texturePool.emplace(EXTEND_ROUGHNESS_HEADER(pbr_header), Texture());
-	commandList.LoadTextureFromFile(texturePool[EXTEND_ROUGHNESS_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "roughness")), TextureUsage::RoughnessMap);
+	texturePool.emplace(EXTEND_ALBEDO_HEADER(pbr_header), std::make_shared <Texture>());
+	commandList.LoadTextureFromFile(*texturePool[EXTEND_ALBEDO_HEADER(pbr_header)],string_2_wstring(albedo_directory), TextureUsage::Albedo);
+	texturePool.emplace(EXTEND_METALLIC_HEADER(pbr_header), std::make_shared <Texture>());
+	commandList.LoadTextureFromFile(*texturePool[EXTEND_METALLIC_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "metallic")), TextureUsage::MetallicMap);
+	texturePool.emplace(EXTEND_NORMAL_HEADER(pbr_header), std::make_shared <Texture>());
+	commandList.LoadTextureFromFile(*texturePool[EXTEND_NORMAL_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "normal")), TextureUsage::Normalmap);
+	texturePool.emplace(EXTEND_ROUGHNESS_HEADER(pbr_header), std::make_shared <Texture>());
+	commandList.LoadTextureFromFile(*texturePool[EXTEND_ROUGHNESS_HEADER(pbr_header)], string_2_wstring(albedoStrToDefined(albedo_directory, "albedo", "roughness")), TextureUsage::RoughnessMap);
 }
 
 void TexturePool::loadCubemap(UINT size, TextureIndex pano_name, TextureIndex cubemap_name, CommandList& commandList)
 {
-	auto skyboxCubemapDesc = texturePool[pano_name].GetD3D12ResourceDesc();
+	auto skyboxCubemapDesc = texturePool[pano_name]->GetD3D12ResourceDesc();
 	skyboxCubemapDesc.Width = skyboxCubemapDesc.Height = size * 1;
 	skyboxCubemapDesc.DepthOrArraySize = 6;
 	skyboxCubemapDesc.MipLevels = 1;
-	texturePool.emplace(cubemap_name, Texture(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, string_2_wstring(cubemap_name)));
-	commandList.PanoToCubemap(texturePool[cubemap_name], texturePool[pano_name]);
+	texturePool.emplace(cubemap_name, std::make_shared <Texture>(skyboxCubemapDesc, nullptr, TextureUsage::Albedo, string_2_wstring(cubemap_name)));
+	commandList.PanoToCubemap(*texturePool[cubemap_name], *texturePool[pano_name]);
 }
 

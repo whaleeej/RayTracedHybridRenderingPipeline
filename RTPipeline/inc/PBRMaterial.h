@@ -51,10 +51,10 @@ public:
 	PBRMaterialCB computePBRMaterialCB(){
 		return { metallic, roughness };
 	}
-	Texture getAlbedoTexture() { return TexturePool::Get().getTexture(AlbedoTexture); }
-	Texture getMetallicTexture() { return TexturePool::Get().getTexture(MetallicTexture); }
-	Texture getNormalTexture() { return TexturePool::Get().getTexture(NormalTexture); }
-	Texture getRoughnessTexture() { return TexturePool::Get().getTexture(RoughnessTexture); }
+	std::shared_ptr<Texture> getAlbedoTexture() { return TexturePool::Get().getTexture(AlbedoTexture); }
+	std::shared_ptr<Texture> getMetallicTexture() { return TexturePool::Get().getTexture(MetallicTexture); }
+	std::shared_ptr<Texture> getNormalTexture() { return TexturePool::Get().getTexture(NormalTexture); }
+	std::shared_ptr<Texture> getRoughnessTexture() { return TexturePool::Get().getTexture(RoughnessTexture); }
 
 private: 
 	float metallic;

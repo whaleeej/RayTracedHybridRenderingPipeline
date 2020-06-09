@@ -30,7 +30,7 @@ using namespace DirectX;
 #undef max
 #endif
 
-#define SCENE3 1
+#define SCENE1 1
 #define GLOBAL_BENCHMARK_LIMIT 1*120.0
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
@@ -43,8 +43,6 @@ static float cameraAnimTime = 0.0f;
 
 HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
-    , m_ScissorRect(CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX))
-    , m_Viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
     , m_Forward(0)
     , m_Backward(0)
     , m_Left(0)
@@ -55,43 +53,30 @@ HybridPipeline::HybridPipeline(const std::wstring& name, int width, int height, 
     , m_Yaw(0)
 	, m_AnimateCamera(false)
     , m_AnimateLights(false)
-    , m_Shift(false)
 	, m_Width(0)
 	, m_Height(0)
 {
-
-    XMVECTOR cameraPos = XMVectorSet(0, 10, -35 , 1);
-    XMVECTOR cameraTarget = XMVectorSet(0, 5, 0, 1);
-    XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
-
-    m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
-
-    m_pAlignedCameraData = (CameraData*)_aligned_malloc(sizeof(CameraData), 16);
-    m_pAlignedCameraData->m_InitialCamPos = m_Camera.get_Translation();
-    m_pAlignedCameraData->m_InitialCamRot = m_Camera.get_Rotation();
-	m_generatorURNG.seed(1729);
-
 	m_Scene = std::make_shared<Scene>();
+	m_Renderers.push_back(std::make_shared<SkyboxRenderer>(m_Width, m_Height));
 }
 
 HybridPipeline::~HybridPipeline()
 {
-    _aligned_free(m_pAlignedCameraData);
+    
 }
 
 bool HybridPipeline::LoadContent()
 {
+	// build Scene
 	loadResource();
 	loadGameObject();
 	transformGameObject();
-	loadDXResource();
-	loadPipeline();
-	{ 
-		createAccelerationStructures();
-		createRtPipelineState();
-		createShaderResources();
-		createSrvUavHeap();
-		createShaderTable();
+
+	m_RenderResourceMap.emplace(RRD_RENDERTARGET_PRESENT,std::make_shared<Texture>(m_pWindow->GetRenderTarget().GetTexture(AttachmentPoint::Color0)));
+	
+	for (auto& pRenderer : m_Renderers) {
+		pRenderer->LoadResource(m_Scene, m_RenderResourceMap);
+		pRenderer->LoadPipeline();
 	}
 	return true;
 }
@@ -106,12 +91,11 @@ void HybridPipeline::OnResize(ResizeEventArgs& e)
         m_Height = std::max(1, e.Height);
 
         float aspectRatio = m_Width / (float)m_Height;
-        m_Camera.set_Projection(45.0f, aspectRatio, 0.1f, 100.0f);
+        m_Scene->m_Camera.set_Projection(45.0f, aspectRatio, 0.1f, 100.0f);
 
-        m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
-            static_cast<float>(m_Width), static_cast<float>(m_Height));
-
-		m_GBuffer.Resize(m_Width, m_Height);
+		for (auto& pRenderer : m_Renderers) {
+			pRenderer->Resize(m_Width, m_Height);
+		}
     }
 }
 
@@ -147,7 +131,6 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		Application::Get().Quit(0);
 	}
 
-
 	// camera
 	{
 		if (m_AnimateCamera)
@@ -162,28 +145,20 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 			XMVECTOR cameraTarget = XMVectorSet(0, 10, 0, 1);
 			XMVECTOR cameraUp = XMVectorSet(0, 1, 0, 0);
 
-			m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
+			m_Scene->m_Camera.set_LookAt(cameraPos, cameraTarget, cameraUp);
 		}
 		else {
-			float speedMultipler = (m_Shift ? 16.0f : 4.0f);
+			float speedMultipler = 4.0f;
 
 			XMVECTOR cameraTranslate = XMVectorSet(m_Right - m_Left, 0.0f, m_Forward - m_Backward, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
 			XMVECTOR cameraPan = XMVectorSet(0.0f, m_Up - m_Down, 0.0f, 1.0f) * speedMultipler * static_cast<float>(e.ElapsedTime);
-			m_Camera.Translate(cameraTranslate, Space::Local);
-			m_Camera.Translate(cameraPan, Space::Local);
+			m_Scene->m_Camera.Translate(cameraTranslate, Space::Local);
+			m_Scene->m_Camera.Translate(cameraPan, Space::Local);
 
 			XMVECTOR cameraRotation = XMQuaternionRotationRollPitchYaw(XMConvertToRadians(m_Pitch), XMConvertToRadians(m_Yaw), 0.0f);
-			m_Camera.set_Rotation(cameraRotation);
+			m_Scene->m_Camera.set_Rotation(cameraRotation);
 
-			XMMATRIX viewMatrix = m_Camera.get_ViewMatrix();
-
-			//char buffer[512];
-			//sprintf_s(buffer, "%f, %f, %f, %f\n",
-			//	m_Camera.get_Translation().m128_f32[0],
-			//	m_Camera.get_Translation().m128_f32[1],
-			//	m_Camera.get_Translation().m128_f32[2],
-			//	m_Camera.get_Translation().m128_f32[3]);
-			//OutputDebugStringA(buffer);
+			XMMATRIX viewMatrix = m_Scene->m_Camera.get_ViewMatrix();
 		}
 	}
 
@@ -216,8 +191,9 @@ void HybridPipeline::OnUpdate(UpdateEventArgs& e)
 		}
 	}
 
-	// update buffer for gpu
-	updateBuffer();
+	for (auto& pRenderer : m_Renderers) {
+		pRenderer->Update(e, m_Scene);
+	}
 }
 
 void HybridPipeline::OnRender(RenderEventArgs& e)
@@ -227,297 +203,61 @@ void HybridPipeline::OnRender(RenderEventArgs& e)
     auto commandQueue = Application::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
     auto commandList = commandQueue->GetCommandList();
 	
-	FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	m_RenderResourceMap[RRD_RENDERTARGET_PRESENT]=std::make_shared<Texture>(m_pWindow->GetRenderTarget().GetTexture(AttachmentPoint::Color0));
 
-	CameraRTCB mCameraCB;
-	mCameraCB.PositionWS = m_Camera.get_Translation();
-	mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-	mCameraCB.fov = m_Camera.get_FoV();
+	for (auto& pRenderer : m_Renderers) {
+		// main render skeleton: Pre Rendering
+		pRenderer->PreRender(m_RenderResourceMap);
 
-	{
-		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
-		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
-		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
-		commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
-		commandList->ClearDepthStencilTexture(m_GBuffer.GetTexture(AttachmentPoint::DepthStencil), D3D12_CLEAR_FLAG_DEPTH);
-	}
+		// main render skeleton: Render it!
+		pRenderer->PreRender(m_RenderResourceMap);
+		pRenderer->Render(e, m_Scene, commandList);
 
-	// Render the skybox.
-	{
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_GBuffer);
-		commandList->SetPipelineState(m_SkyboxPipelineState);
-		commandList->SetGraphicsRootSignature(m_SkyboxSignature);
+		// main render skeleton: After Rendering
+		auto pRetResourceMap = pRenderer->PostRender();
 
-		// The view matrix should only consider the camera's rotation, but not the translation.
-		auto viewMatrix = XMMatrixTranspose(XMMatrixRotationQuaternion(m_Camera.get_Rotation()));
-		auto projMatrix = m_Camera.get_ProjectionMatrix();
-		auto viewProjMatrix = viewMatrix * projMatrix;
-		commandList->SetGraphics32BitConstants(0, viewProjMatrix);
-
-		// skybox rendering
-		auto& skybox_texture = TexturePool::Get().getTexture(m_Scene->cubemap_Index);
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-		srvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
-		// TODO: Need a better way to bind a cubemap.
-		commandList->SetShaderResourceView(1, 0, skybox_texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, &srvDesc);
-		
-		m_Scene->m_SkyboxMesh->Draw(*commandList);
-	}
-
-	// Rasterizing Pipe, G-Buffer-Gen
-	{
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_GBuffer);
-		commandList->SetPipelineState(m_DeferredPipelineState);
-		commandList->SetGraphicsRootSignature(m_DeferredRootSignature);
-
-		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++) {
-			{
-				// comment the light for pos visualization
-				std::string objIndex = it->first;
-				if (objIndex.find("light") != std::string::npos) {
-					continue;
+		//对比是否是同一个Map
+		if (pRetResourceMap != &m_RenderResourceMap) {//如果不是
+			for (auto pRes = pRetResourceMap->begin(); pRes != pRetResourceMap->end(); pRes++) {
+				if (m_RenderResourceMap.find(pRes->first) == m_RenderResourceMap.end()) {//则在Map中新增缺的内容
+					m_RenderResourceMap.emplace(pRes->first, pRes->second);
 				}
 			}
-			it->second->Draw(*commandList, m_Camera);
 		}
 	}
 
-	// Let's raytrace
-	{ 
-		commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
-		//commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, mpSamplerHeap.Get());
+	commandQueue->ExecuteCommandList(commandList);
+	// Present
+	m_pWindow->Present();
 
-		commandList->TransitionBarrier(mRtShadowOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->TransitionBarrier(mRtReflectOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color0), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color1), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color2), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->TransitionBarrier(m_GBuffer.GetTexture(AttachmentPoint::Color3), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		D3D12_DISPATCH_RAYS_DESC raytraceDesc = {};
-		raytraceDesc.Width = m_Viewport.Width;
-		raytraceDesc.Height = m_Viewport.Height;
-		raytraceDesc.Depth = 1;
+	//// prev buffer cache
+	//{
+	//	auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
+	//		Texture tmp = t2;
+	//		t2 = t1;
+	//		t1 = tmp;
+	//	};
+	//	viewProjectMatrix_prev = m_Scene->m_Camera.get_ViewMatrix() * m_Scene->m_Camera.get_ProjectionMatrix();
+	//	swapCurrPrevTexture(gPosition_prev, gPosition);
+	//	swapCurrPrevTexture(gAlbedoMetallic_prev, gAlbedoMetallic);
+	//	swapCurrPrevTexture(gNormalRoughness_prev, gNormalRoughness);
+	//	swapCurrPrevTexture(gExtra_prev, gExtra);
+	//	swapCurrPrevTexture(col_acc_prev, col_acc);
+	//	swapCurrPrevTexture(moment_acc_prev, moment_acc);
+	//	swapCurrPrevTexture(his_length_prev, his_length);
+	//	swapCurrPrevTexture(noisy_prev, noisy_curr);
+	//	swapCurrPrevTexture(spp_prev, spp_curr);
+	//	swapCurrPrevTexture(filtered_prev, filtered_curr);
 
-		// RayGen is the first entry in the shader-table
-		raytraceDesc.RayGenerationShaderRecord.StartAddress = mpShaderTable->GetGPUVirtualAddress() + 0 * mShaderTableEntrySize;
-		raytraceDesc.RayGenerationShaderRecord.SizeInBytes = mShaderTableEntrySize;
-
-		// Miss is the second entry in the shader-table
-		size_t missOffset = 1 * mShaderTableEntrySize;
-		raytraceDesc.MissShaderTable.StartAddress = mpShaderTable->GetGPUVirtualAddress() + missOffset;
-		raytraceDesc.MissShaderTable.StrideInBytes = mShaderTableEntrySize;
-		raytraceDesc.MissShaderTable.SizeInBytes = mShaderTableEntrySize * 2;   // Only two
-
-		int objectToRT = 0;
-		for (auto it = m_Scene->gameObjectPool.begin(); it !=m_Scene->gameObjectPool.end(); it++)
-		{
-			// 特殊处理剔除光源不加入光追
-			std::string objIndex = it->first;
-			if (objIndex.find("light") != std::string::npos) {
-				continue;
-			}
-			objectToRT++;
-			commandList->TransitionBarrier((it->second)->material.getAlbedoTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier((it->second)->material.getMetallicTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier((it->second)->material.getNormalTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier((it->second)->material.getMetallicTexture(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(MeshPool::Get().getPool()[it->second->mesh]->getVertexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->TransitionBarrier(MeshPool::Get().getPool()[it->second->mesh]->getIndexBuffer(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		}
-
-		// Hit is the third entry in the shader-table
-		size_t hitOffset = 3 * mShaderTableEntrySize;
-		raytraceDesc.HitGroupTable.StartAddress = mpShaderTable->GetGPUVirtualAddress() + hitOffset;
-		raytraceDesc.HitGroupTable.StrideInBytes = mShaderTableEntrySize;
-		raytraceDesc.HitGroupTable.SizeInBytes = mShaderTableEntrySize * ( 2* objectToRT);
-
-		// Bind the empty root signature
-		commandList->SetComputeRootSignature(mpEmptyRootSig);
-		// Dispatch
-		commandList->SetPipelineState1(mpPipelineState);
-		commandList->DispatchRays(&raytraceDesc);
-	}
-	
-	// Perform Temporal Accumulation and Variance Estimation
-	{ 
-		commandList->SetPipelineState(m_PostSVGFTemporalPipelineState);
-		commandList->SetComputeRootSignature(m_PostSVGFTemporalRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, moment_acc_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, his_length_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, moment_acc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, his_length, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, variance_inout[1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-	}
-	
-	// Perform ATrous Iteration
-	{
-		commandList->SetPipelineState(m_PostSVGFATrousPipelineState);
-		commandList->SetComputeRootSignature(m_PostSVGFATrousRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		
-		// pingpang interation
-		for (uint32_t level = 1; level <= ATrous_Level_Max; level++) {
-			assert(ATrous_Level_Max > 1);
-			uint32_t pingPangSrvUavOffset = ppSrvUavOffset;
-			Texture color_in = (level==1)? col_acc : color_inout[level % 2];
-			Texture color_out = (level == ATrous_Level_Max)? col_acc : color_inout[(level + 1) % 2];
-			Texture variance_in = variance_inout[level % 2]; // 这里预先设定过temporal pipeline的rt就是variance_inout[1]
-			Texture variance_out = variance_inout[(level + 1) % 2];
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, color_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetShaderResourceView(0, pingPangSrvUavOffset++, variance_in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, color_out, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			commandList->SetUnorderedAccessView(0, pingPangSrvUavOffset++, variance_out, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			commandList->SetCompute32BitConstants(1, level);
-			commandList->Dispatch(m_Width / local_width, m_Height / local_height);
-		}
-	}
-
-	// Perform BMFR_1_TemporalNoisy
-	{
-		commandList->SetPipelineState(m_PostBMFRTemporalNoisyPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRTemporalNoisyRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetComputeDynamicConstantBuffer(1, viewProjectMatrix_prev);
-		commandList->SetCompute32BitConstants(2, globalFrameCount);
-		commandList->Dispatch(WORKSET_WITH_MARGINS_WIDTH / local_width, WORKSET_WITH_MARGINS_HEIGHT / local_height);
-	}
-
-	// Perform BMFR_2_QR
-	{
-		commandList->SetPipelineState(m_PostBMFRQRFactorizationPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRQRFactorizationRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, A_LSQ_matrix, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(FITTER_GLOBAL / LOCAL_SIZE);
-	}
-
-	// Perform BMFR_3_WeightedSum
-	{
-		commandList->SetPipelineState(m_PostBMFRWeightedSumPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRWeightedSumRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, lsq_weights, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, feature_scale_minmax, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, noisy_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
-
-	// Perform BMFR_4_
-	{
-		commandList->SetPipelineState(m_PostBMFRTemporalFilteredPipelineState);
-		commandList->SetComputeRootSignature(m_PostBMFRTemporalFilteredRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, weighted_sum, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_reproject, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, pixel_accept, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, spp_curr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_prev, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		commandList->SetUnorderedAccessView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		commandList->SetCompute32BitConstants(1, globalFrameCount);
-		commandList->Dispatch(WORKSET_WIDTH / local_width, WORKSET_HEIGHT / local_height);
-	}
-
-	// post lighting
-	{
-		commandList->SetViewport(m_Viewport);
-		commandList->SetScissorRect(m_ScissorRect);
-		commandList->SetRenderTarget(m_pWindow->GetRenderTarget());
-		commandList->SetPipelineState(m_PostLightingPipelineState);
-		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->SetGraphicsRootSignature(m_PostLightingRootSignature);
-		uint32_t ppSrvUavOffset = 0;
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gPosition, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gAlbedoMetallic, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gNormalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, gExtra, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtShadowOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, mRtReflectOutputTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, col_acc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetShaderResourceView(0, ppSrvUavOffset++, filtered_curr, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		commandList->SetGraphicsDynamicConstantBuffer(1, m_Scene->m_PointLight);
-		commandList->SetGraphicsDynamicConstantBuffer(2, mCameraCB);
-		commandList->SetGraphicsDynamicConstantBuffer(3, postTestingCB);
-		commandList->Draw(3);
-	}
-
-	// prev buffer cache
-	{
-		auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
-			Texture tmp = t2;
-			t2 = t1;
-			t1 = tmp;
-		};
-		viewProjectMatrix_prev = m_Camera.get_ViewMatrix() * m_Camera.get_ProjectionMatrix();
-		swapCurrPrevTexture(gPosition_prev, gPosition);
-		swapCurrPrevTexture(gAlbedoMetallic_prev, gAlbedoMetallic);
-		swapCurrPrevTexture(gNormalRoughness_prev, gNormalRoughness);
-		swapCurrPrevTexture(gExtra_prev, gExtra);
-		swapCurrPrevTexture(col_acc_prev, col_acc);
-		swapCurrPrevTexture(moment_acc_prev, moment_acc);
-		swapCurrPrevTexture(his_length_prev, his_length);
-		swapCurrPrevTexture(noisy_prev, noisy_curr);
-		swapCurrPrevTexture(spp_prev, spp_curr);
-		swapCurrPrevTexture(filtered_prev, filtered_curr);
-
-		// G Buffer re-orgnizating
-		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
-	}
+	//	// G Buffer re-orgnizating
+	//	m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
+	//	m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
+	//	m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
+	//	m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
+	//}
 
 
-    commandQueue->ExecuteCommandList(commandList);
-    // Present
-    m_pWindow->Present();
+   
 }
 
 void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
@@ -544,8 +284,8 @@ void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
         break;
     case KeyCode::R:
         // Reset camera transform
-        m_Camera.set_Translation(m_pAlignedCameraData->m_InitialCamPos);
-        m_Camera.set_Rotation(m_pAlignedCameraData->m_InitialCamRot);
+		m_Scene->m_Camera.set_Translation(m_Scene->m_pAlignedCameraData->m_InitialCamPos);
+		m_Scene->m_Camera.set_Rotation(m_Scene->m_pAlignedCameraData->m_InitialCamRot);
         m_Pitch = 0.0f;
         m_Yaw = 0.0f;
         break;
@@ -578,18 +318,15 @@ void HybridPipeline::OnKeyPressed(KeyEventArgs& e)
 		m_AnimateCamera = !m_AnimateCamera;
 		cameraAnimTime = 0.0f;
 		if (!m_AnimateCamera) {
-			m_Camera.set_Translation(m_pAlignedCameraData->m_InitialCamPos);
-			m_Camera.set_Rotation(m_pAlignedCameraData->m_InitialCamRot);
+			m_Scene->m_Camera.set_Translation(m_Scene->m_pAlignedCameraData->m_InitialCamPos);
+			m_Scene->m_Camera.set_Rotation(m_Scene->m_pAlignedCameraData->m_InitialCamRot);
 			m_Pitch = 0.0f;
 			m_Yaw = 0.0f;
 		}
 		break;
 	case KeyCode::X:
-		postTestingCB.inc();
-    case KeyCode::ShiftKey:
-        //m_Shift = true;
-		// disable the shift key
-        break;
+		//postTestingCB.inc();
+		break;
     }
     
 }
@@ -629,9 +366,6 @@ void HybridPipeline::OnKeyReleased(KeyEventArgs& e)
     case KeyCode::E:
         m_Up = 0.0f;
         break;
-    case KeyCode::ShiftKey:
-        m_Shift = false;
-        break;
     }
     
 }
@@ -654,12 +388,12 @@ void HybridPipeline::OnMouseMoved(MouseMotionEventArgs& e)
 
 void HybridPipeline::OnMouseWheel(MouseWheelEventArgs& e)
 {
-    auto fov = m_Camera.get_FoV();
+    auto fov = m_Scene->m_Camera.get_FoV();
 
     fov -= e.WheelDelta;
     fov = Math::clamp(fov, 12.0f, 90.0f);
 
-    m_Camera.set_FoV(fov);
+	m_Scene->m_Camera.set_FoV(fov);
 
     char buffer[256];
     sprintf_s(buffer, "FoV: %f\n", fov);
@@ -840,1197 +574,5 @@ void HybridPipeline::transformGameObject() {
 			, XMMatrixScaling(scalePlane, 1.0f, scalePlane));
 	}
 }
-void HybridPipeline::loadDXResource() {
-	auto createTex2D_RenderTarget = [](std::wstring name, int w, int h, DXGI_FORMAT format= DXGI_FORMAT_R32G32B32A32_FLOAT){
-		DXGI_FORMAT HDRFormat = format;
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET| D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		D3D12_CLEAR_VALUE colorClearValue;
-		colorClearValue.Format = desc.Format;
-		colorClearValue.Color[0] = 0.0f;
-		colorClearValue.Color[1] = 0.0f;
-		colorClearValue.Color[2] = 0.0f;
-		colorClearValue.Color[3] = 1.0f;
-		return Texture(desc, &colorClearValue,
-			TextureUsage::RenderTarget, name);
-	};
-	auto createTex2D_DepthStencil = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT) {
-		DXGI_FORMAT depthBufferFormat = format;
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto depthDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthBufferFormat,
-			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-		D3D12_CLEAR_VALUE depthClearValue;
-		depthClearValue.Format = depthDesc.Format;
-		depthClearValue.DepthStencil = { 1.0f, 0 };
-		return Texture(depthDesc, &depthClearValue,
-			TextureUsage::Depth, name);
-	};
-	auto createTex2D_ReadOnly = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT) {
-		DXGI_FORMAT HDRFormat = format;
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_NONE);
-		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
-	};
-	auto createTex2D_ReadWrite = [](std::wstring name, int w, int h, DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT) {
-		DXGI_FORMAT HDRFormat = format;
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(HDRFormat,
-			w, h, 1, 0, sampleDesc.Count, sampleDesc.Quality,
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
-	};
-	auto createTex3D_ReadWrite = [](std::wstring name, int w, int h, int d, DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT) {
-		DXGI_FORMAT HDRFormat = format;
-		// Create an off-screen multi render target(MRT) and a depth buffer.
-		auto desc = CD3DX12_RESOURCE_DESC::Tex3D(HDRFormat,
-			w, h, d, 0, 
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		return Texture(desc, 0, TextureUsage::IntermediateBuffer, name);
-	};
 
-	{
-		gPosition = createTex2D_RenderTarget(L"gPosition+HitTexture", m_Width, m_Height);
-		gAlbedoMetallic = createTex2D_RenderTarget(L"gAlbedoMetallic Texture", m_Width, m_Height);
-		gNormalRoughness = createTex2D_RenderTarget(L"gNormalRoughness Texture", m_Width, m_Height);
-		gExtra = createTex2D_RenderTarget(L"gExtra: ObjectId Texture", m_Width, m_Height);
-		// Attach the HDR texture to the HDR render target.
-		m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
-		m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
-		m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, createTex2D_DepthStencil(L"Depth Render Target", m_Width, m_Height));
-
-		gPosition_prev = createTex2D_RenderTarget(L"gPosition_prev", m_Width, m_Height);
-		gAlbedoMetallic_prev = createTex2D_RenderTarget(L"gAlbedoMetallic_prev", m_Width, m_Height);
-		gNormalRoughness_prev = createTex2D_RenderTarget(L"gNormalRoughness_prev", m_Width, m_Height);
-		gExtra_prev = createTex2D_RenderTarget(L"gExtra_prev", m_Width, m_Height);
-
-		col_acc = createTex2D_ReadWrite(L"col_acc", m_Width, m_Height);
-		moment_acc = createTex2D_ReadWrite(L"moment_acc", m_Width, m_Height);
-		his_length = createTex2D_ReadWrite(L"his_length", m_Width, m_Height);
-		col_acc_prev = createTex2D_ReadWrite(L"col_acc_prev", m_Width, m_Height);
-		moment_acc_prev = createTex2D_ReadWrite(L"moment_acc_prev", m_Width, m_Height);
-		his_length_prev = createTex2D_ReadWrite(L"his_length_prev", m_Width, m_Height);
-
-		color_inout[0] = createTex2D_ReadWrite(L"color_inout[0]", m_Width, m_Height);
-		color_inout[1] = createTex2D_ReadWrite(L"color_inout[1]", m_Width, m_Height);
-		variance_inout[0] = createTex2D_ReadWrite(L"variance_inout[0]", m_Width, m_Height);
-		variance_inout[1] = createTex2D_ReadWrite(L"variance_inout[1]", m_Width, m_Height);
-
-		noisy_curr = createTex2D_ReadWrite(L"noisy_curr", m_Width, m_Height);
-		noisy_prev = createTex2D_ReadWrite(L"noisy_prev", m_Width, m_Height);
-		spp_curr = createTex2D_ReadWrite(L"spp_curr", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
-		spp_prev = createTex2D_ReadWrite(L"spp_prev", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
-		pixel_reproject = createTex2D_ReadWrite(L"pixel_reproject", m_Width, m_Height, DXGI_FORMAT_R32G32_FLOAT);
-		pixel_accept = createTex2D_ReadWrite(L"pixel_accept", m_Width, m_Height, DXGI_FORMAT_R32_UINT);
-		A_LSQ_matrix = createTex3D_ReadWrite(L"A_LSQ_matrix", WORKSET_WITH_MARGINS_WIDTH, WORKSET_WITH_MARGINS_HEIGHT, BUFFER_COUNT, DXGI_FORMAT_R32_FLOAT);
-		lsq_weights = createTex3D_ReadWrite(L"lsq_weights", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, BUFFER_COUNT - 3, DXGI_FORMAT_R32G32B32A32_FLOAT);
-		feature_scale_minmax = createTex3D_ReadWrite(L"feature_scale_minmax", WORKSET_WITH_MARGINS_WIDTH / BLOCK_EDGE_LENGTH, WORKSET_WITH_MARGINS_HEIGHT / BLOCK_EDGE_LENGTH, 12, DXGI_FORMAT_R32G32B32A32_FLOAT);
-		
-		weighted_sum = createTex2D_ReadWrite(L"weighted_output", m_Width, m_Height);
-
-		filtered_curr = createTex2D_ReadWrite(L"filtered_curr", m_Width, m_Height);
-		filtered_prev = createTex2D_ReadWrite(L"filtered_prev", m_Width, m_Height);
-	}
-
-}
-void HybridPipeline::loadPipeline() {
-	auto device = Application::Get().GetDevice();
-	/////////////////////////////////// Root Signature
-	{
-		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-		{
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-		}
-		// Disable the multiple sampling for performance and simplicity
-		DXGI_SAMPLE_DESC sampleDesc = { 1, 0 }/*Application::Get().GetMultisampleQualityLevels(HDRFormat, D3D12_MAX_MULTISAMPLE_SAMPLE_COUNT)*/;
-
-		// Create a root signature and PSO for the skybox shaders.
-		{
-			// Load the Skybox shaders.
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_PS.cso", &ps));
-
-			// Setup the input layout for the skybox vertex shader.
-			D3D12_INPUT_ELEMENT_DESC inputLayout[1] = {
-				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			};
-
-			// Allow input layout and deny unnecessary access to certain pipeline stages.
-			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-			rootParameters[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-			CD3DX12_STATIC_SAMPLER_DESC linearClampSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &linearClampSampler, rootSignatureFlags);
-
-			m_SkyboxSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			// Setup the Skybox pipeline state.
-			struct SkyboxPipelineState
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-				CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-			} skyboxPipelineStateStream;
-
-			skyboxPipelineStateStream.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
-			skyboxPipelineStateStream.InputLayout = { inputLayout, 1 };
-			skyboxPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			skyboxPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			skyboxPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			skyboxPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
-			skyboxPipelineStateStream.SampleDesc = sampleDesc;
-
-			D3D12_PIPELINE_STATE_STREAM_DESC skyboxPipelineStateStreamDesc = {
-				sizeof(SkyboxPipelineState), &skyboxPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&skyboxPipelineStateStreamDesc, IID_PPV_ARGS(&m_SkyboxPipelineState)));
-		}
-
-		// Create a root signature for the Deferred Shadings pipeline.
-		{
-			// Load the Deferred shaders.
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_PS.cso", &ps));
-
-			// Allow input layout and deny unnecessary access to certain pipeline stages.
-			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0) };
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[5];
-			rootParameters[0].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_VERTEX);
-			rootParameters[1].InitAsConstantBufferView(0, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[2].InitAsConstantBufferView(1, 1, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[3].InitAsConstants(1, 2, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[4].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-			//CD3DX12_STATIC_SAMPLER_DESC linearRepeatSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
-			CD3DX12_STATIC_SAMPLER_DESC anisotropicSampler(0, D3D12_FILTER_ANISOTROPIC);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &anisotropicSampler, rootSignatureFlags);
-
-			m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			// Setup the Deferred pipeline state.
-			struct DeferredPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-				CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-			} deferredPipelineStateStream;
-
-			deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
-			deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
-			deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
-			deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
-			deferredPipelineStateStream.SampleDesc = sampleDesc;
-
-			D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
-				sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
-		}
-
-		// Create the PostSVGFTempral_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4, 0) };
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstantBufferView(0, 0);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostSVGFTemporalRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			// Create the PostProcessing PSO
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFTemporal_CS.cso", &cs));
-
-			struct PostProcessingPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postProcessingPipelineStateStream;
-
-			postProcessingPipelineStateStream.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
-			postProcessingPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
-				sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
-		}
-
-		// Create the PostATrous_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 2, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstants(4, 0);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostSVGFATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFATrous_CS.cso", &cs));
-
-			struct PostATrousPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postATrousPipelineStateStream;
-
-			postATrousPipelineStateStream.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
-			postATrousPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
-				sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
-		}
-
-		// Create the PostBMFRTemporalNoisy_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 5, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstantBufferView(0);
-			rootParameters[2].InitAsConstants(4, 1);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostBMFRTemporalNoisyRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_1_TemporalNoisy_CS.cso", &cs));
-
-			struct PostBMFRTemporalNoisyPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postBMFRTemporalNoisyPipelineStateStream;
-
-			postBMFRTemporalNoisyPipelineStateStream.pRootSignature = m_PostBMFRTemporalNoisyRootSignature.GetRootSignature().Get();
-			postBMFRTemporalNoisyPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalNoisyPipelineStateStreamDesc = {
-				sizeof(PostBMFRTemporalNoisyPipelineStateStream), & postBMFRTemporalNoisyPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalNoisyPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
-		}
-
-		// Create the PostBMFRQRFactorization_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstants(4, 0);
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostBMFRQRFactorizationRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_2_QRFactorization_CS.cso", &cs));
-
-			struct PostBMFRQRFactorizationPipelineStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postBMFRQRFactorizationPipelineStateStream;
-
-			postBMFRQRFactorizationPipelineStateStream.pRootSignature = m_PostBMFRQRFactorizationRootSignature.GetRootSignature().Get();
-			postBMFRQRFactorizationPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRQRFactorizationPipelineStateStreamDesc = {
-				sizeof(PostBMFRQRFactorizationPipelineStateStream), &postBMFRQRFactorizationPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postBMFRQRFactorizationPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRQRFactorizationPipelineState)));
-		}
-
-		// Create the PostBMFRWeightedSum_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstants(4, 0);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostBMFRWeightedSumRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_3_WeightedSum_CS.cso", &cs));
-
-			struct PostBMFRWeightedSumStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postBMFRWeightedSumStateStream;
-
-			postBMFRWeightedSumStateStream.pRootSignature = m_PostBMFRWeightedSumRootSignature.GetRootSignature().Get();
-			postBMFRWeightedSumStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRWeightedSumStateStreamDesc = {
-				sizeof(postBMFRWeightedSumStateStream), &postBMFRWeightedSumStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postBMFRWeightedSumStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRWeightedSumPipelineState)));
-		}
-
-		// Create the PostBMFRTemporalFiltered_CS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[2] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0),
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange);
-			rootParameters[1].InitAsConstants(4, 0);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostBMFRTemporalFilteredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> cs;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostBMFR_4_TemporalFiltered_CS.cso", &cs));
-
-			struct PostBMFRTemporalFilteredStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-			} postBMFRTemporalFilteredStateStream;
-
-			postBMFRTemporalFilteredStateStream.pRootSignature = m_PostBMFRTemporalFilteredRootSignature.GetRootSignature().Get();
-			postBMFRTemporalFilteredStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalFilteredStateStreamDesc = {
-				sizeof(postBMFRTemporalFilteredStateStream), &postBMFRTemporalFilteredStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalFilteredStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
-		}
-
-		// Create the PostLighting_PS Root Signature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
-				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0)
-			};
-
-			CD3DX12_ROOT_PARAMETER1 rootParameters[4];
-			rootParameters[0].InitAsDescriptorTable(arraysize(descriptorRange), descriptorRange, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[1].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[2].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-			rootParameters[3].InitAsConstantBufferView(2, 0, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, D3D12_SHADER_VISIBILITY_PIXEL);
-
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-			rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
-
-			m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
-			ComPtr<ID3DBlob> vs;
-			ComPtr<ID3DBlob> ps;
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-			ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-			struct PostLightingStateStream
-			{
-				CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-				CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-				CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-				CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-				CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-				CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-			} postLightingPipelineStateStream;
-
-			postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
-			postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-			postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-			postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
-			postLightingPipelineStateStream.RTVFormats = m_pWindow->GetRenderTarget().GetRenderTargetFormats();
-
-			D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
-				sizeof(postLightingPipelineStateStream), &postLightingPipelineStateStream
-			};
-			ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
-		}
-	}
-}
-void HybridPipeline::updateBuffer()
-{
-	// update the structure buffer of frameId
-	{
-		std::uniform_int_distribution<uint32_t> seedDistribution(0, UINT_MAX);
-		FrameIndexCB fid;
-		fid.FrameIndex = static_cast<uint32_t>(globalFrameCount);
-		fid.seed = seedDistribution(m_generatorURNG);
-		void* pData;
-		mpRTFrameIndexCB->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, &fid, sizeof(FrameIndexCB));
-		mpRTFrameIndexCB->Unmap(0, nullptr);
-	}
-
-	// update the camera for rt
-	{
-		CameraRTCB mCameraCB;
-		mCameraCB.PositionWS = m_Camera.get_Translation();
-		mCameraCB.InverseViewMatrix = m_Camera.get_InverseViewMatrix();
-		mCameraCB.fov = m_Camera.get_FoV();
-		void* pData;
-		mpRTCameraCB->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, &mCameraCB, sizeof(CameraRTCB));
-		mpRTCameraCB->Unmap(0, nullptr);
-	}
-
-	// update the light for rt
-	{
-		void* pData;
-		mpRTPointLightCB->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, &(m_Scene->m_PointLight), sizeof(PointLight));
-		mpRTPointLightCB->Unmap(0, nullptr);
-	}
-}
-
-
-////////////////////////////////////////////////////////////////////// RT Object 
-void HybridPipeline::createAccelerationStructures()
-{
-	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
-	{
-		D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0,
-	};
-
-	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
-	{
-		D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0
-	};
-
-	auto pDevice = Application::Get().GetDevice();
-	auto commandQueue = Application::Get().GetCommandQueue();
-	auto commandList = commandQueue->GetCommandList();
-	
-	std::vector<AccelerationStructureBuffers> bottomLevelBuffers;
-	mpBottomLevelASes.resize(MeshPool::Get().size()); 
-	bottomLevelBuffers.resize(MeshPool::Get().size());//Before the commandQueue finishes its execution of AS creation, these resources' lifecycle have to be held
-	std::map<MeshIndex, int> MeshIndex2blasSeqCache; // Record MeshIndex to the sequence of mesh in mpBottomLevelASes
-
-	int blasSeqCount=0;
-	for (auto it = MeshPool::Get().getPool().begin(); it != MeshPool::Get().getPool().end(); it++) { //mpBottomLevelASes
-
-		MeshIndex2blasSeqCache.emplace(it->first, blasSeqCount);
-		auto pMesh = it->second;
-
-		// set the index and vertex buffer to generic read status //Crucial!!!!!!!! // Make Sure the correct status // hey yeah
-		commandList->TransitionBarrier(pMesh->getVertexBuffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
-		commandList->TransitionBarrier(pMesh->getIndexBuffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
-
-		D3D12_RAYTRACING_GEOMETRY_DESC geomDesc = {};
-		geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geomDesc.Triangles.VertexBuffer.StartAddress = pMesh->getVertexBuffer().GetD3D12Resource()->GetGPUVirtualAddress();//Vertex Setup
-		geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexPositionNormalTexture);
-		geomDesc.Triangles.VertexFormat = VertexPositionNormalTexture::InputElements[0].Format;
-		geomDesc.Triangles.VertexCount = pMesh->getVertexCount();
-		geomDesc.Triangles.IndexBuffer = pMesh->getIndexBuffer().GetD3D12Resource()->GetGPUVirtualAddress(); //Index Setup
-		geomDesc.Triangles.IndexFormat = pMesh->getIndexBuffer().GetIndexBufferView().Format;
-		geomDesc.Triangles.IndexCount = pMesh->getIndexCount();
-		
-		geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-		// Get the size requirements for the scratch and AS buffers
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-		inputs.NumDescs = 1;
-		inputs.pGeometryDescs = &geomDesc;
-		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
-		pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
-		// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
-		bottomLevelBuffers[blasSeqCount].pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, 
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
-		bottomLevelBuffers[blasSeqCount].pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, 
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
-		// 成员变量持有，全局记录持久资源的状态
-		ASBuffer asBuffer;
-		mpBottomLevelASes[blasSeqCount] = bottomLevelBuffers[blasSeqCount].pResult;
-		asBuffer.SetD3D12Resource(mpBottomLevelASes[blasSeqCount]);
-		asBuffer.SetName(L"BottomLevelAS"+string_2_wstring(it->first));
-		ResourceStateTracker::AddGlobalResourceState(mpBottomLevelASes[blasSeqCount].Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
-
-		// Create the bottom-level AS
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-		asDesc.Inputs = inputs;
-		asDesc.DestAccelerationStructureData = bottomLevelBuffers[blasSeqCount].pResult->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = bottomLevelBuffers[blasSeqCount].pScratch->GetGPUVirtualAddress();
-
-		commandList->BuildRaytracingAccelerationStructure(&asDesc);
-
-		// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
-		commandList->UAVBarrier(asBuffer, true);
-		blasSeqCount++;
-	}
-
-	AccelerationStructureBuffers topLevelBuffers; //构建GameObject
-	{ // topLevelBuffers
-		uint32_t nonLightCount = 0;
-		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-		{
-			std::string objIndex = it->first;
-			if (objIndex.find("light") != std::string::npos) {
-				continue;
-			}
-			nonLightCount++;
-		}
-		int gameObjectCount = m_Scene->gameObjectPool.size();
-		// First, get the size of the TLAS buffers and create them
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-		inputs.NumDescs = nonLightCount;
-		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-		pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
-		// Create the buffers
-		topLevelBuffers.pScratch = createBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, kDefaultHeapProps);
-		topLevelBuffers.pResult = createBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, kDefaultHeapProps);
-		mTlasSize = info.ResultDataMaxSizeInBytes;
-		// 成员变量持有，全局记录持久资源的状态
-		ASBuffer asBuffer;
-		mpTopLevelAS = topLevelBuffers.pResult;
-		asBuffer.SetD3D12Resource(mpTopLevelAS.Get());
-		asBuffer.SetName(L"TopLevelAS");
-		ResourceStateTracker::AddGlobalResourceState(mpTopLevelAS.Get(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
-
-		
-
-		// The instance desc should be inside a buffer, create and map the buffer
-		topLevelBuffers.pInstanceDesc = createBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * nonLightCount, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
-		topLevelBuffers.pInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
-		ZeroMemory(pInstanceDesc, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * nonLightCount);
-
-		int tlasGoCount=0;
-		for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-		{
-			// 特殊处理剔除光源不加入光追
-			std::string objIndex = it->first;
-			if (objIndex.find("light")!=std::string::npos) {
-				continue;
-			}
-
-			// Initialize the instance desc. We only have a single instance
-			pInstanceDesc[tlasGoCount].InstanceID = tlasGoCount;                            // This value will be exposed to the shader via InstanceID()
-			pInstanceDesc[tlasGoCount].InstanceContributionToHitGroupIndex = 2* tlasGoCount;   // This is the offset inside the shader-table. 
-			pInstanceDesc[tlasGoCount].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			XMMATRIX m = XMMatrixTranspose(it->second->transform.ComputeModel());
-			memcpy(pInstanceDesc[tlasGoCount].Transform, m.r, sizeof(pInstanceDesc[tlasGoCount].Transform));
-			pInstanceDesc[tlasGoCount].AccelerationStructure =/* mpBottomLevelAS->GetGPUVirtualAddress();*/ mpBottomLevelASes[MeshIndex2blasSeqCache[it->second->mesh]]->GetGPUVirtualAddress();
-			pInstanceDesc[tlasGoCount].InstanceMask = 0xFF;
-			tlasGoCount++;
-		}
-		
-		// Unmap
-		topLevelBuffers.pInstanceDesc->Unmap(0, nullptr);
-
-		// Create the TLAS
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-		asDesc.Inputs = inputs;
-		asDesc.Inputs.InstanceDescs = topLevelBuffers.pInstanceDesc->GetGPUVirtualAddress();
-		asDesc.DestAccelerationStructureData = topLevelBuffers.pResult->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = topLevelBuffers.pScratch->GetGPUVirtualAddress();
-
-		commandList->BuildRaytracingAccelerationStructure(&asDesc);
-
-		// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
-		commandList->UAVBarrier(asBuffer, true);
-	}
-
-	// Wait for the execution of commandlist on the direct command queue, then release scratch resources in topLevelBuffers and bottomLevelBuffers
-	uint64_t mFenceValue = commandQueue->ExecuteCommandList(commandList);
-	commandQueue->WaitForFenceValue(mFenceValue);
-}
-
-void HybridPipeline::createRtPipelineState()
-{
-	// Need 10 subobjects:
-	//  1 for the DXIL library
-	//  1 for hit-group
-	//  2 for RayGen root-signature (root-signature and the subobject association)
-	//  2 for the root-signature shared between miss and hit shaders (signature and association)
-	//  2 for shader config (shared between all programs. 1 for the config, 1 for association)
-	//  1 for pipeline config
-	//  1 for the global root signature
-	auto mpDevice = Application::Get().GetDevice();
-
-	std::array<D3D12_STATE_SUBOBJECT, 15> subobjects;
-	uint32_t index = 0;
-
-	// Compile the shader
-	auto pDxilLib = compileLibrary(L"RTPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
-	const WCHAR* entryPoints[] = { kRayGenShader, kShadowMissShader ,kShadwoClosestHitShader, kSecondaryMissShader , kSecondaryClosestHitShader };
-	DxilLibrary dxilLib = DxilLibrary(pDxilLib, entryPoints, arraysize(entryPoints));
-	subobjects[index++] = dxilLib.stateSubobject; // 0 Library
-
-	HitProgram shadowHitProgram(0, kShadwoClosestHitShader, kShadowHitGroup);
-	subobjects[index++] = shadowHitProgram.subObject; // 1 shadow Hit Group
-
-	HitProgram secondaryHitProgram(0, kSecondaryClosestHitShader, kSecondaryHitGroup);
-	subobjects[index++] = secondaryHitProgram.subObject; // 2 secondary Hit Group
-
-	CD3DX12_STATIC_SAMPLER_DESC static_sampler_desc(0);
-
-	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(mpDevice, createLocalRootDesc(2,5,1, &static_sampler_desc,3,0,0).desc);
-	subobjects[index] = rgsRootSignature.subobject; // 3 RayGen Root Sig
-
-	uint32_t rgsRootIndex = index++; // 3
-	ExportAssociation rgsRootAssociation(&kRayGenShader, 1, &(subobjects[rgsRootIndex]));
-	subobjects[index++] = rgsRootAssociation.subobject; // 4 Associate Root Sig to RGS
-
-	// Create the secondary root-signature and association
-	LocalRootSignature secondaryRootSignature(mpDevice, createLocalRootDesc(0, 7, 1, &static_sampler_desc ,5,0,1).desc);
-	subobjects[index] = secondaryRootSignature.subobject;// 5 Secondary chs sig
-
-	uint32_t secondaryRootIndex = index++;//5
-	ExportAssociation secondaryRootAssociation(&kSecondaryClosestHitShader, 1, &(subobjects[secondaryRootIndex]));
-	subobjects[index++] = secondaryRootAssociation.subobject;//6 Associate secondary sig to secondarychs
-
-	// Create the secondary miss root-signature and association
-	LocalRootSignature secondaryMissRootSignature(mpDevice, createLocalRootDesc(0, 1, 1, &static_sampler_desc, 0, 0, 2).desc);
-	subobjects[index] = secondaryMissRootSignature.subobject;// 7 Secondary miss sig
-
-	uint32_t secondaryMissRootIndex = index++;//7
-	ExportAssociation secondaryMissRootAssociation(&kSecondaryMissShader, 1, &(subobjects[secondaryMissRootIndex]));
-	subobjects[index++] = secondaryMissRootAssociation.subobject;//8 Associate secondary sig to secondarychs
-
-	// Create the miss- and hit-programs root-signature and association
-	D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
-	emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	LocalRootSignature hitMissRootSignature(mpDevice, emptyDesc);
-	subobjects[index] = hitMissRootSignature.subobject; // 9 Root Sig to be shared between Miss and shadowCHS
-
-	uint32_t hitMissRootIndex = index++; // 9
-	const WCHAR* missHitExportName[] = { kShadowMissShader, kShadwoClosestHitShader};
-	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
-	subobjects[index++] = missHitRootAssociation.subobject; // 10 Associate Root Sig to Miss and CHS
-
-	// Bind the payload size to the programs
-	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 4);
-	subobjects[index] = shaderConfig.subobject; // 11 Shader Config
-
-	uint32_t shaderConfigIndex = index++; // 11 
-	const WCHAR* shaderExports[] = {kRayGenShader, kShadowMissShader, kSecondaryMissShader, kShadwoClosestHitShader, kSecondaryClosestHitShader};
-	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
-	subobjects[index++] = configAssociation.subobject; // 12 Associate Shader Config to Miss, shadowCHS, shadowRGS, secondaryCHS, secondaryRGS
-
-	// Create the pipeline config
-	PipelineConfig config(4);
-	subobjects[index++] = config.subobject; // 13 configuration 
-
-	// Create the global root signature and store the empty signature
-	GlobalRootSignature root(mpDevice, {});
-	mpEmptyRootSig = root.pRootSig;
-	subobjects[index++] = root.subobject; // 14
-
-	// Create the state
-	D3D12_STATE_OBJECT_DESC desc;
-	desc.NumSubobjects = index; // 15
-	desc.pSubobjects = subobjects.data();
-	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-
-	ThrowIfFailed(mpDevice->CreateStateObject(&desc, IID_PPV_ARGS(&mpPipelineState)));
-}
-
-RootSignatureDesc HybridPipeline::createLocalRootDesc(int uav_num, int srv_num, int sampler_num, const D3D12_STATIC_SAMPLER_DESC* pStaticSamplers, int cbv_num, int c32_num, int space)
-{
-	// Create the root-signature 
-	//******Layout*********/
-	// Param[0] = DescriptorTable
-	/////////////// |---------------range for UAV---------------| |-------------------range for SRV-------------------|
-	// Param[1-n] = 
-	RootSignatureDesc desc;
-	int range_size = 0;
-	if (uav_num > 0) range_size++;
-	if (srv_num > 0) range_size++;
-
-	desc.range.resize(range_size);
-	int range_counter = 0;
-	// UAV
-	if (uav_num > 0) {
-		desc.range[range_counter].BaseShaderRegister = 0;
-		desc.range[range_counter].NumDescriptors = uav_num;
-		desc.range[range_counter].RegisterSpace = space;
-		desc.range[range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-		desc.range[range_counter].OffsetInDescriptorsFromTableStart = 0;
-		range_counter++;
-	}
-	// SRV
-	if (srv_num > 0) {
-		desc.range[range_counter].BaseShaderRegister = 0;
-		desc.range[range_counter].NumDescriptors = srv_num;
-		desc.range[range_counter].RegisterSpace = space;
-		desc.range[range_counter].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		desc.range[range_counter].OffsetInDescriptorsFromTableStart = uav_num;
-		range_counter++;
-	}
-	
-	int descriptor_table_counter = 0;
-	if (range_counter > 0) descriptor_table_counter++;
-	//if (sample_range_counter > 0) descriptor_table_counter++;
-
-	int i = 0;
-	desc.rootParams.resize(descriptor_table_counter + cbv_num + c32_num );
-	{
-		
-		if (range_counter > 0) {
-			desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			desc.rootParams[i].DescriptorTable.NumDescriptorRanges = range_size;
-			desc.rootParams[i].DescriptorTable.pDescriptorRanges = desc.range.data();
-			i++;
-		}
-		//if (sample_range_counter > 0) {
-		//	desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		//	desc.rootParams[i].DescriptorTable.NumDescriptorRanges = sample_range_size;
-		//	desc.rootParams[i].DescriptorTable.pDescriptorRanges = sampleDesc.range.data();
-		//	i++;
-		//}
-	}
-	for (; i < cbv_num + descriptor_table_counter; i++) {
-		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		desc.rootParams[i].Descriptor.RegisterSpace = space;
-		desc.rootParams[i].Descriptor.ShaderRegister = i- descriptor_table_counter;
-	}
-	for (; i < cbv_num + c32_num + descriptor_table_counter; i++) {
-		desc.rootParams[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		desc.rootParams[i].Constants.Num32BitValues = 1;
-		desc.rootParams[i].Constants.RegisterSpace = space;
-		desc.rootParams[i].Constants.ShaderRegister = i - descriptor_table_counter;
-	}
-	// Create the desc
-	desc.desc.NumParameters = descriptor_table_counter + cbv_num+ c32_num;
-	desc.desc.pParameters = desc.rootParams.data();
-	desc.desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	if (sampler_num > 0) {
-		desc.desc.NumStaticSamplers = sampler_num;
-		desc.desc.pStaticSamplers = pStaticSamplers;
-	}
-
-	return desc;
-}
-
-void HybridPipeline::createShaderResources()
-{
-	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
-	{
-		D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0,
-	};
-
-	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
-	{
-		D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0
-	};
-
-	auto pDevice = Application::Get().GetDevice();
-	//****************************UAV Resource
-	mRtShadowOutputTexture = Texture(CD3DX12_RESOURCE_DESC::Tex2D(
-		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height,1,0,1,0, 
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN,0
-	), nullptr, TextureUsage::IntermediateBuffer, L"mpRtShadowOutputTexture");
-	mRtReflectOutputTexture = Texture(CD3DX12_RESOURCE_DESC::Tex2D(
-		DXGI_FORMAT_R32G32B32A32_FLOAT, m_Viewport.Width, m_Viewport.Height, 1, 0, 1, 0,
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0
-	), nullptr, TextureUsage::IntermediateBuffer, L"mRtReflectOutputTexture");
-
-	
-	//****************************CBV Resource
-	mpRTPointLightCB = createBuffer(pDevice, sizeof(PointLight), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-	mpRTCameraCB = createBuffer(pDevice, sizeof(CameraRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ,kUploadHeapProps);
-	mpRTFrameIndexCB = createBuffer(pDevice, sizeof(FrameIndexCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-
-	//****************************CBV for per object 
-	int objectToRT = 0;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-		objectToRT++;
-	}
-	mpRTMaterialCBList.resize(objectToRT);
-	mpRTPBRMaterialCBList.resize(objectToRT);
-	mpRTGameObjectIndexCBList.resize(objectToRT);
-	objectToRT = 0;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-
-		void* pData = 0;
-		// base material
-		mpRTMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(Material::MaterialCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-		mpRTMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &it->second->material.computeMaterialCB(), sizeof(Material::MaterialCB));
-		mpRTMaterialCBList[objectToRT]->Unmap(0, nullptr);
-		// pbr material
-		mpRTPBRMaterialCBList[objectToRT] = createBuffer(pDevice, sizeof(PBRMaterial::PBRMaterialCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-		mpRTPBRMaterialCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &it->second->material.computePBRMaterialCB(), sizeof(PBRMaterial::PBRMaterialCB));
-		mpRTPBRMaterialCBList[objectToRT]->Unmap(0, nullptr);
-		// rt go index
-		mpRTGameObjectIndexCBList[objectToRT] = createBuffer(pDevice, sizeof(ObjectIndexRTCB), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-		mpRTGameObjectIndexCBList[objectToRT]->Map(0, nullptr, (void**)& pData);
-		memcpy(pData, &it->second->gid, sizeof(float));
-		mpRTGameObjectIndexCBList[objectToRT]->Unmap(0, nullptr);
-		
-		objectToRT++;
-	}
-	
-}
-
-void HybridPipeline::createSrvUavHeap() {
-	auto pDevice = Application::Get().GetDevice();
-
-	int objectToRT = 0;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-		objectToRT++;
-	}
-
-	//****************************Descriptor heap
-
-	// Create the uavSrvHeap and its handle
-	uint32_t srvuavBias = 8;
-	uint32_t srvuavPerHitSize = 7;
-	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.NumDescriptors = srvuavBias + objectToRT * srvuavPerHitSize;
-	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mpSrvUavHeap)));
-	D3D12_CPU_DESCRIPTOR_HANDLE uavSrvHandle = mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-
-	// Create the UAV for GShadowOutput
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavGOutputDesc = {};
-	uavGOutputDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	pDevice->CreateUnorderedAccessView(mRtShadowOutputTexture.GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	// Create the UAV for GReflectOutput
-	pDevice->CreateUnorderedAccessView(mRtReflectOutputTexture.GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	// Create srv for TLAS
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvTLASDesc = {};
-	srvTLASDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-	srvTLASDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvTLASDesc.RaytracingAccelerationStructure.Location = mpTopLevelAS->GetGPUVirtualAddress();
-	pDevice->CreateShaderResourceView(nullptr, &srvTLASDesc, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	//GBuffer
-	for (int i = 0; i < 4; i++) {
-		UINT pDestDescriptorRangeSizes[] = { 1 };
-		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &m_GBuffer.GetTexture((AttachmentPoint)i).GetShaderResourceView(), pDestDescriptorRangeSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	}
-
-	// skybox
-	auto& skybox_texture = TexturePool::Get().getTexture("skybox_cubemap");
-	D3D12_SHADER_RESOURCE_VIEW_DESC skyboxSrvDesc = {};
-	skyboxSrvDesc.Format = skybox_texture.GetD3D12ResourceDesc().Format;
-	skyboxSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	skyboxSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-	skyboxSrvDesc.TextureCube.MipLevels = (UINT)-1; // Use all mips.
-	// TODO: Need a better way to bind a cubemap.
-	pDevice->CreateShaderResourceView(skybox_texture.GetD3D12Resource().Get(), &skyboxSrvDesc, uavSrvHandle);
-	uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	objectToRT = 0;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-		auto pLobject = it->second;
-
-		UINT pDestDescriptorRangeSizes[] = { 1 };
-		//pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-		//	1,              , pDestDescriptorRangeSizes, 
-		//	D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		// indices 0
-		pDevice->CreateShaderResourceView(nullptr, &srvTLASDesc, uavSrvHandle);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		// indices 1
-		D3D12_SHADER_RESOURCE_VIEW_DESC indexSrvDesc = {};
-		indexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		indexSrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-		indexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		indexSrvDesc.Buffer.NumElements = (UINT)((MeshPool::Get().getPool()[pLobject->mesh]->getIndexCount()/*+1*/)/*/2*/); // 修改为32bit的index
-		indexSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-		pDevice->CreateShaderResourceView(MeshPool::Get().getPool()[pLobject->mesh]->getIndexBuffer().GetD3D12Resource().Get(), &indexSrvDesc, uavSrvHandle);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		// vetices 2
-		D3D12_SHADER_RESOURCE_VIEW_DESC vertexSrvDesc = {};
-		vertexSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		vertexSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		vertexSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		vertexSrvDesc.Buffer.FirstElement = 0;
-		vertexSrvDesc.Buffer.NumElements = MeshPool::Get().getPool()[pLobject->mesh]->getVertexCount();
-		vertexSrvDesc.Buffer.StructureByteStride = sizeof(VertexPositionNormalTexture);
-		pDevice->CreateShaderResourceView(MeshPool::Get().getPool()[pLobject->mesh]->getVertexBuffer().GetD3D12Resource().Get(), &vertexSrvDesc, uavSrvHandle);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//albedo 3
-		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &pLobject->material.getAlbedoTexture().GetShaderResourceView() , pDestDescriptorRangeSizes,
-			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//metallic 4
-		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &pLobject->material.getMetallicTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
-			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//normal 5
-		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &pLobject->material.getNormalTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
-			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		//roughness 6
-		pDevice->CopyDescriptors(1, &uavSrvHandle, pDestDescriptorRangeSizes,
-			1, &pLobject->material.getRoughnessTexture().GetShaderResourceView(), pDestDescriptorRangeSizes,
-			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		objectToRT++;
-	}
-}
-
-void HybridPipeline::updateSrvUavHeap() {
-	auto pDevice = Application::Get().GetDevice();
-
-	//D3D12_CPU_DESCRIPTOR_HANDLE uavSrvHandle = mpSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-	//// Create the UAV for GShadowOutput - no updating
-	//D3D12_UNORDERED_ACCESS_VIEW_DESC uavGOutputDesc = {};
-	//uavGOutputDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	////pDevice->CreateUnorderedAccessView(mRtShadowOutputTexture.GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
-	//uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	//// Create the UAV for GReflectOutput
-	//pDevice->CreateUnorderedAccessView(mRtReflectOutputTexture.GetD3D12Resource().Get(), nullptr, &uavGOutputDesc, uavSrvHandle);
-	//uavSrvHandle.ptr += pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void HybridPipeline::createShaderTable()
-{
-	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
-	{
-		D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0,
-	};
-
-	const D3D12_HEAP_PROPERTIES kDefaultHeapProps =
-	{
-		D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0,
-		0
-	};
-
-	auto mpDevice = Application::Get().GetDevice();
-
-	int objectToRT = 0;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-		objectToRT++;
-	}
-
-	// Calculate the size and create the buffer
-	mShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	mShaderTableEntrySize += 48; // The ray-gen's descriptor table
-	mShaderTableEntrySize = Math::AlignUp(mShaderTableEntrySize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-	uint32_t shaderTableSize = mShaderTableEntrySize * (3 + objectToRT *2);
-
-	// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
-	mpShaderTable = createBuffer(mpDevice, shaderTableSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, kUploadHeapProps);
-	NAME_D3D12_OBJECT(mpShaderTable);
-	ResourceStateTracker::AddGlobalResourceState(mpShaderTable.Get(), D3D12_RESOURCE_STATE_GENERIC_READ);
-
-	// Map the buffer
-	uint8_t* pData;
-	ThrowIfFailed(mpShaderTable->Map(0, nullptr, (void**)& pData));
-
-	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties> pRtsoProps;
-	mpPipelineState->QueryInterface(IID_PPV_ARGS(&pRtsoProps));
-
-	// Entry 0 - ray-gen program ID and descriptor data
-	memcpy(pData + mShaderTableEntrySize * 0, pRtsoProps->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-	D3D12_GPU_VIRTUAL_ADDRESS heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*0) = heapStart;
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*1) = mpRTPointLightCB->GetGPUVirtualAddress();
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*2) = mpRTCameraCB->GetGPUVirtualAddress();
-	*(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8*3) = mpRTFrameIndexCB->GetGPUVirtualAddress();
-	
-	// Entry 1 - shadow miss program
-	memcpy(pData + mShaderTableEntrySize*1, pRtsoProps->GetShaderIdentifier(kShadowMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-	// entry 2 - secondary miss program
-	memcpy(pData + mShaderTableEntrySize*2, pRtsoProps->GetShaderIdentifier(kSecondaryMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-	 heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + //绑定 skybox
-		 +mpDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 7;
-	 *(D3D12_GPU_VIRTUAL_ADDRESS*)(pData + mShaderTableEntrySize * 2 + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 0) = heapStart;
-
-	objectToRT = 0;
-	uint32_t srvuavBias = 8;
-	uint32_t srvuavPerHitSize = 7;
-	for (auto it = m_Scene->gameObjectPool.begin(); it != m_Scene->gameObjectPool.end(); it++)
-	{
-		// 特殊处理剔除光源不加入光追
-		std::string objIndex = it->first;
-		if (objIndex.find("light") != std::string::npos) {
-			continue;
-		}
-		// Entry 3+i*2 -  shadow hit program
-		uint8_t* pHitEntry = pData + mShaderTableEntrySize * (3 + objectToRT * 2); // +2 skips the ray-gen and miss entries
-		memcpy(pHitEntry, pRtsoProps->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-		// entry 3+i*2+1 secondary hit program
-		pHitEntry = pData + mShaderTableEntrySize * (3 + objectToRT * 2 + 1); // +2 skips the ray-gen and miss entries
-		memcpy(pHitEntry, pRtsoProps->GetShaderIdentifier(kSecondaryHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		D3D12_GPU_VIRTUAL_ADDRESS heapStart = mpSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr
-			+ mpDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * (srvuavBias + objectToRT * srvuavPerHitSize);
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 0) = heapStart;
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 1) = mpRTMaterialCBList[objectToRT]->GetGPUVirtualAddress();
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 2) = mpRTPBRMaterialCBList[objectToRT]->GetGPUVirtualAddress();
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 3) = mpRTGameObjectIndexCBList[objectToRT]->GetGPUVirtualAddress();
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 4) = mpRTPointLightCB->GetGPUVirtualAddress();
-		*(D3D12_GPU_VIRTUAL_ADDRESS*)(pHitEntry + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + 8 * 5) = mpRTFrameIndexCB->GetGPUVirtualAddress();
-
-		objectToRT++;
-	}
-	// Unmap
-	mpShaderTable->Unmap(0, nullptr);
-}
 
