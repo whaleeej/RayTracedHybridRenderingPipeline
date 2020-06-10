@@ -1,4 +1,4 @@
-#include "..\inc\MeshPool.h"
+#include "MeshPool.h"
 
 static MeshPool* gIns_MeshPool;
 

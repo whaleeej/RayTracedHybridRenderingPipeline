@@ -1,4 +1,4 @@
-#include "..\inc\GBufferRenderer.h"
+#include "GBufferRenderer.h"
 
 GBufferRenderer::GBufferRenderer(int w, int h) :
 	Renderer(w, h),

@@ -1,4 +1,4 @@
-#include "..\inc\GIFilteringRenderer.h"
+#include "GIFilteringRenderer.h"
 
 GIFilteringRenderer::GIFilteringRenderer(int w, int h) :
 	Renderer(w, h)

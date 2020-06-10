@@ -1,5 +1,6 @@
-cmake_minimum_required( VERSION 3.12.1 ) # Latest version of CMake when this file was created.
+cmake_minimum_required( VERSION 3.12.1 )
 
+#### format project catalogue
 file(GLOB SOURCE_Buildin false inc/Buildin/*.h src/Buildin/*.cpp)
 file(GLOB SOURCE_DXRuntime false inc/DXRuntime/*.h src/DXRuntime/*.cpp)
 file(GLOB SOURCE_Framework false inc/Framework/*.h src/Framework/*.cpp)
@@ -30,8 +31,12 @@ source_group( "Resources\\Shaders" FILES ${SHADER_FILES} )
 source_group( "Resources" FILES DX12Lib.rc resource.h )
 source_group( "Resources\\Icon" FILES Resources/Icon/app_icon.ico )
 
+### build project
 file(GLOB_RECURSE HEADER_FILES false inc/*.h)
 file(GLOB_RECURSE SOURCE_FILES false src/*.cpp)
+
+add_compile_definitions(_DISABLE_EXTENDED_ALIGNED_STORAGE)
+add_compile_definitions(_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
 
 add_library( DX12Lib STATIC
     ${HEADER_FILES}
@@ -40,7 +45,7 @@ add_library( DX12Lib STATIC
 )
 
 target_include_directories( DX12Lib
-    PUBLIC  inc/Buildin
+    PUBLIC inc/Buildin
     PUBLIC inc/Dep
     PUBLIC inc/DXRuntime
     PUBLIC inc/Framework
@@ -50,9 +55,6 @@ target_include_directories( DX12Lib
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
 )
 
-add_compile_definitions(_DISABLE_EXTENDED_ALIGNED_STORAGE)
-add_compile_definitions(_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
-
 target_link_libraries( DX12Lib 
 	PUBLIC DirectXTex
     PUBLIC d3d12.lib
@@ -61,17 +63,7 @@ target_link_libraries( DX12Lib
     PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/DX12Lib.dir/${CMAKE_CFG_INTDIR}/DX12Lib.res # This is the only way I could figure out how to link the compiled resource file.
 )
 
-# # Enable precompiled header files.
-# set_source_files_properties( ${SOURCE_FILES} 
-#     PROPERTIES 
-#         COMPILE_FLAGS /Yu"DX12LibPCH.h"
-# )
-
-# set_source_files_properties( src/DX12LibPCH.cpp
-#     PROPERTIES
-#         COMPILE_FLAGS /Yc"DX12LibPCH.h"
-# )
-
+###set properties
 set_source_files_properties( ${SHADER_FILES}
     PROPERTIES
         VS_SHADER_MODEL 5.1
