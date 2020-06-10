@@ -38,15 +38,6 @@ void ShadowFilteringRenderer::LoadResource(std::shared_ptr<Scene> scene, RenderR
 	variance_inout[1] = createTex2D_ReadWrite(L"variance_inout[1]", m_Width, m_Height);
 
 	resources.emplace(RRD_SHADOW_ACC, std::make_shared<Texture>(col_acc));
-	resources.emplace(RRD_SHADOW_ACC_PREV, std::make_shared<Texture>(col_acc_prev));
-	resources.emplace(RRD_SHADOW_MOMENT_ACC, std::make_shared<Texture>(moment_acc));
-	resources.emplace(RRD_SHADOW_MOMENT_ACC_PREV, std::make_shared<Texture>(moment_acc_prev));
-	resources.emplace(RRD_SHADOW_HISTORY, std::make_shared<Texture>(his_length));
-	resources.emplace(RRD_SHADOW_HISTORY_PREV, std::make_shared<Texture>(his_length_prev));
-	resources.emplace(RRD_SHADOW_INOUT_FIRST, std::make_shared<Texture>(color_inout[0]));
-	resources.emplace(RRD_SHADOW_INOUT_SECOND, std::make_shared<Texture>(color_inout[1]));
-	resources.emplace(RRD_SHADOW_VAR_INOUT_FIRST, std::make_shared<Texture>(variance_inout[0]));
-	resources.emplace(RRD_SHADOW_VAR_INOUT_SECOND, std::make_shared<Texture>(variance_inout[1]));
 }
 
 void ShadowFilteringRenderer::LoadPipeline()
@@ -77,7 +68,7 @@ void ShadowFilteringRenderer::LoadPipeline()
 
 		// Create the PostProcessing PSO
 		ComPtr<ID3DBlob> cs;
-		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFTemporal_CS.cso", &cs));
+		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostSVGFTemporal_CS.cso", &cs));
 
 		struct PostProcessingPipelineStateStream
 		{
@@ -111,7 +102,7 @@ void ShadowFilteringRenderer::LoadPipeline()
 		m_PostSVGFATrousRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 		ComPtr<ID3DBlob> cs;
-		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostSVGFATrous_CS.cso", &cs));
+		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostSVGFATrous_CS.cso", &cs));
 
 		struct PostATrousPipelineStateStream
 		{
@@ -188,4 +179,37 @@ void ShadowFilteringRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> 
 			commandList->Dispatch(m_Width / local_width, m_Height / local_height);
 		}
 	}
+}
+
+void ShadowFilteringRenderer::PreRender(RenderResourceMap& resources)
+{
+	Renderer::PreRender(resources);
+	gPosition = *resources[RRD_POSITION];
+	gPosition_prev = *resources[RRD_POSITION_PREV];
+	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
+	gAlbedoMetallic_prev = *resources[RRD_ALBEDO_MATALLIC_PREV];
+	gNormalRoughness = *resources[RRD_NORMAL_ROUGHNESS];
+	gNormalRoughness_prev = *resources[RRD_NORMAL_ROUGHNESS_PREV];
+	gExtra = *resources[RRD_EXTRA];
+	gExtra_prev = *resources[RRD_EXTRA_PREV];
+
+	mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
+
+	auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
+		Texture tmp = t2;
+		t2 = t1;
+		t1 = tmp;
+	};
+
+	swapCurrPrevTexture(col_acc_prev, col_acc);
+	swapCurrPrevTexture(moment_acc_prev, moment_acc);
+	swapCurrPrevTexture(his_length_prev, his_length);
+
+	
+}
+
+RenderResourceMap* ShadowFilteringRenderer::PostRender()
+{
+	(*m_Resources)[RRD_SHADOW_ACC] = std::make_shared<Texture>(col_acc);
+	return Renderer::PostRender();
 }

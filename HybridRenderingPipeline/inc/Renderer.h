@@ -4,6 +4,7 @@
 #include <Events.h>
 #include <RootSignature.h>
 #include <Application.h>
+
 #include "RenderResourceDefinition.h"
 #include "RenderTarget.h"
 #include "Scene.h"
@@ -18,6 +19,8 @@ public:
 	virtual ~Renderer();
 
 	virtual void Resize(int w, int h);
+	virtual void PressKey(KeyEventArgs& e);
+	virtual void ReleaseKey(KeyEventArgs& e);
 
 	virtual void LoadResource(std::shared_ptr<Scene> scene, RenderResourceMap& resources)=0;
 	virtual void LoadPipeline()=0;

@@ -13,6 +13,11 @@ public://override
 	virtual void Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene);
 	virtual void Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList);
 	virtual void Resize(int w, int h);
+	virtual void PressKey(KeyEventArgs& e);
+
+public:
+	virtual void PreRender(RenderResourceMap& resources);
+	virtual RenderResourceMap* PostRender();
 
 private:
 	struct CameraCB
@@ -31,8 +36,7 @@ private:
 	};
 
 private:
-	CameraCB mCameraCB;
-	PassTestingCB postTestingCB;
+	RenderTarget presentRenderTarget;
 
 	Texture gPosition; //srv
 	Texture gAlbedoMetallic; //srv
@@ -45,7 +49,8 @@ private:
 	Texture col_acc;
 	Texture filtered_curr;
 
-	RenderTarget presentRenderTarget;
+	CameraCB mCameraCB;
+	PassTestingCB postTestingCB;
 
 	RootSignature m_PostLightingRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PostLightingPipelineState;

@@ -14,11 +14,16 @@ public://override
 	virtual void Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList);
 	virtual void Resize(int w, int h);
 
+public:
+	virtual void PreRender(RenderResourceMap& resources);
+	virtual RenderResourceMap* PostRender();
+
 private:
 	RootSignature m_DeferredRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_DeferredPipelineState;
 
 	RenderTarget m_GBuffer;
+
 	Texture gPosition; //srv
 	Texture gAlbedoMetallic; //srv
 	Texture gNormalRoughness; //srv
@@ -27,7 +32,6 @@ private:
 	Texture gAlbedoMetallic_prev; //srv
 	Texture gNormalRoughness_prev; //srv
 	Texture gExtra_prev; //srv
-
 
 	D3D12_VIEWPORT m_Viewport;
 	D3D12_RECT m_ScissorRect;

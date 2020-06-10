@@ -50,32 +50,26 @@ void Game::OnRender(RenderEventArgs& e)
 
 void Game::OnKeyPressed(KeyEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnKeyReleased(KeyEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnMouseMoved(class MouseMotionEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnMouseButtonPressed(MouseButtonEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnMouseButtonReleased(MouseButtonEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnMouseWheel(MouseWheelEventArgs& e)
 {
-    // By default, do nothing.
 }
 
 void Game::OnResize(ResizeEventArgs& e)
@@ -86,9 +80,6 @@ void Game::OnResize(ResizeEventArgs& e)
 
 void Game::OnWindowDestroy()
 {
-    // If the Window which we are registered to is 
-    // destroyed, then any resources which are associated 
-    // to the window must be released.
     UnloadContent();
 }
 

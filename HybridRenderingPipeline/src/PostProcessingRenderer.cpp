@@ -58,8 +58,8 @@ void PostProcessingRenderer::LoadPipeline()
 
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostProcessing_VS.cso", &vs));
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/PostLighting_PS.cso", &ps));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostProcessing_VS.cso", &vs));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostLighting_PS.cso", &ps));
 
 	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -124,3 +124,38 @@ void PostProcessingRenderer::Resize(int w, int h)
 	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
 		static_cast<float>(m_Width), static_cast<float>(m_Height));
 }
+
+void PostProcessingRenderer::PressKey(KeyEventArgs& e)
+{
+	switch (e.Key)
+	{
+	case KeyCode::D4:
+		postTestingCB.inc();
+		break;
+	}
+}
+
+void PostProcessingRenderer::PreRender(RenderResourceMap& resources)
+{
+	Renderer::PreRender(resources);
+
+	gPosition = *resources[RRD_POSITION];
+	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
+	gNormalRoughness = *resources[RRD_NORMAL_ROUGHNESS];
+	gExtra = *resources[RRD_EXTRA];
+
+	mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
+	mRtReflectOutputTexture = *resources[RRD_RT_INDIRECT_SAMPLE];
+
+	col_acc = *resources[RRD_SHADOW_ACC];
+	filtered_curr = *resources[RRD_INDIRECT_FILTERED];
+
+	std::shared_ptr<Texture> presentTexture = resources[RRD_RENDERTARGET_PRESENT];
+	presentRenderTarget.AttachTexture(AttachmentPoint::Color0, *presentTexture);
+}
+
+RenderResourceMap* PostProcessingRenderer::PostRender()
+{
+	return Renderer::PostRender();
+}
+

@@ -16,13 +16,15 @@ void SkyboxRenderer::LoadResource(std::shared_ptr<Scene> scene, RenderResourceMa
 {
 	Renderer::LoadResource(scene, resources);
 
-	m_Albedo  = createTex2D_RenderTarget(L"gAlbedoMetallic Texture", m_Width, m_Height);
+	m_Albedo  = createTex2D_RenderTarget(L"gAlbedoMetallic", m_Width, m_Height);
+	m_Albedo_prev = createTex2D_RenderTarget(L"gAlbedoMetallic_prev", m_Width, m_Height);
 	m_DepthStencil = createTex2D_DepthStencil(L"Depth Render Target", m_Width, m_Height);
 	m_SkyboxRT.AttachTexture(AttachmentPoint::Color0, m_Albedo);
 	m_SkyboxRT.AttachTexture(AttachmentPoint::DepthStencil, m_DepthStencil);
 
 	
 	m_Resources->emplace(RRD_ALBEDO_MATALLIC, std::make_shared<Texture>(m_Albedo));
+	m_Resources->emplace(RRD_ALBEDO_MATALLIC_PREV, std::make_shared<Texture>(m_Albedo_prev));
 	m_Resources->emplace(RRD_DEPTH_STENCIL, std::make_shared<Texture>(m_DepthStencil));
 }
 
@@ -40,8 +42,8 @@ void SkyboxRenderer::LoadPipeline()
 	// Load the Skybox shaders.
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_VS.cso", &vs));
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Skybox_PS.cso", &ps));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/Skybox_VS.cso", &vs));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/Skybox_PS.cso", &ps));
 
 	// Setup the input layout for the skybox vertex shader.
 	D3D12_INPUT_ELEMENT_DESC inputLayout[1] = {
@@ -135,4 +137,24 @@ void SkyboxRenderer::Resize(int w, int h)
 
 	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
 		static_cast<float>(m_Width), static_cast<float>(m_Height));
+}
+
+void SkyboxRenderer::PreRender(RenderResourceMap& resources)
+{
+	Renderer::PreRender(resources);
+	auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
+		Texture tmp = t2;
+		t2 = t1;
+		t1 = tmp;
+	};
+	swapCurrPrevTexture(m_Albedo, m_Albedo_prev);
+	m_SkyboxRT.AttachTexture(AttachmentPoint::Color0, m_Albedo);
+
+}
+
+RenderResourceMap* SkyboxRenderer::PostRender()
+{
+	(*m_Resources)[RRD_ALBEDO_MATALLIC] = std::make_shared<Texture>(m_Albedo);
+	(*m_Resources)[RRD_ALBEDO_MATALLIC_PREV] = std::make_shared<Texture>(m_Albedo_prev);
+	return Renderer::PostRender();
 }

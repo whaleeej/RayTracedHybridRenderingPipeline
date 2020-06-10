@@ -18,7 +18,7 @@ std::string wstring_2_string(const std::wstring& ws)
 
 void msgBox(const std::string& msg)
 {
-	HWND gWinHandle = Application::Get().GetWindowByName(L"RTPipeline")->GetWindowHandle();
+	HWND gWinHandle = Application::Get().GetWindowByName(L"HybridPipeline")->GetWindowHandle();
 	MessageBoxA(gWinHandle, msg.c_str(), "Error", MB_OK);
 }
 

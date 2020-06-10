@@ -80,7 +80,6 @@ void RayTracingRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> scene
 	// Let's raytrace
 	
 	commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
-	//commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, mpSamplerHeap.Get());
 
 	commandList->TransitionBarrier(mRtShadowOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	commandList->TransitionBarrier(mRtReflectOutputTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -132,6 +131,20 @@ void RayTracingRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> scene
 	commandList->SetPipelineState1(mpPipelineState);
 	commandList->DispatchRays(&raytraceDesc);
 	
+}
+
+void RayTracingRenderer::PreRender(RenderResourceMap& resources)
+{
+	Renderer::PreRender(resources);
+	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
+	gPosition = *resources[RRD_POSITION];
+	gNormalRoughness = *resources[RRD_NORMAL_ROUGHNESS];
+	gExtra = *resources[RRD_EXTRA];
+}
+
+RenderResourceMap* RayTracingRenderer::PostRender()
+{
+	return Renderer::PostRender();
 }
 
 void RayTracingRenderer::createAccelerationStructures()
@@ -319,7 +332,7 @@ void RayTracingRenderer::createRtPipelineState()
 	uint32_t index = 0;
 
 	// Compile the shader
-	auto pDxilLib = compileLibrary(L"RTPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
+	auto pDxilLib = compileLibrary(L"HybridRenderingPipeline/shaders/RayTracing.hlsl", L"lib_6_3");
 	const WCHAR* entryPoints[] = { kRayGenShader, kShadowMissShader ,kShadwoClosestHitShader, kSecondaryMissShader , kSecondaryClosestHitShader };
 	DxilLibrary dxilLib = DxilLibrary(pDxilLib, entryPoints, arraysize(entryPoints));
 	subobjects[index++] = dxilLib.stateSubobject; // 0 Library

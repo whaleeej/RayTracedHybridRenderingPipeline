@@ -16,19 +16,18 @@ void GBufferRenderer::LoadResource(std::shared_ptr<Scene> scene, RenderResourceM
 {
 	Renderer::LoadResource(scene, resources);
 
-	gPosition = createTex2D_RenderTarget(L"gPosition+HitTexture", m_Width, m_Height);
+	gPosition = createTex2D_RenderTarget(L"gPosition", m_Width, m_Height);
 	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
-	gNormalRoughness = createTex2D_RenderTarget(L"gNormalRoughness Texture", m_Width, m_Height);
-	gExtra = createTex2D_RenderTarget(L"gExtra: ObjectId Texture", m_Width, m_Height);
+	gNormalRoughness = createTex2D_RenderTarget(L"gNormalRoughness", m_Width, m_Height);
+	gExtra = createTex2D_RenderTarget(L"gExtra", m_Width, m_Height);
 
 	gPosition_prev = createTex2D_RenderTarget(L"gPosition_prev", m_Width, m_Height);
-	gAlbedoMetallic_prev = createTex2D_RenderTarget(L"gAlbedoMetallic_prev", m_Width, m_Height);
+	gAlbedoMetallic_prev = *resources[RRD_ALBEDO_MATALLIC_PREV];
 	gNormalRoughness_prev = createTex2D_RenderTarget(L"gNormalRoughness_prev", m_Width, m_Height);
 	gExtra_prev = createTex2D_RenderTarget(L"gExtra_prev", m_Width, m_Height);
 
 	m_Resources->emplace(RRD_POSITION, std::make_shared<Texture>(gPosition));
 	m_Resources->emplace(RRD_POSITION_PREV, std::make_shared<Texture>(gPosition_prev));
-	m_Resources->emplace(RRD_ALBEDO_MATALLIC_PREV, std::make_shared<Texture>(gAlbedoMetallic_prev));
 	m_Resources->emplace(RRD_NORMAL_ROUGHNESS, std::make_shared<Texture>(gNormalRoughness));
 	m_Resources->emplace(RRD_NORMAL_ROUGHNESS_PREV, std::make_shared<Texture>(gNormalRoughness_prev));
 	m_Resources->emplace(RRD_EXTRA, std::make_shared<Texture>(gExtra));
@@ -56,8 +55,8 @@ void GBufferRenderer::LoadPipeline()
 	// Load the Deferred shaders.
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_VS.cso", &vs));
-	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/RTPipeline/Deferred_PS.cso", &ps));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/Deferred_VS.cso", &vs));
+	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/Deferred_PS.cso", &ps));
 
 	// Allow input layout and deny unnecessary access to certain pipeline stages.
 	D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -119,7 +118,7 @@ void GBufferRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)
 void GBufferRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList)
 {
 	FLOAT clearColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color1), clearColor);
+	commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color0), clearColor);
 	commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color2), clearColor);
 	commandList->ClearTexture(m_GBuffer.GetTexture(AttachmentPoint::Color3), clearColor);
 
@@ -147,4 +146,37 @@ void GBufferRenderer::Resize(int w, int h)
 
 	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f,
 		static_cast<float>(m_Width), static_cast<float>(m_Height));
+}
+
+void GBufferRenderer::PreRender(RenderResourceMap& resources)
+{
+	Renderer::PreRender(resources);
+	auto swapCurrPrevTexture = [](Texture& t1, Texture& t2) {
+		Texture tmp = t2;
+		t2 = t1;
+		t1 = tmp;
+	};
+	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
+	gAlbedoMetallic_prev = *resources[RRD_ALBEDO_MATALLIC_PREV];
+
+	swapCurrPrevTexture(gPosition, gPosition_prev);
+	swapCurrPrevTexture(gNormalRoughness, gNormalRoughness_prev);
+	swapCurrPrevTexture(gExtra, gExtra_prev);
+
+	m_GBuffer.AttachTexture(AttachmentPoint::Color0, gPosition);
+	m_GBuffer.AttachTexture(AttachmentPoint::Color1, gAlbedoMetallic);
+	m_GBuffer.AttachTexture(AttachmentPoint::Color2, gNormalRoughness);
+	m_GBuffer.AttachTexture(AttachmentPoint::Color3, gExtra);
+	m_GBuffer.AttachTexture(AttachmentPoint::DepthStencil, *resources[RRD_DEPTH_STENCIL]);
+}
+
+RenderResourceMap* GBufferRenderer::PostRender()
+{
+	(*m_Resources)[RRD_POSITION] = std::make_shared<Texture>(gPosition);
+	(*m_Resources)[RRD_POSITION_PREV] = std::make_shared<Texture>(gPosition_prev);
+	(*m_Resources)[RRD_NORMAL_ROUGHNESS] = std::make_shared<Texture>(gNormalRoughness);
+	(*m_Resources)[RRD_NORMAL_ROUGHNESS_PREV] = std::make_shared<Texture>(gNormalRoughness_prev);
+	(*m_Resources)[RRD_EXTRA] = std::make_shared<Texture>(gExtra);
+	(*m_Resources)[RRD_EXTRA_PREV] = std::make_shared<Texture>(gExtra_prev);
+	return Renderer::PostRender();
 }

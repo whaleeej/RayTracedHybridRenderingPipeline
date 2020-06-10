@@ -19,6 +19,14 @@ void Renderer::Resize(int w, int h)
 	m_Height = h;
 }
 
+void Renderer::PressKey(KeyEventArgs& e)
+{
+}
+
+void Renderer::ReleaseKey(KeyEventArgs& e)
+{
+}
+
 void Renderer::LoadResource(std::shared_ptr<Scene> scene, RenderResourceMap& resources) {
 	m_Resources = &resources;
 }

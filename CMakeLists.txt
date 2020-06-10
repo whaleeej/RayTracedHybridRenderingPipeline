@@ -15,9 +15,9 @@ project( DirectX12-Demo LANGUAGES CXX )
 
 add_subdirectory( DirectXTex )
 add_subdirectory( DX12Lib )
-add_subdirectory( RTPipeline)
+add_subdirectory( HybridRenderingPipeline )
 
 # Set the startup project.
 set_directory_properties( PROPERTIES 
-    VS_STARTUP_PROJECT RTPipeline
+    VS_STARTUP_PROJECT HybridRenderingPipeline
 )

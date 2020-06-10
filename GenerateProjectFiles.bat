@@ -2,7 +2,6 @@
 
 PUSHD %~dp0
 
-REM Update these lines if the currently installed version of Visual Studio is not 2017.
 SET CMAKE="cmake"
 SET CMAKE_GENERATOR="Visual Studio 16 2019"
 SET CMAKE_BINARY_DIR=build_vs2019
@@ -17,17 +16,12 @@ cd D:\Repos\DX12-HybridPipeline
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Release /e /I
 XCOPY .\DX12Lib\lib\dxcompiler\*.dll .\build_vs2019\bin\Debug /e /I
 
-XCOPY .\RTPipeline\assimp\*.exp .\build_vs2019\bin\Release /e /I
-XCOPY .\RTPipeline\assimp\*.exp .\build_vs2019\bin\Debug /e /I
-XCOPY .\RTPipeline\assimp\*.dll .\build_vs2019\bin\Release /e /I
-XCOPY .\RTPipeline\assimp\*.dll .\build_vs2019\bin\Debug /e /I
+XCOPY .\HybridRenderingPipeline\assimp\*.exp .\build_vs2019\bin\Release /e /I
+XCOPY .\HybridRenderingPipeline\assimp\*.exp .\build_vs2019\bin\Debug /e /I
+XCOPY .\HybridRenderingPipeline\assimp\*.dll .\build_vs2019\bin\Release /e /I
+XCOPY .\HybridRenderingPipeline\assimp\*.dll .\build_vs2019\bin\Debug /e /I
 
-IF ERRORLEVEL 1 (
-    PAUSE
-) ELSE (
-    PAUSE
-    REM START DirectX12-Demo.sln
-)
+PAUSE
 
 POPD
 POPD

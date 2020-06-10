@@ -17,6 +17,10 @@ public://override
 	virtual void Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene);
 	virtual void Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList);
 
+public:
+	virtual void PreRender(RenderResourceMap& resources);
+	virtual RenderResourceMap* PostRender();
+
 private:
 	//Camera
 	struct CameraRTCB
@@ -41,6 +45,7 @@ private:
 
 private:
 	std::shared_ptr<Scene> m_Scene;
+
 	Texture gPosition; //srv
 	Texture gAlbedoMetallic; //srv
 	Texture gNormalRoughness; //srv

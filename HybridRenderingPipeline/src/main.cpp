@@ -4,7 +4,7 @@
 #include <Shlwapi.h>
 
 #include <Application.h>
-#include <RTPipeline.h>
+#include <HybridRenderingPipeline.h>
 
 #include <dxgidebug.h>
 
@@ -41,7 +41,7 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
 
     Application::Create(hInstance);
     {
-        std::shared_ptr<HybridPipeline> demo = std::make_shared<HybridPipeline>(L"RTPipeline", 960, 960);
+        std::shared_ptr<HybridRenderingPipeline> demo = std::make_shared<HybridRenderingPipeline>(L"HybridPipeline", 960, 960);
         retCode = Application::Get().Run(demo);
     }
     TexturePool::Get().clear();
@@ -49,6 +49,5 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdL
     Application::Destroy();
 
     atexit(&ReportLiveObjects);
-
     return retCode;
 }

@@ -13,6 +13,11 @@ public://override
 	virtual void Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene);
 	virtual void Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList);
 
+public:
+	virtual void PreRender(RenderResourceMap& resources);
+	virtual RenderResourceMap* PostRender();
+
+
 private:
 	Texture gPosition; //srv
 	Texture gAlbedoMetallic; //srv
