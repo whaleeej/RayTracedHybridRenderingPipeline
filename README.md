@@ -1,6 +1,4 @@
 # Ray Traced Hybrid Rendering Pipeline  
-## Demo Video Link  
--   [click me](http://47.100.57.110:8079/images/HybridRenderingPipelineDemo.mp4)
 ## Pipeline Design  
 - Stages  
     - Raster Stage - G-Buffer Gen + Post Processing 
