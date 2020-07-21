@@ -19,12 +19,15 @@ static double totalTime = 0.0;
 HybridRenderingPipeline::HybridRenderingPipeline(const std::wstring& name, int width, int height, bool vSync)
     : super(name, width, height, vSync)
 {
+	
 	m_Scene = std::make_shared<Scene>();
 	m_Renderers.push_back(std::make_shared<SkyboxRenderer>(m_Width, m_Height));
 	m_Renderers.push_back(std::make_shared<GBufferRenderer>(m_Width, m_Height));
-	m_Renderers.push_back(std::make_shared<RayTracingRenderer>(m_Width, m_Height));
-	m_Renderers.push_back(std::make_shared<ShadowFilteringRenderer>(m_Width, m_Height));
-	m_Renderers.push_back(std::make_shared<GIFilteringRenderer>(m_Width, m_Height));
+	if (Application::Get().isDXRSupport()) {
+		m_Renderers.push_back(std::make_shared<RayTracingRenderer>(m_Width, m_Height));
+		m_Renderers.push_back(std::make_shared<ShadowFilteringRenderer>(m_Width, m_Height));
+		m_Renderers.push_back(std::make_shared<GIFilteringRenderer>(m_Width, m_Height));
+	}
 	m_Renderers.push_back(std::make_shared<PostProcessingRenderer>(m_Width, m_Height));
 }
 

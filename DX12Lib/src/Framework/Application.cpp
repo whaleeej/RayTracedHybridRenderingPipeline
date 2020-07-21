@@ -35,6 +35,7 @@ Application::Application(HINSTANCE hInst)
     : m_hInstance(hInst)
     , m_TearingSupported(false)
     , m_loadedFlg(false)
+	, m_DXRSupported(false)
 {
     // Windows 10 Creators update adds Per Monitor V2 DPI awareness context.
     // Using this awareness context allows the client area of the window 
@@ -181,6 +182,7 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 
     return dxgiAdapter4;
 }
+
 Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
     ComPtr<ID3D12Device5> d3d12Device5;
@@ -191,8 +193,10 @@ Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
 	ThrowIfFailed(d3d12Device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)));
 	if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-		ThrowIfFailed(-1);
+		m_DXRSupported = false;
 	}
+	else
+		m_DXRSupported = true;
 
     // Enable debug messages in debug mode.
 #if defined(_DEBUG)
@@ -284,7 +288,6 @@ DXGI_SAMPLE_DESC Application::GetMultisampleQualityLevels( DXGI_FORMAT format, U
     return sampleDesc;
 }
 
-
 std::shared_ptr<Window> Application::CreateRenderWindow(const std::wstring& windowName, int clientWidth, int clientHeight, bool vSync )
 {
     // First check if a window with the given name already exists.
@@ -343,7 +346,6 @@ std::shared_ptr<Window> Application::GetWindowByName(const std::wstring& windowN
 
     return window;
 }
-
 
 int Application::Run(std::shared_ptr<Game> pGame)
 {
@@ -425,27 +427,11 @@ void Application::ReleaseStaleDescriptors( uint64_t finishedFrame )
     }
 }
 
-//Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Application::CreateDescriptorHeap(UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
-//{
-//    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-//    desc.Type = type;
-//    desc.NumDescriptors = numDescriptors;
-//    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-//    desc.NodeMask = 0;
-//
-//    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-//    ThrowIfFailed(m_d3d12Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
-//
-//    return descriptorHeap;
-//}
-
 UINT Application::GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const
 {
     return m_d3d12Device->GetDescriptorHandleIncrementSize(type);
 }
 
-
-// Remove a window from our window lists.
 static void RemoveWindow(HWND hWnd)
 {
     WindowMap::iterator windowIter = gs_Windows.find(hWnd);
@@ -457,7 +443,6 @@ static void RemoveWindow(HWND hWnd)
     }
 }
 
-// Convert the message ID into a MouseButton ID
 MouseButtonEventArgs::MouseButton DecodeMouseButton(UINT messageID)
 {
     MouseButtonEventArgs::MouseButton mouseButton = MouseButtonEventArgs::None;

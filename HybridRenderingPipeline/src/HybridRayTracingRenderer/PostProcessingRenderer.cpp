@@ -20,10 +20,18 @@ void PostProcessingRenderer::LoadResource(std::shared_ptr<Scene> scene, RenderRe
 	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
 	gNormalRoughness = *resources[RRD_NORMAL_ROUGHNESS];
 	gExtra = *resources[RRD_EXTRA];
-	mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
-	mRtReflectOutputTexture = *resources[RRD_RT_INDIRECT_SAMPLE];
-	col_acc = *resources[RRD_SHADOW_ACC];
-	filtered_curr = *resources[RRD_INDIRECT_FILTERED];
+	if (Application::Get().isDXRSupport()) {
+		mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
+		mRtReflectOutputTexture = *resources[RRD_RT_INDIRECT_SAMPLE];
+		col_acc = *resources[RRD_SHADOW_ACC];
+		filtered_curr = *resources[RRD_INDIRECT_FILTERED];
+	}
+	else {
+		mRtShadowOutputTexture = createTex2D_ReadOnly(L"mRtShadowOutputTexture", m_Width, m_Height);
+		mRtReflectOutputTexture = createTex2D_ReadOnly(L"mRtReflectOutputTexture", m_Width, m_Height);
+		col_acc = createTex2D_ReadOnly(L"col_acc", m_Width, m_Height);
+		filtered_curr = createTex2D_ReadOnly(L"filtered_curr", m_Width, m_Height);
+	}
 
 	std::shared_ptr<Texture> presentTexture = resources[RRD_RENDERTARGET_PRESENT];
 	presentRenderTarget.AttachTexture(AttachmentPoint::Color0, *presentTexture);
@@ -143,12 +151,14 @@ void PostProcessingRenderer::PreRender(RenderResourceMap& resources)
 	gAlbedoMetallic = *resources[RRD_ALBEDO_MATALLIC];
 	gNormalRoughness = *resources[RRD_NORMAL_ROUGHNESS];
 	gExtra = *resources[RRD_EXTRA];
+	if (Application::Get().isDXRSupport()) {
+		mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
+		mRtReflectOutputTexture = *resources[RRD_RT_INDIRECT_SAMPLE];
 
-	mRtShadowOutputTexture = *resources[RRD_RT_SHADOW_SAMPLE];
-	mRtReflectOutputTexture = *resources[RRD_RT_INDIRECT_SAMPLE];
-
-	col_acc = *resources[RRD_SHADOW_ACC];
-	filtered_curr = *resources[RRD_INDIRECT_FILTERED];
+		col_acc = *resources[RRD_SHADOW_ACC];
+		filtered_curr = *resources[RRD_INDIRECT_FILTERED];
+	}
+	
 
 	std::shared_ptr<Texture> presentTexture = resources[RRD_RENDERTARGET_PRESENT];
 	presentRenderTarget.AttachTexture(AttachmentPoint::Color0, *presentTexture);

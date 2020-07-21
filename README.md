@@ -1,4 +1,9 @@
 # Ray Traced Hybrid Rendering Pipeline  
+## TODO
+1. shader位置问题
+2. 依赖库独立
+3. 去除多余的res
+4. 动态加载renderdoc.dll,保存上下文
 ## Pipeline Design  
 - Stages  
     - Raster Stage - G-Buffer Gen + Post Processing 
