@@ -192,11 +192,11 @@ Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::
 	// check for Device Ray Tracing Support
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
 	ThrowIfFailed(d3d12Device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)));
-	if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-		m_DXRSupported = false;
-	}
-	else
-		m_DXRSupported = true;
+	//if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
+	//	m_DXRSupported = false;
+	//}
+	//else
+	//	m_DXRSupported = true;
 
     // Enable debug messages in debug mode.
 #if defined(_DEBUG)

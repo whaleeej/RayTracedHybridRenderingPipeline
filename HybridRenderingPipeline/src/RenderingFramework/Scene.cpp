@@ -10,7 +10,7 @@
 #include "Scene.h"
 
 
-#define SCENE3 1
+#define SCENE1 1
 
 Scene::Scene():
 	m_Forward(0)

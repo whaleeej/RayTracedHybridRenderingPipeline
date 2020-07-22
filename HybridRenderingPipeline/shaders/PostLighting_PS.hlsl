@@ -164,6 +164,19 @@ float4 main(float4 Position : SV_Position) : SV_TARGET0
 	float3 V = normalize(CameraCB.PositionWS.xyz - position);
 	float3 N = normalize(normal);
 	
+	// ambient
+	float3 color0 = 0.01 * albedo;
+
+	// direct
+	float3 color1 = 1 * DoPbrPointLight(pointLight, N, V, P, albedo, roughness, metallic, 1);
+
+	// indirect
+	float3 color2 = 1 * ao * reflectivity;
+
+	// compact
+	float3 color = LinearToSRGB(simpleToneMapping((color0 + color1 + color2)));
+
+	return float4(color, 1);
 	
 	
 	if (PostTestingCB.index == 0)

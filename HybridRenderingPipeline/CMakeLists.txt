@@ -52,11 +52,11 @@ target_include_directories( HybridRenderingPipeline
     PUBLIC inc/RenderingFramework
     PUBLIC inc/ResourceFactory
     PUBLIC inc/VirtualBaseElement
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assimp/include
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rd/assimp/include
 )
 
 target_link_directories(HybridRenderingPipeline
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assimp
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rd/assimp
 )
 
 target_link_libraries( HybridRenderingPipeline
