@@ -74,19 +74,27 @@ void GIFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostBMFR_1_TemporalNoisy_CS.cso", &cs));
 
-		struct PostBMFRTemporalNoisyPipelineStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postBMFRTemporalNoisyPipelineStateStream;
+		//struct PostBMFRTemporalNoisyPipelineStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postBMFRTemporalNoisyPipelineStateStream;
 
-		postBMFRTemporalNoisyPipelineStateStream.pRootSignature = m_PostBMFRTemporalNoisyRootSignature.GetRootSignature().Get();
-		postBMFRTemporalNoisyPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postBMFRTemporalNoisyPipelineStateStream.pRootSignature = m_PostBMFRTemporalNoisyRootSignature.GetRootSignature().Get();
+		//postBMFRTemporalNoisyPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalNoisyPipelineStateStreamDesc = {
-			sizeof(PostBMFRTemporalNoisyPipelineStateStream), &postBMFRTemporalNoisyPipelineStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalNoisyPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalNoisyPipelineStateStreamDesc = {
+		//	sizeof(PostBMFRTemporalNoisyPipelineStateStream), &postBMFRTemporalNoisyPipelineStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalNoisyPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostBMFRTemporalNoisyRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
 	}
 
 	// Create the PostBMFRQRFactorization_CS Root Signature
@@ -107,19 +115,27 @@ void GIFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostBMFR_2_QRFactorization_CS.cso", &cs));
 
-		struct PostBMFRQRFactorizationPipelineStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postBMFRQRFactorizationPipelineStateStream;
+		//struct PostBMFRQRFactorizationPipelineStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postBMFRQRFactorizationPipelineStateStream;
 
-		postBMFRQRFactorizationPipelineStateStream.pRootSignature = m_PostBMFRQRFactorizationRootSignature.GetRootSignature().Get();
-		postBMFRQRFactorizationPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postBMFRQRFactorizationPipelineStateStream.pRootSignature = m_PostBMFRQRFactorizationRootSignature.GetRootSignature().Get();
+		//postBMFRQRFactorizationPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postBMFRQRFactorizationPipelineStateStreamDesc = {
-			sizeof(PostBMFRQRFactorizationPipelineStateStream), &postBMFRQRFactorizationPipelineStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postBMFRQRFactorizationPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRQRFactorizationPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postBMFRQRFactorizationPipelineStateStreamDesc = {
+		//	sizeof(PostBMFRQRFactorizationPipelineStateStream), &postBMFRQRFactorizationPipelineStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postBMFRQRFactorizationPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRQRFactorizationPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostBMFRQRFactorizationRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostBMFRTemporalNoisyPipelineState)));
 	}
 
 	// Create the PostBMFRWeightedSum_CS Root Signature
@@ -142,19 +158,27 @@ void GIFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostBMFR_3_WeightedSum_CS.cso", &cs));
 
-		struct PostBMFRWeightedSumStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postBMFRWeightedSumStateStream;
+		//struct PostBMFRWeightedSumStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postBMFRWeightedSumStateStream;
 
-		postBMFRWeightedSumStateStream.pRootSignature = m_PostBMFRWeightedSumRootSignature.GetRootSignature().Get();
-		postBMFRWeightedSumStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postBMFRWeightedSumStateStream.pRootSignature = m_PostBMFRWeightedSumRootSignature.GetRootSignature().Get();
+		//postBMFRWeightedSumStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postBMFRWeightedSumStateStreamDesc = {
-			sizeof(postBMFRWeightedSumStateStream), &postBMFRWeightedSumStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postBMFRWeightedSumStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRWeightedSumPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postBMFRWeightedSumStateStreamDesc = {
+		//	sizeof(postBMFRWeightedSumStateStream), &postBMFRWeightedSumStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postBMFRWeightedSumStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRWeightedSumPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostBMFRWeightedSumRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostBMFRWeightedSumPipelineState)));
 	}
 
 	// Create the PostBMFRTemporalFiltered_CS Root Signature
@@ -177,19 +201,27 @@ void GIFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostBMFR_4_TemporalFiltered_CS.cso", &cs));
 
-		struct PostBMFRTemporalFilteredStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postBMFRTemporalFilteredStateStream;
+		//struct PostBMFRTemporalFilteredStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postBMFRTemporalFilteredStateStream;
 
-		postBMFRTemporalFilteredStateStream.pRootSignature = m_PostBMFRTemporalFilteredRootSignature.GetRootSignature().Get();
-		postBMFRTemporalFilteredStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postBMFRTemporalFilteredStateStream.pRootSignature = m_PostBMFRTemporalFilteredRootSignature.GetRootSignature().Get();
+		//postBMFRTemporalFilteredStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalFilteredStateStreamDesc = {
-			sizeof(postBMFRTemporalFilteredStateStream), &postBMFRTemporalFilteredStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalFilteredStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postBMFRTemporalFilteredStateStreamDesc = {
+		//	sizeof(postBMFRTemporalFilteredStateStream), &postBMFRTemporalFilteredStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postBMFRTemporalFilteredStateStreamDesc, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostBMFRTemporalFilteredRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostBMFRTemporalFilteredPipelineState)));
 	}
 }
 

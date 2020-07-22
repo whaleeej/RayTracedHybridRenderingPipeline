@@ -907,9 +907,13 @@ void CommandList::SetPipelineState(Microsoft::WRL::ComPtr<ID3D12PipelineState> p
 
 void CommandList::SetPipelineState1(Microsoft::WRL::ComPtr < ID3D12StateObject > pipelineState)
 {
+#ifdef ENABLE_RAYTRACING
 	m_d3d12CommandList->SetPipelineState1(pipelineState.Get());
 
 	TrackObject(pipelineState);
+#else 
+	assert(0);
+#endif
 }
 
 void CommandList::SetGraphicsRootSignature( const RootSignature& rootSignature )
@@ -1082,7 +1086,9 @@ void CommandList::Dispatch( uint32_t numGroupsX, uint32_t numGroupsY, uint32_t n
 void CommandList::DispatchRays(D3D12_DISPATCH_RAYS_DESC* desc)
 {
 	FlushResourceBarriers();
+#ifdef ENABLE_RAYTRACING
 	m_d3d12CommandList->DispatchRays(desc);
+#endif
 }
 
 bool CommandList::Close( CommandList& pendingCommandList )

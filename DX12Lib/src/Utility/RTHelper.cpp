@@ -49,7 +49,7 @@ ID3DBlobPtr compileLibrary(const WCHAR* filename, const WCHAR* targetString)
 	return pBlob;
 }
 
-Microsoft::WRL::ComPtr<ID3D12RootSignature> createRootSignature(Microsoft::WRL::ComPtr<ID3D12Device5> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
+Microsoft::WRL::ComPtr<ID3D12RootSignature> createRootSignature(Microsoft::WRL::ComPtr<ID3D12Device1> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
 {
 	Microsoft::WRL::ComPtr<ID3DBlob> pSigBlob;
 	Microsoft::WRL::ComPtr<ID3DBlob> pErrorBlob;
@@ -66,7 +66,7 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> createRootSignature(Microsoft::WRL::
 	return pRootSig;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> createBuffer(Microsoft::WRL::ComPtr <ID3D12Device5> pDevice, uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps)
+Microsoft::WRL::ComPtr<ID3D12Resource> createBuffer(Microsoft::WRL::ComPtr <ID3D12Device1> pDevice, uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps)
 {
 	D3D12_RESOURCE_DESC bufDesc = {};
 	bufDesc.Alignment = 0;

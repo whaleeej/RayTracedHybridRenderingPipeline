@@ -31,7 +31,7 @@
  */
 
 
-#include <d3d12.h>              // For ID3D12CommandQueue, ID3D12Device5, and ID3D12Fence
+#include <d3d12.h>              // For ID3D12CommandQueue, ID3D12Device1, and ID3D12Fence
 #include <wrl.h>                // For Microsoft::WRL::ComPtr
 
 #include <atomic>               // For std::atomic_bool

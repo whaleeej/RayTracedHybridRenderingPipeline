@@ -70,19 +70,27 @@ void ShadowFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostSVGFTemporal_CS.cso", &cs));
 
-		struct PostProcessingPipelineStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postProcessingPipelineStateStream;
+		//struct PostProcessingPipelineStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postProcessingPipelineStateStream;
 
-		postProcessingPipelineStateStream.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
-		postProcessingPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postProcessingPipelineStateStream.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
+		//postProcessingPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
-			sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postProcessingPipelineStateStreamDesc = {
+		//	sizeof(PostProcessingPipelineStateStream), &postProcessingPipelineStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postProcessingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostSVGFTemporalRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostSVGFTemporalPipelineState)));
 	}
 
 	// Create the PostATrous_CS Root Signature
@@ -104,19 +112,27 @@ void ShadowFilteringRenderer::LoadPipeline()
 		ComPtr<ID3DBlob> cs;
 		ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostSVGFATrous_CS.cso", &cs));
 
-		struct PostATrousPipelineStateStream
-		{
-			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-			CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		} postATrousPipelineStateStream;
+		//struct PostATrousPipelineStateStream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+		//	CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+		//} postATrousPipelineStateStream;
 
-		postATrousPipelineStateStream.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
-		postATrousPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		//postATrousPipelineStateStream.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
+		//postATrousPipelineStateStream.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
 
-		D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
-			sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
-		};
-		ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
+		//D3D12_PIPELINE_STATE_STREAM_DESC postAtrousPipelineStateStreamDesc = {
+		//	sizeof(PostATrousPipelineStateStream), &postATrousPipelineStateStream
+		//};
+		//ThrowIfFailed(device->CreatePipelineState(&postAtrousPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+		ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+		pipelineStateDes.NodeMask = 0;
+		pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		pipelineStateDes.pRootSignature = m_PostSVGFATrousRootSignature.GetRootSignature().Get();
+		pipelineStateDes.CS = CD3DX12_SHADER_BYTECODE(cs.Get());
+		ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PostSVGFATrousPipelineState)));
 	}
 }
 

@@ -238,7 +238,7 @@ void Scene::addSingleLight(MeshIndex mesh_name, PBRMaterial material, GameObject
 
 void Scene::addSingleGameObject(MeshIndex mesh_name, PBRMaterial material, GameObjectIndex name) {
 	gameObjectPool.emplace(name, std::make_shared<GameObject>());
-	gameObjectPool[name]->gid = gNum++;
+	gameObjectPool[name]->gid = (float)gNum++;
 	gameObjectPool[name]->mesh = mesh_name;
 	gameObjectPool[name]->material = material;
 	gameObjectAssembling.emplace(name, name);
@@ -271,7 +271,7 @@ std::string Scene::importModel(std::shared_ptr<CommandList> commandList,
 		material->GetTexture(aiTextureType_DIFFUSE, 0, &str); // 这里默认这个mat中这个类型的贴图只有一张
 		TextureIndex albedoIndex;
 		albedoIndex = str.data;
-		int a = albedoIndex.find_first_of(':');
+		//int a = albedoIndex.find_first_of(':');
 		if ((int)albedoIndex.find_first_of(':') < 0) {
 			albedoIndex = rootPath + "/" + albedoIndex;
 		}
@@ -311,7 +311,7 @@ void Scene::copyGameObjectAssembling(GameObjectIndex from, GameObjectIndex to) {
 	std::vector<GameObjectIndex> indices;
 	for (auto k = objAssemble.first; k != objAssemble.second; k++) {
 		std::shared_ptr<GameObject> localGo = std::make_shared<GameObject>();
-		localGo->gid = gNum++;
+		localGo->gid = (float)gNum++;
 		localGo->mesh = gameObjectPool[k->second]->mesh;
 		localGo->transform = gameObjectPool[k->second]->transform;
 		localGo->material = gameObjectPool[k->second]->material;
@@ -431,7 +431,7 @@ void Scene::processMesh(aiMesh* mesh, const aiScene* scene,
 
 		//缓存gameobject
 		gameObjectPool.emplace(meshIndex, std::make_shared<GameObject>());//6
-		gameObjectPool[meshIndex]->gid = gNum++;
+		gameObjectPool[meshIndex]->gid = (float)gNum++;
 		gameObjectPool[meshIndex]->mesh = meshIndex;
 		gameObjectPool[meshIndex]->material = {Material::White};
 		gameObjectPool[meshIndex]->material.setPBRTex(albedoIndex, metallicIndex, normalIndex, roughnessIndex);
@@ -540,47 +540,47 @@ void Scene::transformGameObject() {
 	{
 		transformSingleAssembling("Assets/SM_TableRound",
 			XMMatrixTranslation(0, 0.0, 0)
-			, XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixRotationX(-(float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
 		transformSingleAssembling("Assets/SM_Chair",
 			XMMatrixTranslation(-10, 0.0, -6)
-			, XMMatrixRotationZ(-std::_Pi / 4.0f) * XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixRotationZ(-(float)std::_Pi / 4.0f) * XMMatrixRotationX(-(float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
 		transformSingleAssembling("Assets/SM_Chair_copy",
 			XMMatrixTranslation(-4, 0.0, 6)
-			, XMMatrixRotationZ(std::_Pi / 3.0f) * XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixRotationZ((float)std::_Pi / 3.0f) * XMMatrixRotationX(-(float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
 		transformSingleAssembling("Assets/SM_Couch",
 			XMMatrixTranslation(8, 0.0, 0)
-			, XMMatrixRotationZ(-std::_Pi) * XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixRotationZ(-(float)std::_Pi) * XMMatrixRotationX(-(float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.08f, 0.08f, 0.08f));
 
 		transformSingleAssembling("Assets/SM_Lamp_Ceiling",
 			XMMatrixTranslation(2, 0.0, 14)
-			, XMMatrixRotationX(std::_Pi / 2.0f)
+			, XMMatrixRotationX((float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.12f, 0.12f, 0.12f));
 
 		transformSingleAssembling("Assets/SM_MatPreviewMesh",
 			XMMatrixTranslation(0, 5.5, 0)
-			, XMMatrixRotationX(-std::_Pi / 2.0f)
+			, XMMatrixRotationX(-(float)std::_Pi / 2.0f)
 			, XMMatrixScaling(0.01f, 0.01f, 0.01f));
 
 		transformSingleAssembling("Assets/Cerberus",
 			XMMatrixTranslation(-1.2f, 10.0f, -1.6f)
-			, XMMatrixRotationX(-std::_Pi / 3.0f * 2.0f)
+			, XMMatrixRotationX(-(float)std::_Pi / 3.0f * 2.0f)
 			, XMMatrixScaling(0.02f, 0.02f, 0.02f));
 
 		transformSingleAssembling("Assets/Unreal-actor",
 			XMMatrixTranslation(0.0f, 10.0f, 0.0f)
-			, XMMatrixRotationY(std::_Pi)
+			, XMMatrixRotationY((float)std::_Pi)
 			, XMMatrixScaling(6.f, 6.f, 6.0f));
 
 		transformSingleAssembling("Assets/Sci-fi-Biolab/source",
 			XMMatrixTranslation(0.0f, 0.0f, 0.0f)
-			, XMMatrixRotationX(-std::_Pi / 2.0)
+			, XMMatrixRotationX(-(float)std::_Pi / 2.0)
 			, XMMatrixScaling(8.f, 8.f, 8.0f));
 
 		transformSingleAssembling("sphere"

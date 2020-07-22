@@ -41,20 +41,28 @@ PanoToCubemapPSO::PanoToCubemapPSO()
     m_RootSignature.SetRootSignatureDesc(rootSignatureDesc.Desc_1_1, featureData.HighestVersion);
 
     // Create the PSO for GenerateMips shader.
-    struct PipelineStateStream
-    {
-        CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-        CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-    } pipelineStateStream;
+    //struct PipelineStateStream
+    //{
+    //    CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+    //    CD3DX12_PIPELINE_STATE_STREAM_CS CS;
+    //} pipelineStateStream;
 
-    pipelineStateStream.pRootSignature = m_RootSignature.GetRootSignature().Get();
-    pipelineStateStream.CS = { g_PanoToCubemap_CS, sizeof(g_PanoToCubemap_CS) };
+    //pipelineStateStream.pRootSignature = m_RootSignature.GetRootSignature().Get();
+    //pipelineStateStream.CS = { g_PanoToCubemap_CS, sizeof(g_PanoToCubemap_CS) };
 
-    D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
-        sizeof(PipelineStateStream), &pipelineStateStream
-    };
+    //D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
+    //    sizeof(PipelineStateStream), &pipelineStateStream
+    //};
 
-    ThrowIfFailed(device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_PipelineState)));
+    //ThrowIfFailed(device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_PipelineState)));
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDes;
+	ZeroMemory(&pipelineStateDes, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+	pipelineStateDes.NodeMask = 0;
+	pipelineStateDes.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	pipelineStateDes.pRootSignature = m_RootSignature.GetRootSignature().Get();
+	pipelineStateDes.CS = { g_PanoToCubemap_CS, sizeof(g_PanoToCubemap_CS) };
+	ThrowIfFailed(device->CreateComputePipelineState(&pipelineStateDes, IID_PPV_ARGS(&m_PipelineState)));
 
     // Create some default texture UAV's to pad any unused UAV's during mip map generation.
     m_DefaultUAV = Application::Get().AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 5);

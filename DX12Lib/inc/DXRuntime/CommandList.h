@@ -1,37 +1,5 @@
 #pragma once
 
-/*
- *  Copyright(c) 2018 Jeremiah van Oosten
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files(the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions :
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *  IN THE SOFTWARE.
- */
-
-/**
- *  @file CommandList.h
- *  @date October 22, 2018
- *  @author Jeremiah van Oosten
- *
- *  @brief CommandList class encapsulates a ID3D12GraphicsCommandList2 interface.
- *  The CommandList class provides additional functionality that makes working with
- *  DirectX 12 applications easier.
- */
-
 #include "TextureUsage.h"
 
 #include <d3d12.h>
@@ -41,6 +9,8 @@
 #include <memory> // for std::unique_ptr
 #include <mutex> // for std::mutex
 #include <vector> // for std::vector
+
+//#define ENABLE_RAYTRACING
 
 class Buffer;
 class ByteAddressBuffer;
@@ -73,9 +43,9 @@ public:
     }
 
     /**
-     * Get direct access to the ID3D12GraphicsCommandList4 interface.
+     * Get direct access to the ID3D12GraphicsCommandList interface.
      */
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetGraphicsCommandList() const
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetGraphicsCommandList() const
     {
         return m_d3d12CommandList;
     }
@@ -407,7 +377,9 @@ public:
     }
 
 	void BuildRaytracingAccelerationStructure(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC* pDesc) {
+#ifdef ENABLE_RAYTRACING
 		m_d3d12CommandList->BuildRaytracingAccelerationStructure(pDesc, 0, nullptr);
+#endif
 	}
 
 protected:
@@ -432,7 +404,7 @@ private:
     using TrackedObjects = std::vector < Microsoft::WRL::ComPtr<ID3D12Object> >;
 
     D3D12_COMMAND_LIST_TYPE m_d3d12CommandListType;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_d3d12CommandList;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_d3d12CommandList;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_d3d12CommandAllocator;
 
     // For copy queues, it may be necessary to generate mips while loading textures.

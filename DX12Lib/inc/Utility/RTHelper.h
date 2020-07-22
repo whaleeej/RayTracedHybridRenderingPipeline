@@ -13,8 +13,8 @@ MAKE_SMART_COM_PTR(ID3DBlob);
 
 
 ID3DBlobPtr compileLibrary(const WCHAR* filename, const WCHAR* targetString);
-Microsoft::WRL::ComPtr<ID3D12RootSignature> createRootSignature(Microsoft::WRL::ComPtr<ID3D12Device5> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc);
-Microsoft::WRL::ComPtr<ID3D12Resource> createBuffer(Microsoft::WRL::ComPtr <ID3D12Device5> pDevice, uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps);
+Microsoft::WRL::ComPtr<ID3D12RootSignature> createRootSignature(Microsoft::WRL::ComPtr<ID3D12Device1> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc);
+Microsoft::WRL::ComPtr<ID3D12Resource> createBuffer(Microsoft::WRL::ComPtr <ID3D12Device1> pDevice, uint64_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps);
 
 
 struct RootSignatureDesc
@@ -96,7 +96,7 @@ struct ExportAssociation
 
 struct LocalRootSignature
 {
-	LocalRootSignature(Microsoft::WRL::ComPtr<ID3D12Device5> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
+	LocalRootSignature(Microsoft::WRL::ComPtr<ID3D12Device1> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
 	{
 		pRootSig = createRootSignature(pDevice, desc);
 		pInterface = pRootSig.Get();
@@ -110,7 +110,7 @@ struct LocalRootSignature
 
 struct GlobalRootSignature
 {
-	GlobalRootSignature(Microsoft::WRL::ComPtr<ID3D12Device5> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
+	GlobalRootSignature(Microsoft::WRL::ComPtr<ID3D12Device1> pDevice, const D3D12_ROOT_SIGNATURE_DESC& desc)
 	{
 		pRootSig = createRootSignature(pDevice, desc);
 		pInterface = pRootSig.Get();

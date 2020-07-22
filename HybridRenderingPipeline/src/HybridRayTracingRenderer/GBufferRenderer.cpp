@@ -84,31 +84,51 @@ void GBufferRenderer::LoadPipeline()
 	m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 	// Setup the Deferred pipeline state.
-	struct DeferredPipelineStateStream
-	{
-		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-		CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-		CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-		CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-		CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-		CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
-		CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-		CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-	} deferredPipelineStateStream;
+	//struct DeferredPipelineStateStream
+	//{
+	//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+	//	CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+	//	CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+	//	CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+	//	CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+	//	CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+	//	CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+	//	CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
+	//} deferredPipelineStateStream;
 
-	deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
-	deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
-	deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-	deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-	deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
-	deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
-	deferredPipelineStateStream.SampleDesc = sampleDesc;
+	//deferredPipelineStateStream.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
+	//deferredPipelineStateStream.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
+	//deferredPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	//deferredPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+	//deferredPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+	//deferredPipelineStateStream.DSVFormat = m_GBuffer.GetDepthStencilFormat();
+	//deferredPipelineStateStream.RTVFormats = m_GBuffer.GetRenderTargetFormats();
+	//deferredPipelineStateStream.SampleDesc = sampleDesc;
 
-	D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
-		sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
-	};
-	ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
+	//D3D12_PIPELINE_STATE_STREAM_DESC deferredPipelineStateStreamDesc = {
+	//	sizeof(DeferredPipelineStateStream), &deferredPipelineStateStream
+	//};
+	//ThrowIfFailed(device->CreatePipelineState(&deferredPipelineStateStreamDesc, IID_PPV_ARGS(&m_DeferredPipelineState)));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC des; // comparti for device1 interface
+	ZeroMemory(&des, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	des.pRootSignature = m_DeferredRootSignature.GetRootSignature().Get();
+	des.InputLayout = { VertexPositionNormalTexture::InputElements, VertexPositionNormalTexture::InputElementCount };
+	des.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	des.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+	des.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+	des.DSVFormat = m_GBuffer.GetDepthStencilFormat();
+	des.NumRenderTargets = m_GBuffer.GetRenderTargetFormats().NumRenderTargets;
+	for (int fi = 0; fi < 8; fi++) {
+		if (fi < m_GBuffer.GetRenderTargetFormats().NumRenderTargets)
+			des.RTVFormats[fi] = m_GBuffer.GetRenderTargetFormats().RTFormats[fi];
+		else
+			des.RTVFormats[fi] = DXGI_FORMAT_UNKNOWN;
+	}
+	des.SampleDesc = sampleDesc;
+	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+	des.RasterizerState = rasterizerDesc;
+	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_DeferredPipelineState)));
 }
 
 void GBufferRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)

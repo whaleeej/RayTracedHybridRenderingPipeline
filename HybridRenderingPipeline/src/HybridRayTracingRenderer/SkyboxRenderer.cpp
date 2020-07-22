@@ -71,29 +71,48 @@ void SkyboxRenderer::LoadPipeline()
 	m_SkyboxSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
 
 	// Setup the Skybox pipeline state.
-	struct SkyboxPipelineState
-	{
-		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-		CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-		CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-		CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-		CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-		CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-		CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
-	} skyboxPipelineStateStream;
+	//struct SkyboxPipelineState
+	//{
+	//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+	//	CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+	//	CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+	//	CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+	//	CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+	//	CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+	//	CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
+	//} skyboxPipelineStateStream;
 
-	skyboxPipelineStateStream.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
-	skyboxPipelineStateStream.InputLayout = { inputLayout, 1 };
-	skyboxPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	skyboxPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-	skyboxPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-	skyboxPipelineStateStream.RTVFormats = m_SkyboxRT.GetRenderTargetFormats();
-	skyboxPipelineStateStream.SampleDesc = sampleDesc;
+	//skyboxPipelineStateStream.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
+	//skyboxPipelineStateStream.InputLayout = { inputLayout, 1 };
+	//skyboxPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	//skyboxPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+	//skyboxPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+	//skyboxPipelineStateStream.RTVFormats = m_SkyboxRT.GetRenderTargetFormats();
+	//skyboxPipelineStateStream.SampleDesc = sampleDesc;
 
-	D3D12_PIPELINE_STATE_STREAM_DESC skyboxPipelineStateStreamDesc = {
-		sizeof(SkyboxPipelineState), &skyboxPipelineStateStream
-	};
-	ThrowIfFailed(device->CreatePipelineState(&skyboxPipelineStateStreamDesc, IID_PPV_ARGS(&m_SkyboxPipelineState)));
+	//D3D12_PIPELINE_STATE_STREAM_DESC skyboxPipelineStateStreamDesc = {
+	//	sizeof(SkyboxPipelineState), &skyboxPipelineStateStream
+	//};
+	//ThrowIfFailed(device->CreatePipelineState(&skyboxPipelineStateStreamDesc, IID_PPV_ARGS(&m_SkyboxPipelineState)));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC des; // comparti for device1 interface
+	ZeroMemory(&des, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	des.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
+	des.InputLayout = { inputLayout, 1 };
+	des.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	des.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
+	des.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+	des.NumRenderTargets = m_SkyboxRT.GetRenderTargetFormats().NumRenderTargets;
+	for (int fi = 0; fi < 8; fi++) {
+		if (fi < m_SkyboxRT.GetRenderTargetFormats().NumRenderTargets)
+			des.RTVFormats[fi] = m_SkyboxRT.GetRenderTargetFormats().RTFormats[fi];
+		else
+			des.RTVFormats[fi] = DXGI_FORMAT_UNKNOWN;
+	}
+	des.SampleDesc = sampleDesc;
+	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+	des.RasterizerState = rasterizerDesc;
+	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_SkyboxPipelineState)));
 }
 
 void SkyboxRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)

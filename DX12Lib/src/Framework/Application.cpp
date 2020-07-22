@@ -186,15 +186,15 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
     return dxgiAdapter4;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
+Microsoft::WRL::ComPtr<ID3D12Device1> Application::CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
-    ComPtr<ID3D12Device5> d3d12Device5;
-    ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device5)));
-    NAME_D3D12_OBJECT(d3d12Device5);
+    ComPtr<ID3D12Device1> d3d12Device1;
+    ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device1)));
+    NAME_D3D12_OBJECT(d3d12Device1);
 
 	// check for Device Ray Tracing Support
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
-	ThrowIfFailed(d3d12Device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)));
+	ThrowIfFailed(d3d12Device1->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)));
 	//if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
 	//	m_DXRSupported = false;
 	//}
@@ -204,7 +204,7 @@ Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::
     // Enable debug messages in debug mode.
 #if defined(_DEBUG)
     ComPtr<ID3D12InfoQueue> pInfoQueue;
-    if (SUCCEEDED(d3d12Device5.As(&pInfoQueue)))
+    if (SUCCEEDED(d3d12Device1.As(&pInfoQueue)))
     {
         pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
         pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
@@ -238,7 +238,7 @@ Microsoft::WRL::ComPtr<ID3D12Device5> Application::CreateDevice(Microsoft::WRL::
     }
 #endif
 
-    return d3d12Device5;
+    return d3d12Device1;
 }
 
 bool Application::CheckTearingSupport()
@@ -384,7 +384,7 @@ void Application::Quit(int exitCode)
     PostQuitMessage(exitCode);
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device5> Application::GetDevice() const
+Microsoft::WRL::ComPtr<ID3D12Device1> Application::GetDevice() const
 {
     return m_d3d12Device;
 }
