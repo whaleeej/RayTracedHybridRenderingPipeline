@@ -42,14 +42,14 @@ namespace rdcboost
 			return false;
 		}
 
-		//pfnRenderdocCreateDeviceAndSwapChain =
-		//	(tD3D11CreateDeviceAndSwapChain)GetProcAddress(sRdcModule, "RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
+		pfnRenderdocCreateDeviceAndSwapChain =
+			(tD3D11CreateDeviceAndSwapChain)GetProcAddress(sRdcModule, "RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
 
-		//if (pfnRenderdocCreateDeviceAndSwapChain == NULL)
-		//{
-		//	LogError("Can't GetProcAddress of RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
-		//	return false;
-		//}
+		if (pfnRenderdocCreateDeviceAndSwapChain == NULL)
+		{
+			LogError("Can't GetProcAddress of RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
+			return false;
+		}
 
 		pRENDERDOC_GetAPI pRenderDocGetAPIFn = 
 			(pRENDERDOC_GetAPI) GetProcAddress(sRdcModule, "RENDERDOC_GetAPI");
@@ -139,33 +139,33 @@ namespace rdcboost
 			return;
 		}
 
-		//WrappedD3D11Device* pWrappedDevice = static_cast<WrappedD3D11Device*>(pDevice);
-		//if (pDevice == NULL || (pWrappedDevice->IsRenderDocDevice() == bSwitchToRdc))
-		//	return;
+		WrappedD3D11Device* pWrappedDevice = static_cast<WrappedD3D11Device*>(pDevice);
+		if (pDevice == NULL || (pWrappedDevice->IsRenderDocDevice() == bSwitchToRdc))
+			return;
 
-		//const SDeviceCreateParams& params = pWrappedDevice->GetDeviceCreateParams();
+		const SDeviceCreateParams& params = pWrappedDevice->GetDeviceCreateParams();
 
-		//tD3D11CreateDeviceAndSwapChain pfnCreateDeviceAndSwapChain =
-		//	bSwitchToRdc ? pfnRenderdocCreateDeviceAndSwapChain : pfnD3D11CreateDeviceAndSwapChain;
+		tD3D11CreateDeviceAndSwapChain pfnCreateDeviceAndSwapChain =
+			bSwitchToRdc ? pfnRenderdocCreateDeviceAndSwapChain : pfnD3D11CreateDeviceAndSwapChain;
 
-		//IDXGISwapChain* pRealSwapChain = NULL;
-		//ID3D11Device* pRealDevice = NULL;
-		//HRESULT res = pfnCreateDeviceAndSwapChain(
-		//					params.pAdapter, params.DriverType, params.Software,
-		//					params.Flags, params.pFeatureLevels, params.FeatureLevels,
-		//					params.SDKVersion, params.SwapChainDesc,
-		//					&pRealSwapChain, &pRealDevice, NULL, NULL);
+		IDXGISwapChain* pRealSwapChain = NULL;
+		ID3D11Device* pRealDevice = NULL;
+		HRESULT res = pfnCreateDeviceAndSwapChain(
+							params.pAdapter, params.DriverType, params.Software,
+							params.Flags, params.pFeatureLevels, params.FeatureLevels,
+							params.SDKVersion, params.SwapChainDesc,
+							&pRealSwapChain, &pRealDevice, NULL, NULL);
 
-		//if (FAILED(res))
-		//{
-		//	LogError("Create new device failed.");
-		//	return;
-		//}
+		if (FAILED(res))
+		{
+			LogError("Create new device failed.");
+			return;
+		}
 
-		//pWrappedDevice->SwitchToDevice(pRealDevice, pRealSwapChain);
-		//pRealSwapChain->Release();
-		//pRealDevice->Release();
-		//pWrappedDevice->SetAsRenderDocDevice(bSwitchToRdc);
+		pWrappedDevice->SwitchToDevice(pRealDevice, pRealSwapChain);
+		pRealSwapChain->Release();
+		pRealDevice->Release();
+		pWrappedDevice->SetAsRenderDocDevice(bSwitchToRdc);
 	}
 
 	RENDERDOC_API_1_0_1* GetRenderdocAPI()
