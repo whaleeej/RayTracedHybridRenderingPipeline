@@ -73,9 +73,9 @@ void Application::Initialize()
     //debugInterface->SetEnableGPUBasedValidation(TRUE);
     //debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
 
-	// renderdoc injection before any initialization
-	//rdcboost::EnableRenderDoc(0, 1);
-	//void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
+	 //renderdoc injection before any initialization
+	rdcboost::EnableRenderDoc(0, 1);
+	void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
 
 #endif
 

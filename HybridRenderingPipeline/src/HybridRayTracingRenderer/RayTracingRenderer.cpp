@@ -5,6 +5,9 @@
 #include <ASBuffer.h>
 #include <ResourceStateTracker.h>
 
+//#define ENABLE_RAYTRACING
+
+
 RayTracingRenderer::RayTracingRenderer(int w, int h):
 	Renderer(w, h)
 {
@@ -77,6 +80,7 @@ void RayTracingRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene
 
 void RayTracingRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> scene, std::shared_ptr<CommandList> commandList)
 {
+#ifdef ENABLE_RAYTRACING
 	// Let's raytrace
 	
 	commandList->SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, mpSrvUavHeap.Get());
@@ -130,7 +134,7 @@ void RayTracingRenderer::Render(RenderEventArgs& e, std::shared_ptr<Scene> scene
 	// Dispatch
 	commandList->SetPipelineState1(mpPipelineState);
 	commandList->DispatchRays(&raytraceDesc);
-	
+#endif
 }
 
 void RayTracingRenderer::PreRender(RenderResourceMap& resources)
@@ -146,9 +150,9 @@ RenderResourceMap* RayTracingRenderer::PostRender()
 {
 	return Renderer::PostRender();
 }
-
 void RayTracingRenderer::createAccelerationStructures()
 {
+#ifdef ENABLE_RAYTRACING
 	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
 	{
 		D3D12_HEAP_TYPE_UPLOAD,
@@ -314,10 +318,12 @@ void RayTracingRenderer::createAccelerationStructures()
 	// Wait for the execution of commandlist on the direct command queue, then release scratch resources in topLevelBuffers and bottomLevelBuffers
 	uint64_t mFenceValue = commandQueue->ExecuteCommandList(commandList);
 	commandQueue->WaitForFenceValue(mFenceValue);
+#endif
 }
 
 void RayTracingRenderer::createRtPipelineState()
 {
+#ifdef ENABLE_RAYTRACING
 	// Need 10 subobjects:
 	//  1 for the DXIL library
 	//  1 for hit-group
@@ -405,11 +411,12 @@ void RayTracingRenderer::createRtPipelineState()
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
 	ThrowIfFailed(mpDevice->CreateStateObject(&desc, IID_PPV_ARGS(&mpPipelineState)));
+#endif
 }
-
 RootSignatureDesc RayTracingRenderer::createLocalRootDesc(int uav_num, int srv_num, int sampler_num,
 	const D3D12_STATIC_SAMPLER_DESC* pStaticSamplers, int cbv_num, int c32_num, int space)
 {
+
 	// Create the root-signature 
 	//******Layout*********/
 	// Param[0] = DescriptorTable
@@ -487,6 +494,7 @@ RootSignatureDesc RayTracingRenderer::createLocalRootDesc(int uav_num, int srv_n
 
 void RayTracingRenderer::createShaderResources()
 {
+#ifdef ENABLE_RAYTRACING
 	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
 	{
 		D3D12_HEAP_TYPE_UPLOAD,
@@ -564,10 +572,11 @@ void RayTracingRenderer::createShaderResources()
 
 		objectToRT++;
 	}
-
+#endif
 }
 
 void RayTracingRenderer::createSrvUavHeap() {
+#ifdef ENABLE_RAYTRACING
 	auto pDevice = Application::Get().GetDevice();
 
 	int objectToRT = 0;
@@ -698,10 +707,12 @@ void RayTracingRenderer::createSrvUavHeap() {
 
 		objectToRT++;
 	}
+#endif
 }
 
 void RayTracingRenderer::createShaderTable()
 {
+#ifdef ENABLE_RAYTRACING
 	const D3D12_HEAP_PROPERTIES kUploadHeapProps =
 	{
 		D3D12_HEAP_TYPE_UPLOAD,
@@ -798,4 +809,5 @@ void RayTracingRenderer::createShaderTable()
 	}
 	// Unmap
 	mpShaderTable->Unmap(0, nullptr);
+#endif
 }
