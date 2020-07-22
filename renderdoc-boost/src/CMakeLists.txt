@@ -1,0 +1,14 @@
+# ADD_FILTER(...	SOURCE_FILES)
+
+INCLUDE_DIRECTORIES(
+	./
+	../include/)
+
+# LINK_DIRECTORIES(...)
+
+FILE(GLOB ROOT_SRC FOLLOW_SYMLINKS *.cpp *.h)
+SET(SOURCE_FILES ${SOURCE_FILES} ${ROOT_SRC})	# add root files
+
+ADD_LIBRARY(renderdoc-boost STATIC ${SOURCE_FILES})
+
+# TARGET_LINK_LIBRARIES(crossParticle ...)

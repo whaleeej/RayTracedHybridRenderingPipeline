@@ -52,11 +52,13 @@ target_include_directories( DX12Lib
     PUBLIC inc/GRAbstract
     PUBLIC inc/DXResource
     PUBLIC inc/Utility
-    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders"
+    PUBLIC ../renderdoc-boost/include
+    PRIVATE "${CMAKE_BINARY_DIR}/Data/Shaders/DX12Lib"
 )
 
 target_link_libraries( DX12Lib 
-	PUBLIC DirectXTex
+    PUBLIC DirectXTex
+    PUBLIC renderdoc-boost
     PUBLIC d3d12.lib
     PUBLIC dxgi.lib
     PUBLIC dxguid.lib
@@ -67,7 +69,8 @@ target_link_libraries( DX12Lib
 set_source_files_properties( ${SHADER_FILES}
     PROPERTIES
         VS_SHADER_MODEL 5.1
-        VS_SHADER_OUTPUT_HEADER_FILE "${CMAKE_CURRENT_BINARY_DIR}/$(Platform)/$(Configuration)/Shaders/%(Filename).h"
+		VS_SHADER_OBJECT_FILE_NAME "${CMAKE_BINARY_DIR}/Data/Shaders/DX12Lib/%(Filename).cso"
+        VS_SHADER_OUTPUT_HEADER_FILE "${CMAKE_BINARY_DIR}/Data/Shaders/DX12Lib/%(Filename).h"
         VS_SHADER_DISABLE_OPTIMIZATIONS $<$<CONFIG:Debug>:ON>
         VS_SHADER_ENABLE_DEBUG $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:ON>
 )

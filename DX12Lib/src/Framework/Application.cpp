@@ -6,6 +6,7 @@
 #include <Game.h>
 #include <DescriptorAllocator.h>
 #include <Window.h>
+#include <RenderdocBoost.h>
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12RenderWindowClass";
 
@@ -65,15 +66,17 @@ Application::Application(HINSTANCE hInst)
 void Application::Initialize()
 {
 #if defined(_DEBUG)
-    // Always enable the debug layer before doing anything DX12 related
-    // so all possible errors generated while creating DX12 objects
-    // are caught by the debug layer.
     ComPtr<ID3D12Debug1> debugInterface;
     ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
     debugInterface->EnableDebugLayer();
     // Enable these if you want full validation (will slow down rendering a lot).
     //debugInterface->SetEnableGPUBasedValidation(TRUE);
     //debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
+
+	// renderdoc injection before any initialization
+	//rdcboost::EnableRenderDoc(0, 1);
+	//void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
+
 #endif
 
     auto dxgiAdapter = GetAdapter(false);

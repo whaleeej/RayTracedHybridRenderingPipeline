@@ -11,12 +11,14 @@ PUSHD %CMAKE_BINARY_DIR%
 %CMAKE% -A x64 -G %CMAKE_GENERATOR% "%~dp0"
 POPD
 
-XCOPY .\3rd\dxcompiler\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /e /I
-XCOPY .\3rd\dxcompiler\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /e /I
-XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Release /e /I
-XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Debug /e /I
-XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /e /I
-XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /e /I
+XCOPY .\3rd\dxcompiler\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /I
+XCOPY .\3rd\dxcompiler\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /I
+XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Release /I
+XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Debug /I
+XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /I
+XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /I
+XCOPY .\3rd\renderdoc\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /I
+XCOPY .\3rd\renderdoc\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /I
 
 PAUSE
 POPD
