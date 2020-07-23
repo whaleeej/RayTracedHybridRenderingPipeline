@@ -1,6 +1,6 @@
 #pragma once
+#include <string>
 #include "WrappedD3D11DeviceChild.h"
-
 namespace rdcboost
 {
 	struct SWrappedClassInstanceInfo
