@@ -8,6 +8,8 @@
 #include <Window.h>
 #include <RenderdocBoost.h>
 
+#define ENABLE_RENDERDOC 1
+
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12RenderWindowClass";
 
 using WindowPtr = std::shared_ptr<Window>;
@@ -22,11 +24,11 @@ uint64_t Application::ms_FrameCount = 0;
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-// A wrapper struct to allow shared pointers for the window class.
-// This is needed because the constructor and destructor for the Window
-// class are protected and not accessible by the std::make_shared method.
 struct MakeWindow : public Window 
 {
+	// A wrapper struct to allow shared pointers for the window class.
+	// This is needed because the constructor and destructor for the Window
+	// class are protected and not accessible by the std::make_shared method.
     MakeWindow(HWND hWnd, const std::wstring& windowName, int clientWidth, int clientHeight, bool vSync)
         : Window(hWnd, windowName, clientWidth, clientHeight, vSync)
     {}
@@ -69,12 +71,14 @@ void Application::Initialize()
     ComPtr<ID3D12Debug1> debugInterface;
     ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
     debugInterface->EnableDebugLayer();
-    // Enable these if you want full validation (will slow down rendering a lot).
-    //debugInterface->SetEnableGPUBasedValidation(TRUE);
-    //debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
+	{ // Enable these if you want full validation (will slow down rendering a lot).
+		//debugInterface->SetEnableGPUBasedValidation(TRUE);
+		//debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
+	}
+#endif
 
-	 //renderdoc injection before any initialization
-	rdcboost::EnableRenderDoc(0, 1);
+#ifdef ENABLE_RENDERDOC
+	rdcboost::D3D12EnableRenderDoc(0, 1);
 	void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
 	RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
 	if (pAPI != NULL)
@@ -84,7 +88,6 @@ void Application::Initialize()
 		if (lastSep != std::string::npos)
 			pAPI->SetLogFilePathTemplate(pathTemplate.substr(lastSep + 1).c_str());
 	}
-
 #endif
 
     auto dxgiAdapter = GetAdapter(false);
@@ -197,7 +200,11 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 Microsoft::WRL::ComPtr<ID3D12Device1> Application::CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
     ComPtr<ID3D12Device1> d3d12Device1;
-    ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device1)));
+#ifdef ENABLE_RENDERDOC
+    ThrowIfFailed(rdcboost::D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device1)));
+#else
+	ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device1)));
+#endif
     NAME_D3D12_OBJECT(d3d12Device1);
 
 	// check for Device Ray Tracing Support

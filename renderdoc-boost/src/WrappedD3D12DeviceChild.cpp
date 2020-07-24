@@ -1,0 +1,9 @@
+#include "WrappedD3D12DeviceChild.h"
+
+
+RDCBOOST_NAMESPACE_BEGIN
+
+
+
+
+RDCBOOST_NAMESPACE_END
