@@ -21,6 +21,9 @@ protected:
 	ID3D12Object* m_pReal;
 };
 
+class WrappedD3D12Object: public WrappedD3D12ObjectBase, public  {
+
+};
 
 
 RDCBOOST_NAMESPACE_END
