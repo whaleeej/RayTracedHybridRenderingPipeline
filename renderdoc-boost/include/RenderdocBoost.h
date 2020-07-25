@@ -1,10 +1,13 @@
 #pragma once
+#include <renderdoc/renderdoc_app.h>
 #include <d3d11.h>
 #include <d3d12.h>
-#include <renderdoc/renderdoc_app.h>
-
-namespace rdcboost
+#define RDCBOOST_NAMESPACE_BEGIN namespace rdcboost\
 {
+#define RDCBOOST_NAMESPACE_END }
+
+
+RDCBOOST_NAMESPACE_BEGIN
 	// API for dx11
 	HRESULT D3D11CreateDeviceAndSwapChain(
 		IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE DriverType, HMODULE Software,
@@ -26,5 +29,5 @@ namespace rdcboost
 	
 	// common wrap for renderdoc
 	RENDERDOC_API_1_0_1* GetRenderdocAPI();
-}
+RDCBOOST_NAMESPACE_END
 

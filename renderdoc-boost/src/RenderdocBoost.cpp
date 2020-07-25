@@ -1,9 +1,13 @@
+#include <set>
+
 #include "RenderdocBoost.h"
+//d3d11 wrapper
 #include "WrappedD3D11DXGISwapChain.h"
 #include "WrappedD3D11Device.h"
 #include "WrappedD3D11Context.h"
 #include "D3D11DeviceCreateParams.h"
-#include <set>
+//d3d12 wrapper
+#include "WrappedD3D12Device.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
@@ -21,7 +25,7 @@ typedef HRESULT(WINAPI *tD3D11CreateDeviceAndSwapChain)(
 	D3D_FEATURE_LEVEL *pFeatureLevel,
 	ID3D11DeviceContext **ppImmediateContext);
 
-tD3D11CreateDeviceAndSwapChain pfnRenderdocCreateDeviceAndSwapChain;
+tD3D11CreateDeviceAndSwapChain pfnRenderdocD3D11CreateDeviceAndSwapChain;
 tD3D11CreateDeviceAndSwapChain pfnD3D11CreateDeviceAndSwapChain;
 
 typedef 	HRESULT (WINAPI* tD3D12CreateDevice)(
@@ -30,7 +34,7 @@ typedef 	HRESULT (WINAPI* tD3D12CreateDevice)(
 	_In_ REFIID riid, // Expected: ID3D12Device
 	_COM_Outptr_opt_ void** ppDevice);
 
-tD3D12CreateDevice pfnRenderdocCreateDevice;
+tD3D12CreateDevice pfnRenderdocD3D12CreateDevice;
 tD3D12CreateDevice pfnD3D12CreateDevice;
 
 static HMODULE sRdcModule;
@@ -51,17 +55,17 @@ static bool InitRenderDoc()
 		return false;
 	}
 
-	pfnRenderdocCreateDeviceAndSwapChain =
+	pfnRenderdocD3D11CreateDeviceAndSwapChain =
 		(tD3D11CreateDeviceAndSwapChain)GetProcAddress(sRdcModule, "RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
-	pfnRenderdocCreateDevice = (tD3D12CreateDevice)GetProcAddress(sRdcModule,
+	pfnRenderdocD3D12CreateDevice = (tD3D12CreateDevice)GetProcAddress(sRdcModule,
 		"RENDERDOC_CreateWrappedD3D12Device");
 
-	if (pfnRenderdocCreateDeviceAndSwapChain == NULL)
+	if (pfnRenderdocD3D11CreateDeviceAndSwapChain == NULL)
 	{
 		LogError("Can't GetProcAddress of RENDERDOC_CreateWrappedD3D11DeviceAndSwapChain");
 		return false;
 	}
-	if (pfnRenderdocCreateDevice == NULL) {
+	if (pfnRenderdocD3D12CreateDevice == NULL) {
 		LogError("Can't GetProcAddress of RENDERDOC_CreateWrappedD3D12Device");
 		return false;
 	}
@@ -161,7 +165,7 @@ void D3D11EnableRenderDoc(ID3D11Device* pDevice, bool bSwitchToRdc)
 	const SDeviceCreateParams& params = pWrappedDevice->GetDeviceCreateParams();
 
 	tD3D11CreateDeviceAndSwapChain pfnCreateDeviceAndSwapChain =
-		bSwitchToRdc ? pfnRenderdocCreateDeviceAndSwapChain : pfnD3D11CreateDeviceAndSwapChain;
+		bSwitchToRdc ? pfnRenderdocD3D11CreateDeviceAndSwapChain : pfnD3D11CreateDeviceAndSwapChain;
 
 	IDXGISwapChain* pRealSwapChain = NULL;
 	ID3D11Device* pRealDevice = NULL;
@@ -190,6 +194,9 @@ HRESULT  D3D12CreateDevice(
 	D3D_FEATURE_LEVEL MinimumFeatureLevel,
 	_In_ REFIID riid, // Expected: ID3D12Device
 	_COM_Outptr_opt_ void** ppDevice) {
+	//TODO: ID3D12Device1, ID3D12Device2 and etc.
+	Assert(riid == __uuidof(ID3D12Device));
+
 	if (pfnD3D12CreateDevice == NULL) {
 		HMODULE d3d12Module = GetModuleHandle("d3d12.dll");
 		pfnD3D12CreateDevice = (tD3D12CreateDevice)GetProcAddress(d3d12Module, "D3D12CreateDevice");
@@ -197,10 +204,41 @@ HRESULT  D3D12CreateDevice(
 
 	ID3D12Device* pRealDevice = NULL;
 	HRESULT res = pfnD3D12CreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
-	return 0;
+
+	WrappedD3D12Device* pWrappedDevice = NULL;
+	if (pRealDevice) {
+		pWrappedDevice = new WrappedD3D12Device(pRealDevice);
+		pRealDevice->Release();
+	}
+
+	if (pWrappedDevice&&ppDevice) {
+		*ppDevice = pWrappedDevice;
+	}
+	else if (pWrappedDevice) {
+		pWrappedDevice->Release();
+	}
+	else
+		LogError("Unable to create wrapped ID3D12Device");
+
+	return res;
 }
 
 void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
+	if (bSwitchToRenderdoc && !InitRenderDoc())
+	{
+		LogError("Can't enable renderdoc because renderdoc is not present.");
+		return;
+	}
+
+	WrappedD3D12Device* pWrappedDevice = static_cast<WrappedD3D12Device*>(pDevice);
+	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == bSwitchToRenderdoc))
+		return;
+
+	tD3D12CreateDevice pfnCreateDevice =
+		bSwitchToRenderdoc ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
+
+	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
+	HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
 
 }
 //*************************************d3d12*************************************//
