@@ -207,7 +207,7 @@ HRESULT  D3D12CreateDevice(
 
 	WrappedD3D12Device* pWrappedDevice = NULL;
 	if (pRealDevice) {
-		pWrappedDevice = new WrappedD3D12Device(pRealDevice);
+		//pWrappedDevice = new WrappedD3D12Device(pRealDevice);
 		pRealDevice->Release();
 	}
 
@@ -238,7 +238,7 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 		bSwitchToRenderdoc ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
 	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
-	HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
+	//HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
 
 }
 //*************************************d3d12*************************************//

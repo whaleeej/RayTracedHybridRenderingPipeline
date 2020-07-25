@@ -1,5 +1,5 @@
 #pragma once
-
+#include <string>
 #include "RdcBoostPCH.h"
 #include "PrivateDataMap.h"
 

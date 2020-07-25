@@ -32,7 +32,7 @@ void SkyboxRenderer::LoadPipeline()
 {
 	auto device = Application::Get().GetDevice();
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 	{
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;

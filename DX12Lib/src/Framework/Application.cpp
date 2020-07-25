@@ -8,7 +8,8 @@
 #include <Window.h>
 #include <RenderdocBoost.h>
 
-#define ENABLE_RENDERDOC 1
+//#define ENABLE_RENDERDOC 1
+//#define ENABLE_RAYTRACING 1
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12RenderWindowClass";
 
@@ -208,13 +209,15 @@ Microsoft::WRL::ComPtr<ID3D12Device1> Application::CreateDevice(Microsoft::WRL::
     NAME_D3D12_OBJECT(d3d12Device1);
 
 	// check for Device Ray Tracing Support
+#ifdef ENABLE_RAYTRACING
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
 	ThrowIfFailed(d3d12Device1->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)));
-	//if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-	//	m_DXRSupported = false;
-	//}
-	//else
-	//	m_DXRSupported = true;
+	if (features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
+		m_DXRSupported = false;
+	}
+	else
+		m_DXRSupported = true;
+#endif
 
     // Enable debug messages in debug mode.
 #if defined(_DEBUG)
