@@ -2,7 +2,7 @@
 #include <map>
 #include <vector>
 #include "PrivateDataMap.h"
-#include "D3D11DeviceCreateParams.h"
+#include "DeviceCreateParams.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 // give every impression of working but do nothing.

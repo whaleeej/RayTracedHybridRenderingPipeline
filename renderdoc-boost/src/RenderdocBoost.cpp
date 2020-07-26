@@ -5,7 +5,7 @@
 #include "WrappedD3D11DXGISwapChain.h"
 #include "WrappedD3D11Device.h"
 #include "WrappedD3D11Context.h"
-#include "D3D11DeviceCreateParams.h"
+#include "DeviceCreateParams.h"
 //d3d12 wrapper
 #include "WrappedD3D12Device.h"
 
@@ -195,7 +195,7 @@ HRESULT  D3D12CreateDevice(
 	_In_ REFIID riid, // Expected: ID3D12Device
 	_COM_Outptr_opt_ void** ppDevice) {
 	//TODO: ID3D12Device1, ID3D12Device2 and etc.
-	Assert(riid == __uuidof(ID3D12Device));
+	Assert(riid == __uuidof(ID3D12Device) || riid == __uuidof(ID3D12Device1));
 
 	if (pfnD3D12CreateDevice == NULL) {
 		HMODULE d3d12Module = GetModuleHandle("d3d12.dll");
@@ -207,7 +207,7 @@ HRESULT  D3D12CreateDevice(
 
 	WrappedD3D12Device* pWrappedDevice = NULL;
 	if (pRealDevice) {
-		//pWrappedDevice = new WrappedD3D12Device(pRealDevice);
+		pWrappedDevice = new WrappedD3D12Device(pRealDevice);
 		pRealDevice->Release();
 	}
 
@@ -238,7 +238,7 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 		bSwitchToRenderdoc ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
 	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
-	//HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
+	HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
 
 }
 //*************************************d3d12*************************************//

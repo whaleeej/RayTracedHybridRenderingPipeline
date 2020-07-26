@@ -8,7 +8,7 @@
 #include <Window.h>
 #include <RenderdocBoost.h>
 
-//#define ENABLE_RENDERDOC 1
+#define ENABLE_RENDERDOC 1
 //#define ENABLE_RAYTRACING 1
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12RenderWindowClass";
@@ -75,19 +75,6 @@ void Application::Initialize()
 	{ // Enable these if you want full validation (will slow down rendering a lot).
 		//debugInterface->SetEnableGPUBasedValidation(TRUE);
 		//debugInterface->SetEnableSynchronizedCommandQueueValidation(TRUE);
-	}
-#endif
-
-#ifdef ENABLE_RENDERDOC
-	rdcboost::D3D12EnableRenderDoc(0, 1);
-	void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
-	RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
-	if (pAPI != NULL)
-	{
-		std::string pathTemplate = pAPI->GetLogFilePathTemplate();
-		size_t lastSep = pathTemplate.find_last_of("\\/");
-		if (lastSep != std::string::npos)
-			pAPI->SetLogFilePathTemplate(pathTemplate.substr(lastSep + 1).c_str());
 	}
 #endif
 
