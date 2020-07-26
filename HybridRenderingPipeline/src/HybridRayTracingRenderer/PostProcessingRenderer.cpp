@@ -46,7 +46,6 @@ void PostProcessingRenderer::LoadPipeline()
 	{
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
-	DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 
 	CD3DX12_DESCRIPTOR_RANGE1 descriptorRange[1] = {
 				CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0)
@@ -69,38 +68,22 @@ void PostProcessingRenderer::LoadPipeline()
 	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostProcessing_VS.cso", &vs));
 	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostLighting_PS.cso", &ps));
 
-	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-
-	//struct PostLightingStateStream
-	//{
-	//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-	//	CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-	//	CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-	//	CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-	//	CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
-	//	CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-	//} postLightingPipelineStateStream;
-
-	//postLightingPipelineStateStream.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
-	//postLightingPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	//postLightingPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
-	//postLightingPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
-	//postLightingPipelineStateStream.Rasterizer = rasterizerDesc;
-	//postLightingPipelineStateStream.RTVFormats = presentRenderTarget.GetRenderTargetFormats();
-
-	//D3D12_PIPELINE_STATE_STREAM_DESC postLightingPipelineStateStreamDesc = {
-	//	sizeof(postLightingPipelineStateStream), &postLightingPipelineStateStream
-	//};
-	//ThrowIfFailed(device->CreatePipelineState(&postLightingPipelineStateStreamDesc, IID_PPV_ARGS(&m_PostLightingPipelineState)));
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC des; // comparti for device1 interface
 	ZeroMemory(&des, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	des.pRootSignature = m_PostLightingRootSignature.GetRootSignature().Get();
-	des.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	des.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 	des.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
+	CD3DX12_BLEND_DESC blendDes(D3D12_DEFAULT);
+	des.BlendState = blendDes;
+	des.SampleMask = 0xffffffff;
+	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	des.RasterizerState = rasterizerDesc;
+	CD3DX12_DEPTH_STENCIL_DESC dsDesc(D3D12_DEFAULT);
+	des.DepthStencilState = dsDesc;
+	des.InputLayout = { 0,0 };
+	des.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	des.NumRenderTargets = presentRenderTarget.GetRenderTargetFormats().NumRenderTargets;
 	for (int fi = 0; fi < 8; fi++) {
 		if (fi < presentRenderTarget.GetRenderTargetFormats().NumRenderTargets)
@@ -108,7 +91,11 @@ void PostProcessingRenderer::LoadPipeline()
 		else
 			des.RTVFormats[fi] = DXGI_FORMAT_UNKNOWN;
 	}
+	des.DSVFormat = presentRenderTarget.GetDepthStencilFormat();
+	DXGI_SAMPLE_DESC sampleDesc = { 1, 0 };
 	des.SampleDesc = sampleDesc;
+	des.NodeMask = 0;
+	des.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_PostLightingPipelineState)));
 }
 
