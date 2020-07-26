@@ -128,6 +128,12 @@ void GBufferRenderer::LoadPipeline()
 	des.SampleDesc = sampleDesc;
 	CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
 	des.RasterizerState = rasterizerDesc;
+	D3D12_DEPTH_STENCIL_DESC dsDesc;
+	dsDesc.DepthEnable = true;
+	dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	dsDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	dsDesc.StencilEnable = false;
+	des.DepthStencilState = dsDesc;
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_DeferredPipelineState)));
 }
 
