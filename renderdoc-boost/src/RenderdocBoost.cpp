@@ -1,11 +1,11 @@
 #include <set>
 
 #include "RenderdocBoost.h"
+#include "DeviceCreateParams.h"
 //d3d11 wrapper
 #include "WrappedD3D11DXGISwapChain.h"
 #include "WrappedD3D11Device.h"
 #include "WrappedD3D11Context.h"
-#include "DeviceCreateParams.h"
 //d3d12 wrapper
 #include "WrappedD3D12Device.h"
 
@@ -207,7 +207,8 @@ HRESULT  D3D12CreateDevice(
 
 	WrappedD3D12Device* pWrappedDevice = NULL;
 	if (pRealDevice) {
-		pWrappedDevice = new WrappedD3D12Device(pRealDevice);
+		pWrappedDevice = new WrappedD3D12Device(pRealDevice, 
+			SDeviceCreateParams(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, 0, 0, &MinimumFeatureLevel, 1, 0, 0));
 		pRealDevice->Release();
 	}
 
@@ -237,9 +238,25 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 	tD3D12CreateDevice pfnCreateDevice =
 		bSwitchToRenderdoc ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
-	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
-	HRESULT res = pfnCreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
+	const SDeviceCreateParams params = pWrappedDevice->GetDeviceCreateParams();
+	if (params.FeatureLevels < 1)
+	{
+		LogError("Can't switch to device without any feature level");
+		return;
+	}
 
+	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
+	HRESULT res = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
+
+	if (FAILED(res)) {
+		LogError("Create new device failed.");
+		Assert(false);
+		return;
+	}
+
+	pWrappedDevice->SwitchToDevice(pRealDevice);
+	pRealDevice->Release();
+	pWrappedDevice->SetAsRenderDocDevice(bSwitchToRenderdoc);
 }
 //*************************************d3d12*************************************//
 

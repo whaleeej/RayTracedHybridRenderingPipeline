@@ -2,8 +2,9 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice)
+WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDeviceCreateParams& param)
 	: WrappedD3D12Object(pRealDevice)
+	, m_DeviceCreateParams(param)
 	, m_bRenderDocDevice(false)
 {
 }
