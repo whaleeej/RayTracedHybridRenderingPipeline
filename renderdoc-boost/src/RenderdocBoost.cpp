@@ -40,7 +40,6 @@ tD3D12CreateDevice pfnD3D12CreateDevice;
 static HMODULE sRdcModule;
 static RENDERDOC_API_1_0_1* sRdcAPI = NULL;
 
-//*************************************d3d11*************************************//
 static bool InitRenderDoc()
 {
 	if (sRdcModule != NULL)
@@ -91,6 +90,7 @@ static bool InitRenderDoc()
 	return true;
 }
 
+//*************************************d3d11*************************************//
 HRESULT D3D11CreateDeviceAndSwapChain(
 	IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE DriverType, HMODULE Software, 
 	UINT Flags, const D3D_FEATURE_LEVEL* pFeatureLevels, UINT FeatureLevels, 
@@ -245,12 +245,11 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 		return;
 	}
 
-	ID3D12Device* pRealDevice = NULL;//TODO: D3D12 createParam
+	ID3D12Device* pRealDevice = NULL;
 	HRESULT res = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
 
 	if (FAILED(res)) {
 		LogError("Create new device failed.");
-		Assert(false);
 		return;
 	}
 
@@ -259,7 +258,6 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 	pWrappedDevice->SetAsRenderDocDevice(bSwitchToRenderdoc);
 }
 //*************************************d3d12*************************************//
-
 
 RENDERDOC_API_1_0_1* GetRenderdocAPI()
 {

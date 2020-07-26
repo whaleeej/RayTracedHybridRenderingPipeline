@@ -140,6 +140,11 @@ public: //override for ID3D12DeviceChild
 			*ppvDevice = static_cast<ID3D12Device*>m_pWrappedDevice;
 			m_pWrappedDevice->AddRef();
 			return S_OK;
+		}else
+		if (riid == __uuidof(ID3D12Device1)) {
+			*ppvDevice = static_cast<ID3D12Device1*>m_pWrappedDevice;
+			m_pWrappedDevice->AddRef();
+			return S_OK;
 		}
 		//TODO: ID3D12Device1/2/3...
 		return S_FALSE;
@@ -156,6 +161,8 @@ public: //framework
 		m_PrivateData.CopyPrivateData(pCopied);
 		m_pReal->Release();
 		m_pReal = pCopied;
+		//TODO: need add 1 ref?
+		m_pReal->AddRef();
 		m_pRealDevice = pNewDevice;
 	}
 
