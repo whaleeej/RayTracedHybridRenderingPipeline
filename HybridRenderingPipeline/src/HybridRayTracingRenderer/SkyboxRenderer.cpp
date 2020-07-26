@@ -32,7 +32,7 @@ void SkyboxRenderer::LoadPipeline()
 {
 	auto device = Application::Get().GetDevice();
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
 	if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 	{
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -103,6 +103,7 @@ void SkyboxRenderer::LoadPipeline()
 	des.VS = CD3DX12_SHADER_BYTECODE(vs.Get());
 	des.PS = CD3DX12_SHADER_BYTECODE(ps.Get());
 	des.NumRenderTargets = m_SkyboxRT.GetRenderTargetFormats().NumRenderTargets;
+	des.DSVFormat = m_SkyboxRT.GetDepthStencilFormat();
 	for (int fi = 0; fi < 8; fi++) {
 		if (fi < m_SkyboxRT.GetRenderTargetFormats().NumRenderTargets)
 			des.RTVFormats[fi] = m_SkyboxRT.GetRenderTargetFormats().RTFormats[fi];
