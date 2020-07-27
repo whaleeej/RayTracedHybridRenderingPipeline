@@ -1,5 +1,5 @@
 #pragma once
-
+#include <dxgi1_6.h>
 #include "WrappedD3D12DeviceChild.h"
 
 RDCBOOST_NAMESPACE_BEGIN

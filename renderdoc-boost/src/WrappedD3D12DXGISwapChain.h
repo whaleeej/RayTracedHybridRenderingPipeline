@@ -4,9 +4,8 @@
 #include "RdcBoostPCH.h"
 
 RDCBOOST_NAMESPACE_BEGIN
-class WrappedD3D12Device;
-class WrappedD3D12CommandQueue;
 class WrappedD3D12Resource;
+class WrappedD3D12CommandQueue;
 
 class WrappedD3D12DXGISwapChain :public IDXGISwapChain1 {
 	struct SResizeBufferParameter
@@ -20,7 +19,7 @@ class WrappedD3D12DXGISwapChain :public IDXGISwapChain1 {
 	};
 
 public:
-	WrappedD3D12DXGISwapChain(IDXGISwapChain1* pReal, ID3D12CommandQueue* pRealCommandQueue, WrappedD3D12Device* pWrappedDevice);
+	WrappedD3D12DXGISwapChain(IDXGISwapChain1* pReal, WrappedD3D12CommandQueue* pCommandQueue);
 	virtual ~WrappedD3D12DXGISwapChain();
 
 public: //override
@@ -133,12 +132,11 @@ public: //override for swapchain1
 		_Out_  DXGI_MODE_ROTATION *pRotation) ;
 
 public: // framework
-	void SwitchToCommandQueueAndDevice(ID3D12CommandQueue* pRealCommandQueue, ID3D12Device* pRealDevice);
-	IDXGISwapChain1* CopyToCommandQueueAndDevice(ID3D12CommandQueue* pRealCommandQueue, ID3D12Device* pRealDevice);
+	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+	IDXGISwapChain1* CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
 
 protected:
-	WrappedD3D12Device* const m_pWrappedDevice;//reffed
-	ID3D12CommandQueue* m_pRealCommandQueue;//reffed
+	WrappedD3D12CommandQueue* const m_pWrappedCommandQueue;//reffed
 	IDXGISwapChain1* m_pRealSwapChain;//reffed
 	unsigned int m_Ref;
 

@@ -4,7 +4,9 @@
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12Resource::WrappedD3D12Resource(ID3D12Resource* pReal, WrappedD3D12Device* pDevice)
-	:WrappedD3D12DeviceChild(pReal, pDevice) {
+	:WrappedD3D12DeviceChild(pReal, pDevice),
+	m_pRealSwapChain(NULL)
+{
 
 }
 WrappedD3D12Resource::~WrappedD3D12Resource() {

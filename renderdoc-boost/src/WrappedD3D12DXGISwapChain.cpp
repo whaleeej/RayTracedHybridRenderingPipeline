@@ -1,20 +1,18 @@
 #include "WrappedD3D12DXGISwapChain.h"
-#include "WrappedD3D12Device.h"
-#include "WrappedD3D12CommandQueue.h"
 #include "WrappedD3D12Resource.h"
+#include "WrappedD3D12CommandQueue.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
-	IDXGISwapChain1* pReal, ID3D12CommandQueue* pRealCommandQueue, WrappedD3D12Device* pWrappedDevice)
+	IDXGISwapChain1* pReal, WrappedD3D12CommandQueue* pCommandQueue)
 	: m_pRealSwapChain(pReal)
-	, m_pRealCommandQueue(pRealCommandQueue)
-	, m_pWrappedDevice(pWrappedDevice)
+	, m_pWrappedCommandQueue(pCommandQueue)
 	, m_Ref(1)
 {
 	m_pRealSwapChain->AddRef();
-	m_pWrappedDevice->AddRef();
-	m_pRealCommandQueue->AddRef();
+	m_pWrappedCommandQueue->AddRef();
+
 	m_ResizeParam.Valid = false;
 
 	// update for swapchain backbuffers
@@ -22,27 +20,29 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	m_pRealSwapChain->GetDesc1(&swapchainDesc);
 	m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
 	for (int i = 0; i < swapchainDesc.BufferCount; i++) {
-		ID3D12Resource** ppvResource = 0 ;
-		m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(ppvResource));
-		m_SwapChainBuffers[i] = new WrappedD3D12Resource(*ppvResource, m_pWrappedDevice);
+		ID3D12Resource* pvResource ;
+		m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
+		WrappedD3D12Device* pvDevice;
+		m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
+		m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice);
 		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
+		pvResource->Release(); pvDevice->Release();
 	}
 }
 
 WrappedD3D12DXGISwapChain::~WrappedD3D12DXGISwapChain()
 {
 	m_pRealSwapChain->Release();
-	m_pWrappedDevice->Release();
-	m_pRealCommandQueue->Release();
+	m_pWrappedCommandQueue->Release();
 }
 
-void WrappedD3D12DXGISwapChain::SwitchToCommandQueueAndDevice(ID3D12CommandQueue* pRealCommandQueue, ID3D12Device* pRealDevice)
+void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue)
 {
-	if (pRealCommandQueue == m_pRealCommandQueue) {
+	if (pRealCommandQueue == m_pWrappedCommandQueue->GetReal()) {
 		return;
 	}
 
-	IDXGISwapChain1* pNewSwapChain = CopyToCommandQueueAndDevice(pRealCommandQueue, pRealDevice);
+	IDXGISwapChain1* pNewSwapChain = CopyToCommandQueue(pRealCommandQueue);
 
 	{ //TODO handle resize/fullscreen
 		Assert(pNewSwapChain);
@@ -50,10 +50,6 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueueAndDevice(ID3D12CommandQueue
 		m_pRealSwapChain->Release();
 		m_pRealSwapChain = pNewSwapChain;
 		m_pRealSwapChain->AddRef();
-
-		m_pRealCommandQueue->Release();
-		m_pRealCommandQueue = pRealCommandQueue;
-		m_pRealCommandQueue->AddRef();
 
 		if (m_ResizeParam.Valid) //TODO: support resize
 		{
@@ -71,22 +67,26 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueueAndDevice(ID3D12CommandQueue
 			m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
 		}
 		for (int i = 0; i < swapchainDesc.BufferCount; i++) {
-			ID3D12Resource** ppvResource = 0;
-			m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(ppvResource));
-			Assert(ppvResource);
+			ID3D12Resource* pvResource = 0;
+			m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
+			Assert(pvResource);
 			if (m_SwapChainBuffers[i]) {
-				m_SwapChainBuffers[i]->SwitchToSwapChain(m_pRealSwapChain, *ppvResource);
+				m_SwapChainBuffers[i]->SwitchToSwapChain(m_pRealSwapChain, pvResource);
 			}
 			else {
-				
-				m_SwapChainBuffers[i] = new WrappedD3D12Resource(*ppvResource, m_pWrappedDevice);
+				WrappedD3D12Device* pvDevice;
+				m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)& pvDevice);
+				Assert(pvDevice);
+				m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice);
 				m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
+				pvDevice->Release();
 			}
+			pvResource->Release();
 		}
 	}
 }
 
-IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueueAndDevice(ID3D12CommandQueue* pRealCommandQueue, ID3D12Device* pRealDevice) {
+IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue) {
 	/************************************************************************/
 	/*          only support DxgiFacotry4 and DxgiSwapchain 4 here            */
 	/************************************************************************/
@@ -101,13 +101,14 @@ IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueueAndDevice(ID3D12Co
 
 	IDXGISwapChain1* swapChain1;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
-	HWND* pHWND;
+	HWND hWnd;
 	//TODO: dxgi swapchain1?2?3?4?
 	static_cast<IDXGISwapChain1*>(m_pRealSwapChain)->GetDesc1(&swapChainDesc);
-	static_cast<IDXGISwapChain1*>(m_pRealSwapChain)->GetHwnd(pHWND);
+	static_cast<IDXGISwapChain1*>(m_pRealSwapChain)->GetHwnd(&hWnd);
+	Assert(hWnd);
 	dxgiFactory4->CreateSwapChainForHwnd(
 		pRealCommandQueue,
-		*pHWND,
+		hWnd,
 		&swapChainDesc,
 		nullptr,
 		nullptr,
@@ -116,7 +117,7 @@ IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueueAndDevice(ID3D12Co
 	//TODO: Disable the Alt+Enter fullscreen toggle feature. Switching to fullscreen
 	// will be handled manually.
 	// need to depend on situation!!!
-	ret = dxgiFactory4->MakeWindowAssociation(*pHWND, DXGI_MWA_NO_ALT_ENTER);
+	ret = dxgiFactory4->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 	if (FAILED(ret)) {
 		LogError("Failed to make window association with newly created swap chain");
 		return NULL;
@@ -179,8 +180,11 @@ HRESULT WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **pp
 
 		if (wrappedTex == NULL)
 		{
-			m_SwapChainBuffers.resize(Buffer + 1);
-			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface, m_pWrappedDevice);
+			m_SwapChainBuffers.resize((size_t)Buffer + 1);
+			WrappedD3D12Device* pvDevice;
+			m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
+			Assert(pvDevice);
+			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface, pvDevice);
 			m_SwapChainBuffers[Buffer]->InitSwapChain(m_pRealSwapChain);
 			wrappedTex = m_SwapChainBuffers[Buffer];
 		}

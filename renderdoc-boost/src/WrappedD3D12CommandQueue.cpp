@@ -4,7 +4,8 @@
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12CommandQueue::WrappedD3D12CommandQueue(ID3D12CommandQueue* pRealD3D12CommandQueue, WrappedD3D12Device* pDevice) :
-	WrappedD3D12DeviceChild(pRealD3D12CommandQueue, pDevice)
+	WrappedD3D12DeviceChild(pRealD3D12CommandQueue, pDevice),
+	m_pWrappedSwapChain(NULL)
 {
 
 }
@@ -29,7 +30,7 @@ HRESULT  WrappedD3D12CommandQueue::createSwapChain(
 		LogError("Initialzation: create swapchain1 failed");
 	}
 	Assert(swapChain1);
-	m_pWrappedSwapChain = new WrappedD3D12DXGISwapChain(swapChain1, GetReal(), GetRealDevice());
+	m_pWrappedSwapChain = new WrappedD3D12DXGISwapChain(swapChain1, this);
 	return ret;
 }
 
@@ -44,7 +45,7 @@ ID3D12DeviceChild* WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* pNewDevi
 	}
 	// switch swapchain
 	Assert(pNewCommandQueue);
-	m_pWrappedSwapChain->SwitchToCommandQueueAndDevice(pNewCommandQueue, pNewDevice);
+	m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue);
 }
 
 

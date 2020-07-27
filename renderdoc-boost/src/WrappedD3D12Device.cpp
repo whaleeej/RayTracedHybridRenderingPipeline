@@ -11,7 +11,11 @@ WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDevice
 }
 
 WrappedD3D12Device::~WrappedD3D12Device() {
-	//release handled in WrappedD3D12ObjectBase
+	for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
+		if (it->second) {
+			//it->second->Release// TODO: release backrefs
+		}
+	}
 }
 
 void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {

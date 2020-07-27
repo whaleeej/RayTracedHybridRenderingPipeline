@@ -1,6 +1,6 @@
 #pragma once
 #include <map>
-#include "WrappedD3D12DeviceChild.h"
+#include "WrappedD3D12Object.h"
 #include "DeviceCreateParams.h"
 
 RDCBOOST_NAMESPACE_BEGIN
