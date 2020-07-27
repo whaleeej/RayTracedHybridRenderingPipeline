@@ -9,15 +9,15 @@ class WrappedD3D12ObjectBase { //interface for m_pReal:ID3D12Object* and switchT
 public:
 	WrappedD3D12ObjectBase(ID3D12Object* pReal) : m_pReal(pReal) { m_pReal->AddRef(); }
 	virtual ~WrappedD3D12ObjectBase() { m_pReal->Release(); }
-
-public: //virtual
-	virtual void SwitchToDevice(ID3D12Device* pNewDevice) = 0;
 	
 public: //func
 	ID3D12Object* GetRealObject() { return m_pReal; }
 
+public: //framework
+	virtual void SwitchToDevice(ID3D12Device* pNewDevice) = 0;
+
 protected:
-	ID3D12Object* m_pReal;
+	ID3D12Object* m_pReal; //reffed
 };
 
 template<typename NestedType>
@@ -64,9 +64,6 @@ public: // override for IUnknown
 		return ret;
 	}
 
-public: // func
-	NestedType* GetReal() { return static_cast<NestedType*>(m_pReal); }
-
 public: // override for ID3D12Object
 	virtual HRESULT STDMETHODCALLTYPE GetPrivateData(REFGUID guid, UINT *pDataSize, void *pData)
 	{
@@ -109,6 +106,9 @@ public: // override for ID3D12Object
 		return GetReal()->SetName(m_ObjectName.c_str());
 	}
 
+public: // func
+	NestedType* GetReal() { return static_cast<NestedType*>(m_pReal); }
+
 protected:
 	unsigned int m_Ref;
 	std::wstring m_ObjectName;
@@ -129,10 +129,8 @@ public:
 	virtual ~WrappedD3D12DeviceChild()
 	{
 		m_pWrappedDevice->OnDeviceChildReleased(static_cast<ID3D12DeviceChild*>m_pReal);
+		m_pWrappedDevice->Release();
 	}
-
-public: //function
-	ID3D12Device* GetRealDevice() { return m_pRealDevice; }
 
 public: //override for ID3D12DeviceChild
 	virtual HRESULT STDMETHODCALLTYPE GetDevice(REFIID riid, void **ppvDevice) {
@@ -149,6 +147,9 @@ public: //override for ID3D12DeviceChild
 		//TODO: ID3D12Device1/2/3...
 		return S_FALSE;
 	}
+
+public: //function
+	ID3D12Device* GetRealDevice() { return m_pRealDevice; }
 
 public: //framework
 	virtual void SwitchToDevice(ID3D12Device* pNewDevice)
@@ -170,8 +171,8 @@ public: //framework
 	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice) = 0;
 
 protected:
-	WrappedD3D12Device* const m_pWrappedDevice;
-	ID3D12Device* m_pRealDevice;
+	WrappedD3D12Device* const m_pWrappedDevice; //reffed
+	ID3D12Device* m_pRealDevice; // not reffed
 };
 
 RDCBOOST_NAMESPACE_END

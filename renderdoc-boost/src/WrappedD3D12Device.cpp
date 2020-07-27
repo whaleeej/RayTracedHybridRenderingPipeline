@@ -1,5 +1,6 @@
 #include <WrappedD3D12Device.h>
-
+#include <WrappedD3D12Resource.h>
+#include <WrappedD3D12CommandQueue.h>
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDeviceCreateParams& param)
@@ -66,7 +67,9 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 
 
 
-/***********************************override***********************************/
+/************************************************************************/
+/*                         override                                                                     */
+/************************************************************************/
 UINT STDMETHODCALLTYPE WrappedD3D12Device::GetNodeCount(void){
 	return GetReal()->GetNodeCount();
 }
@@ -81,7 +84,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	ID3D12CommandQueue* pCommandQueue = NULL;
 	HRESULT ret = GetReal()->CreateCommandQueue(pDesc, IID_PPV_ARGS(&pCommandQueue));
 	if (pCommandQueue) {
-		WrappedD3D12DeviceChild<ID3D12CommandQueue>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandQueue>(pCommandQueue, this);
+		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue, this);
 		*ppCommandQueue = wrapped;
 		m_BackRefs[pCommandQueue] = wrapped;
 		pCommandQueue->Release();
@@ -300,7 +303,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 	ID3D12Resource* pvResource = NULL;
 	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (pvResource) {
-		WrappedD3D12DeviceChild<ID3D12Resource>* wrapped = new WrappedD3D12DeviceChild<ID3D12Resource>(pvResource, this);
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
 		*ppvResource = wrapped;
 		m_BackRefs[pvResource] = wrapped;
 		pvResource->Release();
@@ -346,7 +349,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 	ID3D12Resource* pvResource = NULL;
 	HRESULT ret = GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (pvResource) {
-		WrappedD3D12DeviceChild<ID3D12Resource>* wrapped = new WrappedD3D12DeviceChild<ID3D12Resource>(pvResource, this);
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
 		*ppvResource = wrapped;
 		m_BackRefs[pvResource] = wrapped;
 		pvResource->Release();
@@ -369,7 +372,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 	ID3D12Resource* pvResource = NULL;
 	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (pvResource) {
-		WrappedD3D12DeviceChild<ID3D12Resource>* wrapped = new WrappedD3D12DeviceChild<ID3D12Resource>(pvResource, this);
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
 		*ppvResource = wrapped;
 		m_BackRefs[pvResource] = wrapped;
 		pvResource->Release();

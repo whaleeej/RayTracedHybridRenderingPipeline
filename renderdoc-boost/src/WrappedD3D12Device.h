@@ -10,15 +10,6 @@ public:
 	WrappedD3D12Device(ID3D12Device* pRealDevice, const SDeviceCreateParams& param);
 	~WrappedD3D12Device();
 
-public: //func
-	bool isRenderDocDevice() { return m_bRenderDocDevice; }
-	bool SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
-	const SDeviceCreateParams& GetDeviceCreateParams() const{ return m_DeviceCreateParams; }
-
-public: // framework
-	virtual void SwitchToDevice(ID3D12Device* pNewDevice);
-	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
-
 public: // override ID3D12Device
 	virtual UINT STDMETHODCALLTYPE GetNodeCount(void);
 
@@ -222,11 +213,19 @@ public: // override ID3D12Device
 
 	virtual LUID STDMETHODCALLTYPE GetAdapterLuid(void) ;
 
+public: //func
+	bool isRenderDocDevice() { return m_bRenderDocDevice; }
+	bool SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
+	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
+
+public: // framework
+	virtual void SwitchToDevice(ID3D12Device* pNewDevice);
+	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
+
 private:
 	SDeviceCreateParams m_DeviceCreateParams;
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs;
-	//WrappedD3D12DXGISwapChain* m_pWrappedSwapChain;
-	//std::vector<WrappedD3D12Texture2D*> m_SwapChainBuffers;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs;//reffed
+	
 	bool m_bRenderDocDevice;
 	//DummyID3D12InfoQueue m_DummyInfoQueue;
 };

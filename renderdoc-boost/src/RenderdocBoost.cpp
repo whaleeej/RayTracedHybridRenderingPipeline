@@ -8,6 +8,7 @@
 #include "WrappedD3D11Context.h"
 //d3d12 wrapper
 #include "WrappedD3D12Device.h"
+#include "WrappedD3D12CommandQueue.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
@@ -256,6 +257,15 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 	pWrappedDevice->SwitchToDevice(pRealDevice);
 	pRealDevice->Release();
 	pWrappedDevice->SetAsRenderDocDevice(bSwitchToRenderdoc);
+}
+
+HRESULT  CreateSwapChainForHwnd(//only support old than dxgifacotry2 and dxgiswapchain1 -> use of CreateSwapChainforHwnd
+	IDXGIFactory2* pDXGIFactory, ID3D12CommandQueue *pCommandQueue, HWND hWnd, 
+	const DXGI_SWAP_CHAIN_DESC1 *pDesc,const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc, 
+	IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain)
+{
+	return static_cast<WrappedD3D12CommandQueue*>(pCommandQueue)->createSwapChain(
+		pDXGIFactory, hWnd, pDesc, pFullscreenDesc, pRestrictToOutput, ppSwapChain);
 }
 //*************************************d3d12*************************************//
 
