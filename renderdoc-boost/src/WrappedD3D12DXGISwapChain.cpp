@@ -22,9 +22,11 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	for (int i = 0; i < swapchainDesc.BufferCount; i++) {
 		ID3D12Resource* pvResource ;
 		m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
+
 		WrappedD3D12Device* pvDevice;
 		m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
-		m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice);
+
+		m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
 		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
 		pvResource->Release(); pvDevice->Release();
 	}
@@ -77,7 +79,7 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 				WrappedD3D12Device* pvDevice;
 				m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)& pvDevice);
 				Assert(pvDevice);
-				m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice);
+				m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
 				m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
 				pvDevice->Release();
 			}
@@ -184,7 +186,7 @@ HRESULT WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **pp
 			WrappedD3D12Device* pvDevice;
 			m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
 			Assert(pvDevice);
-			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface, pvDevice);
+			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
 			m_SwapChainBuffers[Buffer]->InitSwapChain(m_pRealSwapChain);
 			wrappedTex = m_SwapChainBuffers[Buffer];
 		}

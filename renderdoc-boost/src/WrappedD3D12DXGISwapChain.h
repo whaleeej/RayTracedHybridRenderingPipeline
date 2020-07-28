@@ -137,11 +137,12 @@ public: // framework
 
 protected:
 	WrappedD3D12CommandQueue* const m_pWrappedCommandQueue;//reffed
-	IDXGISwapChain1* m_pRealSwapChain;//reffed
-	unsigned int m_Ref;
-
-	SResizeBufferParameter m_ResizeParam;
 	std::vector<WrappedD3D12Resource*> m_SwapChainBuffers;//reffed with new //TODO ref it
+
+	IDXGISwapChain1* m_pRealSwapChain;//reffed
+
+	unsigned int m_Ref;
+	SResizeBufferParameter m_ResizeParam;
 };
 
 RDCBOOST_NAMESPACE_END

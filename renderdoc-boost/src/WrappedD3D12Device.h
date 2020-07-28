@@ -217,15 +217,32 @@ public: //func
 	bool isRenderDocDevice() { return m_bRenderDocDevice; }
 	bool SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
 	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
+	WrappedD3D12DescriptorHeap* findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
+		for (auto it = m_BackRefs_DescriptorHeaps.begin(); it != m_BackRefs_DescriptorHeaps.end(); it++) {
+			if (it->second) {
+				WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
+				auto start = pWrappedHeap->GetCPUDescriptorHandleForHeapStart();
+				auto offset = pWrappedHeap->GetDesc().NumDescriptors;
+				auto interval = GetReal()->GetDescriptorHandleIncrementSize(pWrappedHeap->GetDesc().Type);
+				if (handle.ptr >= start.ptr && handle.ptr < start.ptr + offset * interval) {
+					return pWrappedHeap;
+				}
+			}
+		}
+		return NULL;
+	}
 
 public: // framework
 	virtual void SwitchToDevice(ID3D12Device* pNewDevice);
 	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
 
 private:
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heaps;//reffed
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resources;//reffed
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeaps;//reffed
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Others;//reffed
+
 	SDeviceCreateParams m_DeviceCreateParams;
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs;//reffed
-	
 	bool m_bRenderDocDevice;
 	//DummyID3D12InfoQueue m_DummyInfoQueue;
 };

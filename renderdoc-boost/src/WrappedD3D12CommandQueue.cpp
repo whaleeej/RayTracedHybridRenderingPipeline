@@ -46,6 +46,7 @@ ID3D12DeviceChild* WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* pNewDevi
 	// switch swapchain
 	Assert(pNewCommandQueue);
 	m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue);
+	return pNewCommandQueue;
 }
 
 

@@ -6,11 +6,25 @@ RDCBOOST_NAMESPACE_BEGIN
 
 class WrappedD3D12Device;
 class WrappedD3D12DXGISwapChain;
+class WrappedD3D12Heap;
 
 class WrappedD3D12Resource : public WrappedD3D12DeviceChild<ID3D12Resource>
 {
 public:
-	WrappedD3D12Resource(ID3D12Resource* pReal, WrappedD3D12Device* pDevice);
+	enum WrappedD3D12ResourceType {
+		CommittedWrappedD3D12Resource,
+		PlacedWrappedD3D12Resource,
+		ReservedWrappedD3D12Resource,
+		BackBufferWrappedD3D12Resource
+	};
+public:
+	WrappedD3D12Resource(
+		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
+		WrappedD3D12Heap* pHeap = NULL,
+		WrappedD3D12ResourceType type = BackBufferWrappedD3D12Resource,
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_CLEAR_VALUE *pClearValue=NULL,
+		UINT64 heapOffset = 0);
 	~WrappedD3D12Resource();
 
 public: //override
@@ -45,13 +59,22 @@ public: //override
 		_Out_opt_  D3D12_HEAP_PROPERTIES *pHeapProperties,
 		_Out_opt_  D3D12_HEAP_FLAGS *pHeapFlags);
 
+public: //func
+	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
+	void changeToState(D3D12_RESOURCE_STATES state);
+
 public://framework
 	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
-	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
 	void SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3D12Resource* pNewResource);
 
 protected:
+	WrappedD3D12Heap * m_pWrappedHeap; // reffed;
 	IDXGISwapChain1* m_pRealSwapChain; //not reffed
+
+	WrappedD3D12ResourceType m_Type;
+	D3D12_RESOURCE_STATES m_State;
+	D3D12_CLEAR_VALUE m_ClearValue;
+	UINT64 m_heapOffset;
 };
 
 

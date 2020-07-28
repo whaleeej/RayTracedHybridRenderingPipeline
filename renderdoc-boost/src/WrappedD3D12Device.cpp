@@ -1,6 +1,7 @@
 #include <WrappedD3D12Device.h>
 #include <WrappedD3D12Resource.h>
 #include <WrappedD3D12CommandQueue.h>
+#include <WrappedD3D12Heap.h>
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDeviceCreateParams& param)
@@ -11,15 +12,15 @@ WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDevice
 }
 
 WrappedD3D12Device::~WrappedD3D12Device() {
-	for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
-		if (it->second) {
-			//it->second->Release// TODO: release backrefs
-		}
-	}
+	//for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
+	//	if (it->second) {
+	//		//it->second->Release// TODO: release backrefs
+	//	}
+	//}
 }
 
 void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
-	if (m_BackRefs.erase(pReal) !=0) return;
+	//if (m_BackRefs.erase(pReal) !=0) return;
 
 	//TODO not in backRefs, then it will be in backbuffer for swapchain, try erase in it
 
@@ -35,30 +36,34 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 	//1. copy private data of device
 	m_PrivateData.CopyPrivateData(pNewDevice);
 
-	//2. create new swapchain
-
-	//3. swapchain buffer switchToDevice
-
-	//4. backRefs switchToDevice
-	if (!m_BackRefs.empty()) {
-		printf("Transferring DeviceChild resources to new device without modifying the content of WrappedDeviceChild\n");
-		printf("--------------------------------------------------\n");
-		std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs;
-		int progress; int idx;
-		for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
-			it->second->SwitchToDevice(pNewDevice);//key of the framework
-			newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject())] = it->second;
-			// sequencing
-			++idx;
-			while (progress < (int)(idx * 50 / m_BackRefs.size()))
-			{
-				printf(">");
-				++progress;
+	//2. backRefs switchToDevice
+	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
+		if (!m_BackRefs.empty()) {
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
+			printf("--------------------------------------------------\n");
+			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs;
+			int progress; int idx;
+			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
+				it->second->SwitchToDevice(pNewDevice);//key of the framework
+				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject())] = it->second;
+				// sequencing
+				++idx;
+				while (progress < (int)(idx * 50 / m_BackRefs.size()))
+				{
+					printf(">");
+					++progress;
+				}
 			}
+			printf("\n");
+			m_BackRefs.swap(newBackRefs);
 		}
-		printf("\n");
-		m_BackRefs.swap(newBackRefs);
-	}
+	};
+	backRefTransferFunc(m_BackRefs_Heaps, "Heaps");
+	backRefTransferFunc(m_BackRefs_Resources, "Resources");
+	backRefTransferFunc(m_BackRefs_DescriptorHeaps, "DescriptorHeaps");
+	backRefTransferFunc(m_BackRefs_Others, "Others");
+
+	
 
 	//5.pReal substitute
 	ULONG refs = m_pReal->Release();
@@ -66,7 +71,6 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 		LogError("Previous real device ref count: %d", static_cast<int>(refs));
 	m_pReal = pNewDevice;
 	m_pReal->AddRef();
-
 }
 
 
@@ -74,10 +78,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
-UINT STDMETHODCALLTYPE WrappedD3D12Device::GetNodeCount(void){
-	return GetReal()->GetNodeCount();
-}
-
+//////////////////////////////////////////////////////////////////////////Create D3D12 Object
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	_In_  const D3D12_COMMAND_QUEUE_DESC *pDesc,
 	REFIID riid,
@@ -90,7 +91,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	if (pCommandQueue) {
 		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue, this);
 		*ppCommandQueue = wrapped;
-		m_BackRefs[pCommandQueue] = wrapped;
+		m_BackRefs_Others[pCommandQueue] = wrapped;
 		pCommandQueue->Release();
 	}
 	else {
@@ -111,7 +112,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 	if (pCommandAllocator) {
 		WrappedD3D12DeviceChild<ID3D12CommandAllocator>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandAllocator>(pCommandAllocator, this);
 		*ppCommandAllocator = wrapped;
-		m_BackRefs[pCommandAllocator] = wrapped;
+		m_BackRefs_Others[pCommandAllocator] = wrapped;
 		pCommandAllocator->Release();
 	}
 	else {
@@ -132,7 +133,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 	if (pPipelineState) {
 		WrappedD3D12DeviceChild<ID3D12PipelineState>* wrapped = new WrappedD3D12DeviceChild<ID3D12PipelineState>(pPipelineState, this);
 		*ppPipelineState = wrapped;
-		m_BackRefs[pPipelineState] = wrapped;
+		m_BackRefs_Others[pPipelineState] = wrapped;
 		pPipelineState->Release();
 	}
 	else {
@@ -153,7 +154,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 	if (pPipelineState) {
 		WrappedD3D12DeviceChild<ID3D12PipelineState>* wrapped = new WrappedD3D12DeviceChild<ID3D12PipelineState>(pPipelineState, this);
 		*ppPipelineState = wrapped;
-		m_BackRefs[pPipelineState] = wrapped;
+		m_BackRefs_Others[pPipelineState] = wrapped;
 		pPipelineState->Release();
 	}
 	else {
@@ -177,20 +178,13 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 	if (pCommandList) {
 		WrappedD3D12DeviceChild<ID3D12CommandList>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandList>(pCommandList, this);
 		*ppCommandList = wrapped;
-		m_BackRefs[pCommandList] = wrapped;
+		m_BackRefs_Others[pCommandList] = wrapped;
 		pCommandList->Release();
 	}
 	else {
 		*ppCommandList = NULL;
 	}
 	return ret;
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CheckFeatureSupport(
-	D3D12_FEATURE Feature,
-	_Inout_updates_bytes_(FeatureSupportDataSize)  void *pFeatureSupportData,
-	UINT FeatureSupportDataSize){
-	return GetReal()->CheckFeatureSupport(Feature, pFeatureSupportData, FeatureSupportDataSize);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
@@ -205,7 +199,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	if (pvHeap) {
 		WrappedD3D12DeviceChild<ID3D12DescriptorHeap>* wrapped = new WrappedD3D12DeviceChild<ID3D12DescriptorHeap>(pvHeap, this);
 		*ppvHeap = wrapped;
-		m_BackRefs[pvHeap] = wrapped;
+		m_BackRefs_DescriptorHeaps[pvHeap] = wrapped;
 		pvHeap->Release();
 	}
 	else {
@@ -214,15 +208,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	return ret;
 }
 
-UINT STDMETHODCALLTYPE WrappedD3D12Device::GetDescriptorHandleIncrementSize(
-	_In_  D3D12_DESCRIPTOR_HEAP_TYPE DescriptorHeapType){}
-
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 	_In_  UINT nodeMask,
 	_In_reads_(blobLengthInBytes)  const void *pBlobWithRootSignature,
 	_In_  SIZE_T blobLengthInBytes,
 	REFIID riid,
-	_COM_Outptr_  void **ppvRootSignature){
+	_COM_Outptr_  void **ppvRootSignature) {
 	if (ppvRootSignature == NULL)
 		return GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, riid, NULL);
 
@@ -231,7 +222,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 	if (pvRootSignature) {
 		WrappedD3D12DeviceChild<ID3D12RootSignature>* wrapped = new WrappedD3D12DeviceChild<ID3D12RootSignature>(pvRootSignature, this);
 		*ppvRootSignature = wrapped;
-		m_BackRefs[pvRootSignature] = wrapped;
+		m_BackRefs_Others[pvRootSignature] = wrapped;
 		pvRootSignature->Release();
 	}
 	else {
@@ -240,34 +231,270 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 	return ret;
 }
 
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
+	_In_  const D3D12_HEAP_PROPERTIES *pHeapProperties,
+	D3D12_HEAP_FLAGS HeapFlags,
+	_In_  const D3D12_RESOURCE_DESC *pDesc,
+	D3D12_RESOURCE_STATES InitialResourceState,
+	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+	REFIID riidResource,
+	_COM_Outptr_opt_  void **ppvResource) {
+	if (ppvResource == NULL)
+		return GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, NULL);
+
+	ID3D12Resource* pvResource = NULL;
+	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
+	if (pvResource) {
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
+			pvResource, this, NULL,
+			WrappedD3D12Resource::CommittedWrappedD3D12Resource,
+			InitialResourceState,
+			pOptimizedClearValue
+		);
+		*ppvResource = wrapped;
+		m_BackRefs_Resources[pvResource] = wrapped;
+		pvResource->Release();
+	}
+	else {
+		*ppvResource = NULL;
+	}
+	return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
+	_In_  const D3D12_HEAP_DESC *pDesc,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvHeap) {
+	if (ppvHeap == NULL)
+		return GetReal()->CreateHeap(pDesc, riid, NULL);
+
+	ID3D12Heap* pvHeap = NULL;
+	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
+	if (pvHeap) {
+		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap, this);
+		*ppvHeap = wrapped;
+		m_BackRefs_Heaps[pvHeap] = wrapped;
+		pvHeap->Release();
+	}
+	else {
+		*ppvHeap = NULL;
+	}
+	return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
+	_In_  ID3D12Heap *pHeap,
+	UINT64 HeapOffset,
+	_In_  const D3D12_RESOURCE_DESC *pDesc,
+	D3D12_RESOURCE_STATES InitialState,
+	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvResource) {
+	if (ppvResource == NULL)
+		return GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, riid, NULL);
+
+	ID3D12Resource* pvResource = NULL;
+	HRESULT ret = GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
+	if (pvResource) {
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
+			pvResource, this, pHeap,
+			WrappedD3D12Resource::PlacedWrappedD3D12Resource,
+			InitialState,
+			pOptimizedClearValue
+		);
+		*ppvResource = wrapped;
+		m_BackRefs_Resources[pvResource] = wrapped;
+		pvResource->Release();
+	}
+	else {
+		*ppvResource = NULL;
+	}
+	return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
+	_In_  const D3D12_RESOURCE_DESC *pDesc,
+	D3D12_RESOURCE_STATES InitialState,
+	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvResource) {
+	if (ppvResource == NULL)
+		return GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, riid, NULL);
+
+	ID3D12Resource* pvResource = NULL;
+	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
+	if (pvResource) {
+		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
+			pvResource, this, NULL,
+			WrappedD3D12Resource::ReservedWrappedD3D12Resource,
+			InitialState,
+			pOptimizedClearValue
+		);
+		*ppvResource = wrapped;
+		m_BackRefs_Resources[pvResource] = wrapped;
+		pvResource->Release();
+	}
+	else {
+		*ppvResource = NULL;
+	}
+	return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::OpenSharedHandle(
+	_In_  HANDLE NTHandle,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvObj) {
+	LogError("OpenSharedHandle not supported yet");
+	return GetReal()->OpenSharedHandle(NTHandle, riid, ppvObj);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
+	UINT64 InitialValue,
+	D3D12_FENCE_FLAGS Flags,
+	REFIID riid,
+	_COM_Outptr_  void **ppFence) {
+	if (ppFence == NULL)
+		return GetReal()->CreateFence(InitialValue, Flags, riid, NULL);
+
+	ID3D12Fence* pFence = NULL;
+	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
+	if (pFence) {
+		WrappedD3D12DeviceChild<ID3D12Fence>* wrapped = new WrappedD3D12DeviceChild<ID3D12Fence>(pFence, this);
+		*ppFence = wrapped;
+		m_BackRefs[pFence] = wrapped;
+		pFence->Release();
+	}
+	else {
+		*ppFence = NULL;
+	}
+	return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateQueryHeap(
+	_In_  const D3D12_QUERY_HEAP_DESC *pDesc,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvHeap) {
+	LogError("Query Heap Not supported yet");
+	return 0;
+	//if (ppvHeap == NULL)
+	//	return GetReal()->CreateQueryHeap(pDesc, riid, NULL);
+
+	//ID3D12QueryHeap* pvHeap = NULL;
+	//HRESULT ret = GetReal()->CreateQueryHeap(pDesc, IID_PPV_ARGS(&pvHeap));
+	//if (pvHeap) {
+	//	WrappedD3D12DeviceChild<ID3D12QueryHeap>* wrapped = new WrappedD3D12DeviceChild<ID3D12QueryHeap>(pvHeap, this);
+	//	*ppvHeap = wrapped;
+	//	m_BackRefs[pvHeap] = wrapped;
+	//	pvHeap->Release();
+	//}
+	//else {
+	//	*ppvHeap = NULL;
+	//}
+	//return ret;
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
+	_In_  const D3D12_COMMAND_SIGNATURE_DESC *pDesc,
+	_In_opt_  ID3D12RootSignature *pRootSignature,
+	REFIID riid,
+	_COM_Outptr_opt_  void **ppvCommandSignature) {
+	LogError("Command Signature Not supported yet");
+	return 0;
+	//if (ppvCommandSignature == NULL)
+	//	return GetReal()->CreateCommandSignature(pDesc, pRootSignature, riid, NULL);
+
+	//ID3D12CommandSignature* pCommandSignature = NULL;
+	//HRESULT ret = GetReal()->CreateCommandSignature(pDesc, pRootSignature, IID_PPV_ARGS(&pCommandSignature));
+	//if (pCommandSignature) {
+	//	WrappedD3D12DeviceChild<ID3D12CommandSignature>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandSignature>(pCommandSignature, this);
+	//	*ppvCommandSignature = wrapped;
+	//	m_BackRefs[pCommandSignature] = wrapped;
+	//	pCommandSignature->Release();
+	//}
+	//else {
+	//	*ppvCommandSignature = NULL;
+	//}
+	//return ret;
+}
+
+
+//////////////////////////////////////////////////////////////////////////Create Descriptor
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 	_In_opt_  const D3D12_CONSTANT_BUFFER_VIEW_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {
+	auto pWrappedHeap = findInBackRefDescriptorHeaps(DestDescriptor);
+	if (!pWrappedHeap)
+	{
+		LogError("Error when create descriptor");
+		Assert(pWrappedHeap);
+	}
+	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
+	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_CBV;
+
+	//TODO: sneaky 通过遍历res的GPU VADDR来找WrappedRes
+	WrappedD3D12Resource* pWrappedD3D12Res = NULL;
+	for (auto it = m_BackRefs_Resources.begin(); it != m_BackRefs_Resources.end(); it++) {
+		if (it->second) {
+			auto pTmpRes = static_cast<WrappedD3D12Resource*>(it->second);
+			if (pTmpRes->GetGPUVirtualAddress() == pDesc->BufferLocation) {
+				pWrappedD3D12Res = pTmpRes;
+			}
+		}
+	}
+	if (!pWrappedD3D12Res)
+	{
+		LogError("Error when create CBV descriptor");
+		Assert(pWrappedD3D12Res);
+	}
+
+	slotDesc.pWrappedD3D12Resource = pWrappedD3D12Res;
+	slotDesc.concreteViewDesc.cbv = *pDesc;
+	pWrappedHeap->cacheDescriptorCreateParam(, DestDescriptor);
+
+	GetReal()->CreateConstantBufferView(pDesc, DestDescriptor);
+}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	_In_opt_  ID3D12Resource *pResource,
 	_In_opt_  const D3D12_SHADER_RESOURCE_VIEW_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
 	_In_opt_  ID3D12Resource *pResource,
 	_In_opt_  ID3D12Resource *pCounterResource,
 	_In_opt_  const D3D12_UNORDERED_ACCESS_VIEW_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
 	_In_opt_  ID3D12Resource *pResource,
 	_In_opt_  const D3D12_RENDER_TARGET_VIEW_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
 	_In_opt_  ID3D12Resource *pResource,
 	_In_opt_  const D3D12_DEPTH_STENCIL_VIEW_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateSampler(
 	_In_  const D3D12_SAMPLER_DESC *pDesc,
-	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor){}
+	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {}
+
+
+UINT STDMETHODCALLTYPE WrappedD3D12Device::GetNodeCount(void) {
+	return GetReal()->GetNodeCount();
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CheckFeatureSupport(
+	D3D12_FEATURE Feature,
+	_Inout_updates_bytes_(FeatureSupportDataSize)  void *pFeatureSupportData,
+	UINT FeatureSupportDataSize){
+	return GetReal()->CheckFeatureSupport(Feature, pFeatureSupportData, FeatureSupportDataSize);
+}
+
+UINT STDMETHODCALLTYPE WrappedD3D12Device::GetDescriptorHandleIncrementSize(
+	_In_  D3D12_DESCRIPTOR_HEAP_TYPE DescriptorHeapType){
+	
+}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CopyDescriptors(
 	_In_  UINT NumDestDescriptorRanges,
@@ -293,100 +520,6 @@ D3D12_HEAP_PROPERTIES STDMETHODCALLTYPE WrappedD3D12Device::GetCustomHeapPropert
 	_In_  UINT nodeMask,
 	D3D12_HEAP_TYPE heapType){}
 
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
-	_In_  const D3D12_HEAP_PROPERTIES *pHeapProperties,
-	D3D12_HEAP_FLAGS HeapFlags,
-	_In_  const D3D12_RESOURCE_DESC *pDesc,
-	D3D12_RESOURCE_STATES InitialResourceState,
-	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
-	REFIID riidResource,
-	_COM_Outptr_opt_  void **ppvResource){
-	if (ppvResource == NULL)
-		return GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, NULL);
-
-	ID3D12Resource* pvResource = NULL;
-	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
-		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
-		*ppvResource = wrapped;
-		m_BackRefs[pvResource] = wrapped;
-		pvResource->Release();
-	}
-	else {
-		*ppvResource = NULL;
-	}
-	return ret;
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
-	_In_  const D3D12_HEAP_DESC *pDesc,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvHeap){
-	if (ppvHeap == NULL)
-		return GetReal()->CreateHeap(pDesc, riid, NULL);
-
-	ID3D12Heap* pvHeap = NULL;
-	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
-	if (pvHeap) {
-		WrappedD3D12DeviceChild<ID3D12Heap>* wrapped = new WrappedD3D12DeviceChild<ID3D12Heap>(pvHeap, this);
-		*ppvHeap = wrapped;
-		m_BackRefs[pvHeap] = wrapped;
-		pvHeap->Release();
-	}
-	else {
-		*ppvHeap = NULL;
-	}
-	return ret;
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
-	_In_  ID3D12Heap *pHeap,
-	UINT64 HeapOffset,
-	_In_  const D3D12_RESOURCE_DESC *pDesc,
-	D3D12_RESOURCE_STATES InitialState,
-	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvResource){
-	if (ppvResource == NULL)
-		return GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, riid, NULL);
-
-	ID3D12Resource* pvResource = NULL;
-	HRESULT ret = GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
-		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
-		*ppvResource = wrapped;
-		m_BackRefs[pvResource] = wrapped;
-		pvResource->Release();
-	}
-	else {
-		*ppvResource = NULL;
-	}
-	return ret;
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
-	_In_  const D3D12_RESOURCE_DESC *pDesc,
-	D3D12_RESOURCE_STATES InitialState,
-	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvResource){
-	if (ppvResource == NULL)
-		return GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, riid, NULL);
-
-	ID3D12Resource* pvResource = NULL;
-	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
-		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(pvResource, this);
-		*ppvResource = wrapped;
-		m_BackRefs[pvResource] = wrapped;
-		pvResource->Release();
-	}
-	else {
-		*ppvResource = NULL;
-	}
-	return ret;
-}
-
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateSharedHandle(
 	_In_  ID3D12DeviceChild *pObject,
 	_In_opt_  const SECURITY_ATTRIBUTES *pAttributes,
@@ -395,14 +528,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateSharedHandle(
 	_Out_  HANDLE *pHandle){
 	LogError("CreateSharedHandle not supported yet");
 	return GetReal()->CreateSharedHandle(pObject, pAttributes, Access, Name, pHandle);
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::OpenSharedHandle(
-	_In_  HANDLE NTHandle,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvObj) {
-	LogError("OpenSharedHandle not supported yet");
-	return GetReal()->OpenSharedHandle(NTHandle, riid, ppvObj);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::OpenSharedHandleByName(
@@ -422,28 +547,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::Evict(
 	UINT NumObjects,
 	_In_reads_(NumObjects)  ID3D12Pageable *const *ppObjects){}
 
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
-	UINT64 InitialValue,
-	D3D12_FENCE_FLAGS Flags,
-	REFIID riid,
-	_COM_Outptr_  void **ppFence) {
-	if (ppFence == NULL)
-		return GetReal()->CreateFence(InitialValue, Flags, riid, NULL);
-
-	ID3D12Fence* pFence = NULL;
-	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
-	if (pFence) {
-		WrappedD3D12DeviceChild<ID3D12Fence>* wrapped = new WrappedD3D12DeviceChild<ID3D12Fence>(pFence, this);
-		*ppFence = wrapped;
-		m_BackRefs[pFence] = wrapped;
-		pFence->Release();
-	}
-	else {
-		*ppFence = NULL;
-	}
-	return ret;
-}
-
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::GetDeviceRemovedReason(void){}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::GetCopyableFootprints(
@@ -456,51 +559,8 @@ void STDMETHODCALLTYPE WrappedD3D12Device::GetCopyableFootprints(
 	_Out_writes_opt_(NumSubresources)  UINT64 *pRowSizeInBytes,
 	_Out_opt_  UINT64 *pTotalBytes){}
 
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateQueryHeap(
-	_In_  const D3D12_QUERY_HEAP_DESC *pDesc,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvHeap) {
-	if (ppvHeap == NULL)
-		return GetReal()->CreateQueryHeap(pDesc, riid, NULL);
-
-	ID3D12QueryHeap* pvHeap = NULL;
-	HRESULT ret = GetReal()->CreateQueryHeap(pDesc, IID_PPV_ARGS(&pvHeap));
-	if (pvHeap) {
-		WrappedD3D12DeviceChild<ID3D12QueryHeap>* wrapped = new WrappedD3D12DeviceChild<ID3D12QueryHeap>(pvHeap, this);
-		*ppvHeap = wrapped;
-		m_BackRefs[pvHeap] = wrapped;
-		pvHeap->Release();
-	}
-	else {
-		*ppvHeap = NULL;
-	}
-	return ret;
-}
-
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::SetStablePowerState(
 	BOOL Enable){}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
-	_In_  const D3D12_COMMAND_SIGNATURE_DESC *pDesc,
-	_In_opt_  ID3D12RootSignature *pRootSignature,
-	REFIID riid,
-	_COM_Outptr_opt_  void **ppvCommandSignature) {
-	if (ppvCommandSignature == NULL)
-		return GetReal()->CreateCommandSignature(pDesc, pRootSignature, riid, NULL);
-
-	ID3D12CommandSignature* pCommandSignature = NULL;
-	HRESULT ret = GetReal()->CreateCommandSignature(pDesc, pRootSignature,IID_PPV_ARGS(&pCommandSignature));
-	if (pCommandSignature) {
-		WrappedD3D12DeviceChild<ID3D12CommandSignature>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandSignature>(pCommandSignature, this);
-		*ppvCommandSignature = wrapped;
-		m_BackRefs[pCommandSignature] = wrapped;
-		pCommandSignature->Release();
-	}
-	else {
-		*ppvCommandSignature = NULL;
-	}
-	return ret;
-}
 
 void STDMETHODCALLTYPE WrappedD3D12Device::GetResourceTiling(
 	_In_  ID3D12Resource *pTiledResource,
