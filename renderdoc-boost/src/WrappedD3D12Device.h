@@ -5,6 +5,7 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
+class WrappedD3D12DescriptorHeap;
 class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
 public:
 	WrappedD3D12Device(ID3D12Device* pRealDevice, const SDeviceCreateParams& param);
@@ -215,22 +216,9 @@ public: // override ID3D12Device
 
 public: //func
 	bool isRenderDocDevice() { return m_bRenderDocDevice; }
-	bool SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
+	void SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
 	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
-	WrappedD3D12DescriptorHeap* findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-		for (auto it = m_BackRefs_DescriptorHeaps.begin(); it != m_BackRefs_DescriptorHeaps.end(); it++) {
-			if (it->second) {
-				WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
-				auto start = pWrappedHeap->GetCPUDescriptorHandleForHeapStart();
-				auto offset = pWrappedHeap->GetDesc().NumDescriptors;
-				auto interval = GetReal()->GetDescriptorHandleIncrementSize(pWrappedHeap->GetDesc().Type);
-				if (handle.ptr >= start.ptr && handle.ptr < start.ptr + offset * interval) {
-					return pWrappedHeap;
-				}
-			}
-		}
-		return NULL;
-	}
+	WrappedD3D12DescriptorHeap* findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 
 public: // framework
 	virtual void SwitchToDevice(ID3D12Device* pNewDevice);

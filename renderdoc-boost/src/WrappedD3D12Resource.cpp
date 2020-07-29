@@ -9,7 +9,7 @@ WrappedD3D12Resource::WrappedD3D12Resource(
 	WrappedD3D12Heap* pHeap,
 	WrappedD3D12ResourceType type,
 	D3D12_RESOURCE_STATES state ,
-	D3D12_CLEAR_VALUE *pClearValue,
+	const D3D12_CLEAR_VALUE *pClearValue,
 	UINT64 heapOffset)
 	:WrappedD3D12DeviceChild(pReal, pDevice),
 	m_pWrappedHeap(pHeap),
@@ -53,7 +53,7 @@ ID3D12DeviceChild* WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) 
 		break;
 	}
 
-	return NULL;
+	return pvResource;
 }
 void WrappedD3D12Resource::InitSwapChain(IDXGISwapChain1* pRealSwapChain) {
 	m_pRealSwapChain = pRealSwapChain;

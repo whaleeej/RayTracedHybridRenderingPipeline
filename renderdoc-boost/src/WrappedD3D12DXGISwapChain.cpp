@@ -19,7 +19,7 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	DXGI_SWAP_CHAIN_DESC1 swapchainDesc;
 	m_pRealSwapChain->GetDesc1(&swapchainDesc);
 	m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
-	for (int i = 0; i < swapchainDesc.BufferCount; i++) {
+	for (UINT i = 0; i < swapchainDesc.BufferCount; i++) {
 		ID3D12Resource* pvResource ;
 		m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
 
@@ -68,7 +68,7 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 		if (m_SwapChainBuffers.size() != swapchainDesc.BufferCount) {
 			m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
 		}
-		for (int i = 0; i < swapchainDesc.BufferCount; i++) {
+		for (UINT i = 0; i < swapchainDesc.BufferCount; i++) {
 			ID3D12Resource* pvResource = 0;
 			m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
 			Assert(pvResource);

@@ -51,7 +51,7 @@ class Window : public std::enable_shared_from_this<Window>
 {
 public:
     // Number of swapchain back buffers.
-    static const UINT BufferCount = 3;
+    static const UINT BufferCount = 2;
 
     /**
     * Get a handle to this window's instance.

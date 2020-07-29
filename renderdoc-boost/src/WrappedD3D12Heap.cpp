@@ -74,7 +74,7 @@ ID3D12DeviceChild* WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDe
 			break;
 		case ViewDesc_UAV:
 			//TODO: support uav counter
-			pNewDevice->CreateUnorderedAccessView(pvResource,NULL ,&m_slotDesc[i].concreteViewDesc.uav, targetHandle);
+			pNewDevice->CreateUnorderedAccessView(pvResource, m_slotDesc[i].pWrappedD3D12CounterResource->GetReal(),&m_slotDesc[i].concreteViewDesc.uav, targetHandle);
 			break;
 		case ViewDesc_RTV:
 			pNewDevice->CreateRenderTargetView(pvResource, &m_slotDesc[i].concreteViewDesc.rtv, targetHandle);

@@ -31,6 +31,7 @@ public:
 	};
 	struct DescriptorHeapSlotDesc{
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
+		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
 		ViewDescType viewDescType = ViewDesc_Unknown;
 		union ConcreteViewDesc{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv;
@@ -60,12 +61,23 @@ public: // function
 		return handle.ptr >= GetReal()->GetCPUDescriptorHandleForHeapStart().ptr && handle.ptr < (GetReal()->GetCPUDescriptorHandleForHeapStart().ptr + desc.NumDescriptors *perSize);
 	}
 
-	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
+	DescriptorHeapSlotDesc& getDescriptorCreateParamCache(size_t i) {
+		Assert(i >= 0 && i < m_slotDesc.size());
+		return m_slotDesc[i];
+	}
+
+	void cacheDescriptorCreateParamByIndex(DescriptorHeapSlotDesc& slotDesc, size_t index) {
+		Assert(index >= 0 && index < m_slotDesc.size());
+		m_slotDesc[index] = slotDesc;
+	}
+
+	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc& slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
 		auto desc = GetReal()->GetDesc();
 		auto diff = handle.ptr - GetReal()->GetCPUDescriptorHandleForHeapStart().ptr;
 		SIZE_T num = (SIZE_T)(diff / m_pRealDevice->GetDescriptorHandleIncrementSize(desc.Type));
 		Assert(num >= 0 && num < desc.NumDescriptors);
-		m_slotDesc[num] = slotDesc;
+		//m_slotDesc[num] = slotDesc;
+		cacheDescriptorCreateParamByIndex(slotDesc, num);
 	}
 
 public: //framework:

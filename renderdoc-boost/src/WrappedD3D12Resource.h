@@ -22,8 +22,8 @@ public:
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
 		WrappedD3D12Heap* pHeap = NULL,
 		WrappedD3D12ResourceType type = BackBufferWrappedD3D12Resource,
-		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_PRESENT,
-		D3D12_CLEAR_VALUE *pClearValue=NULL,
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
+		const D3D12_CLEAR_VALUE *pClearValue=NULL,
 		UINT64 heapOffset = 0);
 	~WrappedD3D12Resource();
 
