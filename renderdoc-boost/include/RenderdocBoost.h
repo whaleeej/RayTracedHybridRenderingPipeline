@@ -27,6 +27,8 @@ RDCBOOST_NAMESPACE_BEGIN
 
 	void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc);
 	
+	void D3D12CallAtEndOfFrame(ID3D12Device* pDevice);
+
 	// common wrap for renderdoc
 	RENDERDOC_API_1_0_1* GetRenderdocAPI();
 RDCBOOST_NAMESPACE_END

@@ -225,19 +225,40 @@ HRESULT  D3D12CreateDevice(
 	return res;
 }
 
+HRESULT  CreateSwapChainForHwnd(//only support old than dxgifacotry2 and dxgiswapchain1 -> use of CreateSwapChainforHwnd
+	IDXGIFactory2* pDXGIFactory, ID3D12CommandQueue *pCommandQueue, HWND hWnd,
+	const DXGI_SWAP_CHAIN_DESC1 *pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc,
+	IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain)
+{
+	return static_cast<WrappedD3D12CommandQueue*>(pCommandQueue)->createSwapChain(
+		pDXGIFactory, hWnd, pDesc, pFullscreenDesc, pRestrictToOutput, ppSwapChain);
+}
+
+static bool d3d12InRenderdocFlg = false;
+
 void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 	if (bSwitchToRenderdoc && !InitRenderDoc())
 	{
+		d3d12InRenderdocFlg = false;
 		LogError("Can't enable renderdoc because renderdoc is not present.");
 		return;
 	}
+	else if (!bSwitchToRenderdoc) {
+		d3d12InRenderdocFlg = false;
+	}
+	else {
+		d3d12InRenderdocFlg = true;
+	}
+}
+
+void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 
 	WrappedD3D12Device* pWrappedDevice = static_cast<WrappedD3D12Device*>(pDevice);
-	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == bSwitchToRenderdoc))
+	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == d3d12InRenderdocFlg))
 		return;
 
 	tD3D12CreateDevice pfnCreateDevice =
-		bSwitchToRenderdoc ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
+		d3d12InRenderdocFlg ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
 	const SDeviceCreateParams params = pWrappedDevice->GetDeviceCreateParams();
 	if (params.FeatureLevels < 1)
@@ -256,16 +277,8 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 
 	pWrappedDevice->SwitchToDevice(pRealDevice);
 	pRealDevice->Release();
-	pWrappedDevice->SetAsRenderDocDevice(bSwitchToRenderdoc);
-}
+	pWrappedDevice->SetAsRenderDocDevice(d3d12InRenderdocFlg);
 
-HRESULT  CreateSwapChainForHwnd(//only support old than dxgifacotry2 and dxgiswapchain1 -> use of CreateSwapChainforHwnd
-	IDXGIFactory2* pDXGIFactory, ID3D12CommandQueue *pCommandQueue, HWND hWnd, 
-	const DXGI_SWAP_CHAIN_DESC1 *pDesc,const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc, 
-	IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain)
-{
-	return static_cast<WrappedD3D12CommandQueue*>(pCommandQueue)->createSwapChain(
-		pDXGIFactory, hWnd, pDesc, pFullscreenDesc, pRestrictToOutput, ppSwapChain);
 }
 //*************************************d3d12*************************************//
 

@@ -62,14 +62,15 @@ public: //override
 public: //func
 	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
 	void changeToState(D3D12_RESOURCE_STATES state);
+	D3D12_RESOURCE_STATES queryState() { return m_State; }
 
 public://framework
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 	void SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3D12Resource* pNewResource);
 
 protected:
-	WrappedD3D12Heap * m_pWrappedHeap; // reffed;
-	IDXGISwapChain1* m_pRealSwapChain; //not reffed
+	COMPtr<WrappedD3D12Heap> m_pWrappedHeap;
+	IDXGISwapChain1* m_pRealSwapChain;
 
 	WrappedD3D12ResourceType m_Type;
 	D3D12_RESOURCE_STATES m_State;

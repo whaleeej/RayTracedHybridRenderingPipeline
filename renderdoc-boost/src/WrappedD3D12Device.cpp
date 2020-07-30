@@ -6,7 +6,9 @@
 #include "WrappedD3D12CommandQueue.h"
 #include "WrappedD3D12RootSignature.h"
 #include "WrappedD3D12PipelineState.h"
+
 RDCBOOST_NAMESPACE_BEGIN
+
 
 WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDeviceCreateParams& param)
 	: WrappedD3D12Object(pRealDevice)
@@ -34,13 +36,12 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 }
 
 void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
-	//0. create new device(done)
+	//create new device(done)
 	Assert(pNewDevice != NULL);
 
-	//1. copy private data of device
+	//copy private data of device
 	m_PrivateData.CopyPrivateData(pNewDevice);
 
-	//2. backRefs switchToDevice
 	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
 			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
@@ -62,12 +63,110 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 			m_BackRefs.swap(newBackRefs);
 		}
 	};
-	backRefTransferFunc(m_BackRefs_Heaps, "Heaps");
-	backRefTransferFunc(m_BackRefs_Resources, "Resources");
-	backRefTransferFunc(m_BackRefs_DescriptorHeaps, "DescriptorHeaps");
-	backRefTransferFunc(m_BackRefs_Others, "Others");
+	auto backRefResourcesTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
+		if (!m_BackRefs.empty()) {
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
+			printf("--------------------------------------------------\n");
+			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
+			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12DeviceChild>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
+			//因为这个生命周期在switchToDevice框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
+			
+			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
+			/*.Type = */D3D12_COMMAND_LIST_TYPE_COPY,
+			/*.Priority =*/ D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
+			/*.Flags =*/ D3D12_COMMAND_QUEUE_FLAG_NONE,
+			/*.NodeMask =*/ 0 };
+			COMPtr<ID3D12CommandQueue>copyCommandQueue;
+			pNewDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
+			COMPtr<ID3D12CommandAllocator> copyCommandAllocator;
+			pNewDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&copyCommandAllocator));
+			COMPtr<ID3D12GraphicsCommandList> copyCommandList;
+			pNewDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
+			uint64_t copyFenceValue = 0;
+			COMPtr<ID3D12Fence> copyFence;
+			pNewDevice->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
 
-	
+			int progress = 0; int idx = 0;
+			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
+				// 缓存wrapper到旧资源的ptr，使用comptr来保存生命
+				newBackRefsReflection[it->second] = it->first; 
+				
+				//key of the framework
+				it->second->SwitchToDevice(pNewDevice);
+				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject())] = it->second;
+				
+				// sequencing
+				++idx;
+				while (progress < (int)(idx * 50 / m_BackRefs.size()))
+				{
+					printf(">");
+					++progress;
+				}
+
+				//enque commandlist
+				D3D12_RESOURCE_BARRIER srcResourceBarrier;
+				ZeroMemory(&srcResourceBarrier, sizeof(srcResourceBarrier));
+				srcResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+				srcResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+				srcResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->first);
+				srcResourceBarrier.Transition.StateBefore =static_cast<WrappedD3D12Resource*>(it->second)->queryState();//根据框架判断resouce有关的操作已经完成，resource实际的状态已经置为query到的state了
+				srcResourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+				srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+				copyCommandList->ResourceBarrier(1,   &srcResourceBarrier);
+
+				copyCommandList->CopyResource(static_cast<WrappedD3D12Resource*>(it->second)->GetReal(), static_cast<ID3D12Resource*>(it->first));
+
+				D3D12_RESOURCE_BARRIER destResourceBarrier;
+				ZeroMemory(&destResourceBarrier, sizeof(destResourceBarrier));
+				destResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+				destResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+				destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject());
+				destResourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+				destResourceBarrier.Transition.StateAfter = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
+				destResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+				copyCommandList->ResourceBarrier(1, &destResourceBarrier);
+			}
+			std::vector<ID3D12CommandList* > listsToExec(1);
+			listsToExec[0] = copyCommandList.Get();
+			copyCommandQueue->ExecuteCommandLists(1, listsToExec.data());
+			copyCommandQueue->Signal(copyFence.Get(), ++copyFenceValue);
+			if ((copyFence->GetCompletedValue() < copyFenceValue)) //等待copy queue执行完毕
+			{
+				auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+				Assert(event && "Failed to create fence event handle.");
+
+				// Is this function thread safe?
+				copyFence->SetEventOnCompletion(copyFenceValue, event);
+				::WaitForSingleObject(event, DWORD_MAX);
+
+				::CloseHandle(event);
+			}
+
+
+			printf("\n");
+			m_BackRefs.swap(newBackRefs);
+		}
+	};
+	//0 切换RootSignature和依赖于Root Signature的Pipeline State
+	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
+	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
+	//1 切换保存资源的resource heap
+	backRefTransferFunc(m_BackRefs_Heap, "Heaps"); 
+	//2 要确保所有的fence进行Signal的Value都已经Complete了
+	for (auto it = m_BackRefs_Fence.begin(); it != m_BackRefs_Fence.end(); it++) {
+		auto pWrappedFence = static_cast<WrappedD3D12Fence*>(it->second);
+		pWrappedFence->WaitToCompleteApplicationFenceValue();
+	}
+	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了
+	// 可以新建resource并且进行copy ->使用新的device的copy queue
+	backRefResourcesTransferFunc(m_BackRefs_Resource, "Resources");
+	//4 因为资源更新了，所以指向资源的descriptor也要重建
+	backRefTransferFunc(m_BackRefs_DescriptorHeap, "DescriptorHeaps");
+	//5 新建command相关的object，重建但不恢复
+	backRefTransferFunc(m_BackRefs_CommandAllocator, "CommandAllocator");
+	backRefTransferFunc(m_BackRefs_CommandList, "CommandList,");
+	backRefTransferFunc(m_BackRefs_Fence, "Fence");
+	backRefTransferFunc(m_BackRefs_CommandQueue, "CommandQueue");
 
 	//5.pReal substitute
 	ULONG refs = m_pReal->Release();
@@ -78,7 +177,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 }
 
 WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-	for (auto it = m_BackRefs_DescriptorHeaps.begin(); it != m_BackRefs_DescriptorHeaps.end(); it++) {
+	for (auto it = m_BackRefs_DescriptorHeap.begin(); it != m_BackRefs_DescriptorHeap.end(); it++) {
 		if (it->second) {
 			WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
 			auto start = pWrappedHeap->GetCPUDescriptorHandleForHeapStart();
@@ -108,7 +207,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	if (pCommandQueue) {
 		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue, this);
 		*ppCommandQueue = wrapped;
-		m_BackRefs_Others[pCommandQueue] = wrapped;
+		m_BackRefs_CommandQueue[pCommandQueue] = wrapped;
 		pCommandQueue->Release();
 	}
 	else {
@@ -129,7 +228,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 	if (pCommandAllocator) {
 		WrappedD3D12CommandAllocator* wrapped = new WrappedD3D12CommandAllocator(pCommandAllocator, this, type);
 		*ppCommandAllocator = wrapped;
-		m_BackRefs_Others[pCommandAllocator] = wrapped;
+		m_BackRefs_CommandAllocator[pCommandAllocator] = wrapped;
 		pCommandAllocator->Release();
 	}
 	else {
@@ -155,7 +254,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 			tmpDesc, pWrappedRootSignature
 		);
 		*ppPipelineState = wrapped;
-		m_BackRefs_Others[pPipelineState] = wrapped;
+		m_BackRefs_PipelineState[pPipelineState] = wrapped;
 		pPipelineState->Release();
 	}
 	else {
@@ -181,7 +280,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 			tmpDesc, pWrappedRootSignature
 			);
 		*ppPipelineState = wrapped;
-		m_BackRefs_Others[pPipelineState] = wrapped;
+		m_BackRefs_PipelineState[pPipelineState] = wrapped;
 		pPipelineState->Release();
 	}
 	else {
@@ -208,7 +307,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 			static_cast<WrappedD3D12CommandAllocator* >(pCommandAllocator), nodeMask
 		);
 		*ppCommandList = wrapped;
-		m_BackRefs_Others[pCommandList] = wrapped;
+		m_BackRefs_CommandList[pCommandList] = wrapped;
 		pCommandList->Release();
 	}
 	else {
@@ -229,7 +328,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	if (pvHeap) {
 		WrappedD3D12DescriptorHeap* wrapped = new WrappedD3D12DescriptorHeap(pvHeap, this);
 		*ppvHeap = wrapped;
-		m_BackRefs_DescriptorHeaps[pvHeap] = wrapped;
+		m_BackRefs_DescriptorHeap[pvHeap] = wrapped;
 		pvHeap->Release();
 	}
 	else {
@@ -254,7 +353,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 			nodeMask, pBlobWithRootSignature, blobLengthInBytes
 		);
 		*ppvRootSignature = wrapped;
-		m_BackRefs_Others[pvRootSignature] = wrapped;
+		m_BackRefs_RootSignature[pvRootSignature] = wrapped;
 		pvRootSignature->Release();
 	}
 	else {
@@ -285,7 +384,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 			0
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resources[pvResource] = wrapped;
+		m_BackRefs_Resource[pvResource] = wrapped;
 		pvResource->Release();
 	}
 	else {
@@ -306,7 +405,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
 	if (pvHeap) {
 		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap, this);
 		*ppvHeap = wrapped;
-		m_BackRefs_Heaps[pvHeap] = wrapped;
+		m_BackRefs_Heap[pvHeap] = wrapped;
 		pvHeap->Release();
 	}
 	else {
@@ -338,7 +437,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 			HeapOffset
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resources[pvResource] = wrapped;
+		m_BackRefs_Resource[pvResource] = wrapped;
 		pvResource->Release();
 	}
 	else {
@@ -367,7 +466,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 			0
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resources[pvResource] = wrapped;
+		m_BackRefs_Resource[pvResource] = wrapped;
 		pvResource->Release();
 	}
 	else {
@@ -397,7 +496,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
 	if (pFence) {
 		WrappedD3D12Fence* wrapped = new WrappedD3D12Fence(pFence, this, InitialValue, Flags);
 		*ppFence = wrapped;
-		m_BackRefs_Others[pFence] = wrapped;
+		m_BackRefs_Fence[pFence] = wrapped;
 		pFence->Release();
 	}
 	else {
@@ -469,7 +568,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 
 	//TODO: sneaky 通过遍历res的GPU VADDR来找WrappedRes
 	WrappedD3D12Resource* pWrappedD3D12Res = NULL;
-	for (auto it = m_BackRefs_Resources.begin(); it != m_BackRefs_Resources.end(); it++) {
+	for (auto it = m_BackRefs_Resource.begin(); it != m_BackRefs_Resource.end(); it++) {
 		if (it->second) {
 			auto pTmpRes = static_cast<WrappedD3D12Resource*>(it->second);
 			if (pTmpRes->GetGPUVirtualAddress() == pDesc->BufferLocation) {

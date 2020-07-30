@@ -142,7 +142,7 @@ IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueu
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
-HRESULT WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **ppSurface)
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **ppSurface)
 {
 	if (ppSurface == NULL) return E_INVALIDARG;
 
@@ -205,52 +205,52 @@ HRESULT WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **pp
 	return ret;
 }
 
-HRESULT WrappedD3D12DXGISwapChain::SetFullscreenState(BOOL Fullscreen,
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetFullscreenState(BOOL Fullscreen,
 	IDXGIOutput *pTarget)
 {
 	return m_pRealSwapChain->SetFullscreenState(Fullscreen, pTarget);
 }
 
-HRESULT WrappedD3D12DXGISwapChain::GetFullscreenState(BOOL *pFullscreen,
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetFullscreenState(BOOL *pFullscreen,
 	IDXGIOutput **ppTarget)
 {
 	return m_pRealSwapChain->GetFullscreenState(pFullscreen, ppTarget);
 }
 
-HRESULT WrappedD3D12DXGISwapChain::GetContainingOutput(IDXGIOutput **ppOutput)
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetContainingOutput(IDXGIOutput **ppOutput)
 {
 	return m_pRealSwapChain->GetContainingOutput(ppOutput);
 }
 
-HRESULT WrappedD3D12DXGISwapChain::SetPrivateData(
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetPrivateData(
 	REFGUID Name, UINT DataSize, const void *pData)
 {
 	LogError("IDXGISwapChain::SetPrivateData is not supported by now.");
 	return E_FAIL;
 }
 
-HRESULT WrappedD3D12DXGISwapChain::SetPrivateDataInterface(
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetPrivateDataInterface(
 	REFGUID Name, const IUnknown *pUnknown)
 {
 	LogError("IDXGISwapChain::SetPrivateDataInterface is not supported by now.");
 	return E_FAIL;
 }
 
-HRESULT WrappedD3D12DXGISwapChain::GetPrivateData(
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetPrivateData(
 	REFGUID Name, UINT *pDataSize, void *pData)
 {
 	LogError("IDXGISwapChain::GetPrivateData is not supported by now.");
 	return E_FAIL;
 }
 
-HRESULT WrappedD3D12DXGISwapChain::GetDevice(REFIID riid, void **ppDevice)
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetDevice(REFIID riid, void **ppDevice)
 {
 	*ppDevice = NULL;
 	LogError("IDXGISwapChain::GetDevice is not supported by now.");
 	return E_FAIL;
 }
 
-HRESULT WrappedD3D12DXGISwapChain::GetParent(REFIID riid, void **ppParent)
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetParent(REFIID riid, void **ppParent)
 {
 	// 		*ppParent = NULL;
 	// 		LogError("IDXGISwapChain::GetParent is not supported by now.");
@@ -258,7 +258,7 @@ HRESULT WrappedD3D12DXGISwapChain::GetParent(REFIID riid, void **ppParent)
 	return m_pRealSwapChain->GetParent(riid, ppParent);
 }
 
-HRESULT WrappedD3D12DXGISwapChain::QueryInterface(
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::QueryInterface(
 	REFIID riid, _COM_Outptr_ void __RPC_FAR *__RPC_FAR *ppvObject)
 {
 	*ppvObject = NULL;
@@ -272,7 +272,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::Present(UINT SyncInterval, 
 	return m_pRealSwapChain->Present(SyncInterval, Flags);
 }
 
-HRESULT WrappedD3D12DXGISwapChain::ResizeBuffers(UINT BufferCount, UINT Width, UINT Height,
+HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::ResizeBuffers(UINT BufferCount, UINT Width, UINT Height,
 	DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
 	LogError("SwapChain ResizeBuffers not supportted by now");
@@ -292,12 +292,12 @@ HRESULT WrappedD3D12DXGISwapChain::ResizeBuffers(UINT BufferCount, UINT Width, U
 	return res;
 }
 
-ULONG WrappedD3D12DXGISwapChain::AddRef(void)
+ULONG  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::AddRef(void)
 {
 	return InterlockedIncrement(&m_Ref);
 }
 
-ULONG WrappedD3D12DXGISwapChain::Release(void)
+ULONG  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::Release(void)
 {
 	unsigned int ret = InterlockedDecrement(&m_Ref);
 	//TODO: need try to release?
@@ -313,5 +313,74 @@ ULONG WrappedD3D12DXGISwapChain::Release(void)
 
 	return ret;
 }
+
+HRESULT   STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetDesc1(
+	/* [annotation][out] */
+	_Out_  DXGI_SWAP_CHAIN_DESC1 *pDesc) {
+	return m_pRealSwapChain->GetDesc1(pDesc);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetFullscreenDesc(
+	/* [annotation][out] */
+	_Out_  DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pDesc) {
+	return m_pRealSwapChain->GetFullscreenDesc(pDesc);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetHwnd(
+	/* [annotation][out] */
+	_Out_  HWND *pHwnd) {
+	return m_pRealSwapChain->GetHwnd(pHwnd);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetCoreWindow(
+	/* [annotation][in] */
+	_In_  REFIID refiid,
+	/* [annotation][out] */
+	_COM_Outptr_  void **ppUnk) {
+	return m_pRealSwapChain->GetCoreWindow(refiid, ppUnk);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::Present1(
+	/* [in] */ UINT SyncInterval,
+	/* [in] */ UINT PresentFlags,
+	/* [annotation][in] */
+	_In_  const DXGI_PRESENT_PARAMETERS *pPresentParameters) {
+	return m_pRealSwapChain->Present1(SyncInterval,PresentFlags,pPresentParameters);
+}
+
+BOOL STDMETHODCALLTYPE   WrappedD3D12DXGISwapChain::IsTemporaryMonoSupported(void) {
+	return m_pRealSwapChain->IsTemporaryMonoSupported();
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetRestrictToOutput(
+	/* [annotation][out] */
+	_Out_  IDXGIOutput **ppRestrictToOutput) {
+	return m_pRealSwapChain->GetRestrictToOutput(ppRestrictToOutput);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::SetBackgroundColor(
+	/* [annotation][in] */
+	_In_  const DXGI_RGBA *pColor) {
+	return m_pRealSwapChain->SetBackgroundColor(pColor);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetBackgroundColor(
+	/* [annotation][out] */
+	_Out_  DXGI_RGBA *pColor) {
+	return m_pRealSwapChain->GetBackgroundColor(pColor);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::SetRotation(
+	/* [annotation][in] */
+	_In_  DXGI_MODE_ROTATION Rotation) {
+	return m_pRealSwapChain->SetRotation(Rotation);
+}
+
+HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetRotation(
+	/* [annotation][out] */
+	_Out_  DXGI_MODE_ROTATION *pRotation) {
+	return m_pRealSwapChain->GetRotation(pRotation);
+}
+
 
 RDCBOOST_NAMESPACE_END

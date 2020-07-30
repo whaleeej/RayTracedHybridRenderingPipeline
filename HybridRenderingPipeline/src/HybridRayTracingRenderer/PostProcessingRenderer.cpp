@@ -81,6 +81,8 @@ void PostProcessingRenderer::LoadPipeline()
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	des.RasterizerState = rasterizerDesc;
 	CD3DX12_DEPTH_STENCIL_DESC dsDesc(D3D12_DEFAULT);
+	dsDesc.DepthEnable = false;
+	dsDesc.StencilEnable = false;
 	des.DepthStencilState = dsDesc;
 	des.InputLayout = { 0,0 };
 	des.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;

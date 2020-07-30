@@ -15,6 +15,7 @@ WrappedD3D12RootSignature::WrappedD3D12RootSignature(ID3D12RootSignature* pReal,
 	//ZeroMemory(m_PBlobWithRootSignature, m_BlobLengthInBytes);
 	memcpy(m_pBlobWithRootSignature, pBlobWithRootSignature, blobLengthInBytes);
 }
+
 WrappedD3D12RootSignature::~WrappedD3D12RootSignature() {
 	delete m_pBlobWithRootSignature;
 }

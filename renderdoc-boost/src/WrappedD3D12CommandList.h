@@ -13,7 +13,7 @@ public://override
 public://function
 
 public://framewokr
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
 	D3D12_COMMAND_LIST_TYPE m_type;
@@ -31,10 +31,10 @@ public://override
 	virtual D3D12_COMMAND_LIST_TYPE STDMETHODCALLTYPE GetType(void);
 
 public://framework
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 	
 protected:
-	WrappedD3D12CommandAllocator* m_pWrappedCommandAllocator;
+	COMPtr<WrappedD3D12CommandAllocator> m_pWrappedCommandAllocator;
 	UINT m_NodeMask;
 };
 
@@ -297,10 +297,10 @@ public://override
 		_In_  UINT64 CountBufferOffset);
 
 public://framework
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr <ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
-	WrappedD3D12CommandAllocator* m_pWrappedCommandAllocator;
+	COMPtr<WrappedD3D12CommandAllocator> m_pWrappedCommandAllocator;
 	UINT m_NodeMask;
 };
 

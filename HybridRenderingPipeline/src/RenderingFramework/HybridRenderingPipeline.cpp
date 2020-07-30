@@ -160,7 +160,7 @@ void HybridRenderingPipeline::OnKeyPressed(KeyEventArgs& e)
         break;
 #ifdef ENABLE_RENDERDOC
 	case KeyCode::C:
-		rdcboost::D3D12EnableRenderDoc(0, 1);
+		rdcboost::D3D12EnableRenderDoc(Application::Get().GetDevice().Get(), 1);
 		void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
 		RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
 		if (pAPI != NULL)

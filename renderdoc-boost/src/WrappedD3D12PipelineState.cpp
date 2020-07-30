@@ -24,11 +24,6 @@ WrappedD3D12PipelineState::~WrappedD3D12PipelineState() {
 	m_pWrappedRootSignature->Release();
 }
 
-HRESULT STDMETHODCALLTYPE WrappedD3D12PipelineState::GetCachedBlob(
-	_COM_Outptr_  ID3DBlob **ppBlob) {
-	return GetReal()->GetCachedBlob(ppBlob);
-}
-
 ID3D12DeviceChild* WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDevice) {
 	ID3D12PipelineState * pvPipelineState;
 	if (m_typeDesc.type ==PipelineStateType_Graphics) {
@@ -51,6 +46,14 @@ ID3D12DeviceChild* WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDev
 	}
 	
 	return pvPipelineState;
+}
+
+/************************************************************************/
+/* override                                                                                             */
+/************************************************************************/
+HRESULT STDMETHODCALLTYPE WrappedD3D12PipelineState::GetCachedBlob(
+	_COM_Outptr_  ID3DBlob **ppBlob) {
+	return GetReal()->GetCachedBlob(ppBlob);
 }
 
 RDCBOOST_NAMESPACE_END

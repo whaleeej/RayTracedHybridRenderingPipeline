@@ -5,23 +5,23 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-class WrappedD3D12ObjectBase { //interface for m_pReal:ID3D12Object* and switchToDevice
+class WrappedD3D12ObjectBase {
 public:
-	WrappedD3D12ObjectBase(ID3D12Object* pReal) : m_pReal(pReal) { m_pReal->AddRef(); }
-	virtual ~WrappedD3D12ObjectBase() { m_pReal->Release(); }
+	WrappedD3D12ObjectBase(ID3D12Object* pReal) : m_pReal(pReal) {}
+	virtual ~WrappedD3D12ObjectBase() {}
 
 public: //func
-	ID3D12Object* GetRealObject() { return m_pReal; }
+	COMPtr<ID3D12Object> GetRealObject() { return m_pReal; }
 
 public: //framework
 	virtual void SwitchToDevice(ID3D12Device* pNewDevice) = 0;
 
 protected:
-	ID3D12Object* m_pReal; //reffed
+	COMPtr<ID3D12Object> m_pReal;
 };
 
 template<typename NestedType>
-class WrappedD3D12Object : public WrappedD3D12ObjectBase, public NestedType { // account for wrapped layer for object, also the base of all d3d12Class
+class WrappedD3D12Object : public WrappedD3D12ObjectBase, public NestedType {
 public:
 	WrappedD3D12Object(NestedType* pReal) : WrappedD3D12ObjectBase(pReal), m_Ref(1) {};
 
@@ -47,8 +47,6 @@ public: // override for IUnknown
 			return S_OK;
 		}
 		return m_pReal->QueryInterface(riid, ppvObject);
-		//*ppvObject = NULL;
-		//return E_POINTER;
 	}
 
 	virtual ULONG STDMETHODCALLTYPE AddRef(void)
@@ -60,7 +58,7 @@ public: // override for IUnknown
 	{
 		unsigned int ret = InterlockedDecrement(&m_Ref);
 		if (ret == 0)
-			delete this; // also call the destructor of WrappedD3D12ObjectBase, unref m_pReal
+			delete this;
 		return ret;
 	}
 
@@ -107,7 +105,7 @@ public: // override for ID3D12Object
 	}
 
 public: // func
-	NestedType* GetReal() { return static_cast<NestedType*>(m_pReal); }
+	COMPtr<NestedType> GetReal() { return COMPtr<NestedType>(static_cast<NestedType*>(m_pReal.Get())); } //这里先临时控制成返回ComPtr， 后续如果性能有问题就改裸指针
 
 protected:
 	unsigned int m_Ref;

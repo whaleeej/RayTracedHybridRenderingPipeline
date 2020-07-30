@@ -10,22 +10,22 @@ WrappedD3D12Heap::WrappedD3D12Heap(ID3D12Heap* pReal, WrappedD3D12Device* pWrapp
 {
 	
 }
+
 WrappedD3D12Heap::~WrappedD3D12Heap() {
 
 }
 
-ID3D12DeviceChild* WrappedD3D12Heap::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12Heap *pvHeap=0;
-	D3D12_HEAP_DESC heapDesc = GetReal()->GetDesc();
+COMPtr<ID3D12DeviceChild> WrappedD3D12Heap::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12Heap>pvHeap=0;
+	D3D12_HEAP_DESC& heapDesc = GetReal()->GetDesc();
 	pNewDevice->CreateHeap(&heapDesc, IID_PPV_ARGS(&pvHeap));
 	return pvHeap;
 }
 
-
 WrappedD3D12DescriptorHeap::WrappedD3D12DescriptorHeap(ID3D12DescriptorHeap* pReal, WrappedD3D12Device* pWrappedDevice)
 	:WrappedD3D12DeviceChild(pReal, pWrappedDevice)
 {
-	auto desc = GetReal()->GetDesc();
+	auto& desc = GetReal()->GetDesc();
 	m_slotDesc.resize(desc.NumDescriptors);
 }
 
@@ -47,14 +47,13 @@ struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从D
 	}
 };
 
-ID3D12DeviceChild* WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12DescriptorHeap* pvNewDescriptorHeap = 0;
+COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12DescriptorHeap> pvNewDescriptorHeap = 0;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = pvNewDescriptorHeap->GetDesc();
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
-	Assert(pvNewDescriptorHeap);
+	Assert(pvNewDescriptorHeap.Get());
 
 	//TODO: 这里要确认slotRes指向的Res是否已经被delete掉了，这里暂时使用Exception机制
-	// copy decriptors from old to new
 	for (int i = 0; i < m_slotDesc.size(); i++) {
 		auto pWrappedRes = m_slotDesc[i].pWrappedD3D12Resource;
 		if (m_slotDesc[i].viewDescType!= ViewDesc_SamplerV
@@ -66,21 +65,20 @@ ID3D12DeviceChild* WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDe
 
 		switch (m_slotDesc[i].viewDescType) {
 		case ViewDesc_SRV:
-			pNewDevice->CreateShaderResourceView(pvResource, &m_slotDesc[i].concreteViewDesc.srv, targetHandle);
+			pNewDevice->CreateShaderResourceView(pvResource.Get(), &m_slotDesc[i].concreteViewDesc.srv, targetHandle);
 			break;
-		case ViewDesc_CBV: //TODO：这里我怎么知道pResource是什么呢？
+		case ViewDesc_CBV: //这里在cache的时候，通过对比GPUVAddr同时解析出来是哪个resource了
 			m_slotDesc[i].concreteViewDesc.cbv.BufferLocation = pvResource->GetGPUVirtualAddress();
 			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, targetHandle);
 			break;
 		case ViewDesc_UAV:
-			//TODO: support uav counter
-			pNewDevice->CreateUnorderedAccessView(pvResource, m_slotDesc[i].pWrappedD3D12CounterResource->GetReal(),&m_slotDesc[i].concreteViewDesc.uav, targetHandle);
+			pNewDevice->CreateUnorderedAccessView(pvResource.Get(), m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get(),&m_slotDesc[i].concreteViewDesc.uav, targetHandle);
 			break;
 		case ViewDesc_RTV:
-			pNewDevice->CreateRenderTargetView(pvResource, &m_slotDesc[i].concreteViewDesc.rtv, targetHandle);
+			pNewDevice->CreateRenderTargetView(pvResource.Get(), &m_slotDesc[i].concreteViewDesc.rtv, targetHandle);
 			break;
 		case ViewDesc_DSV:
-			pNewDevice->CreateDepthStencilView(pvResource, &m_slotDesc[i].concreteViewDesc.dsv, targetHandle);
+			pNewDevice->CreateDepthStencilView(pvResource.Get(), &m_slotDesc[i].concreteViewDesc.dsv, targetHandle);
 			break;
 		case ViewDesc_SamplerV:
 			pNewDevice->CreateSampler(&m_slotDesc[i].concreteViewDesc.sampler, targetHandle);
@@ -90,12 +88,6 @@ ID3D12DeviceChild* WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDe
 			break;
 		}
 	}
-	//pNewDevice->CopyDescriptorsSimple(
-	//	descHeapDesc.NumDescriptors,
-	//	pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-	//	GetReal()->GetCPUDescriptorHandleForHeapStart(),
-	//	descHeapDesc.Type
-	//);
 
 	return pvNewDescriptorHeap;
 

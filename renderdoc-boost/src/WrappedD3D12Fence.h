@@ -20,14 +20,16 @@ public://override
 
 public://function
 	void WaitToCompleteApplicationFenceValue() {
-		auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-		Assert(event && "Failed to create fence event handle.");
+		if (GetCompletedValue() < m_AppFenceValue) {
+			auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+			Assert(event && "Failed to create fence event handle.");
 
-		// Is this function thread safe?
-		this->SetEventOnCompletion(m_AppFenceValue, event);
-		::WaitForSingleObject(event, 0xffffffffUL);
+			// Is this function thread safe?
+			this->SetEventOnCompletion(m_AppFenceValue, event);
+			::WaitForSingleObject(event, DWORD_MAX);
 
-		::CloseHandle(event);
+			::CloseHandle(event);
+		}
 	}
 
 public://framewokr

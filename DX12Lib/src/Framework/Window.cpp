@@ -9,6 +9,9 @@
 #include <RenderTarget.h>
 #include <ResourceStateTracker.h>
 #include <Texture.h>
+#include "RenderdocBoost.h"
+
+#define ENABLE_RENDERDOC 1
 
 Window::Window(HWND hWnd, const std::wstring& windowName, int clientWidth, int clientHeight, bool vSync )
     : m_hWnd(hWnd)
@@ -403,6 +406,10 @@ UINT Window::Present( const Texture& texture )
     commandQueue->WaitForFenceValue( m_FenceValues[m_CurrentBackBufferIndex] );
 
     Application::Get().ReleaseStaleDescriptors( m_FrameValues[m_CurrentBackBufferIndex] );
+
+#ifdef ENABLE_RENDERDOC
+	rdcboost::D3D12CallAtEndOfFrame(Application::Get().GetDevice().Get());
+#endif
 
     return m_CurrentBackBufferIndex;
 }

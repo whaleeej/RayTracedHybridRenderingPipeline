@@ -13,7 +13,7 @@ public: //override
 	virtual D3D12_HEAP_DESC STDMETHODCALLTYPE GetDesc(void);
 
 public: //framework:
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 };
 
 class WrappedD3D12Resource;
@@ -56,7 +56,7 @@ public: //override
 
 public: // function
 	bool handleInDescriptorHeapRange(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-		auto desc = GetReal()->GetDesc();
+		auto& desc = GetReal()->GetDesc();
 		UINT perSize = m_pRealDevice->GetDescriptorHandleIncrementSize(desc.Type);
 		return handle.ptr >= GetReal()->GetCPUDescriptorHandleForHeapStart().ptr && handle.ptr < (GetReal()->GetCPUDescriptorHandleForHeapStart().ptr + desc.NumDescriptors *perSize);
 	}
@@ -72,7 +72,7 @@ public: // function
 	}
 
 	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc& slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-		auto desc = GetReal()->GetDesc();
+		auto& desc = GetReal()->GetDesc();
 		auto diff = handle.ptr - GetReal()->GetCPUDescriptorHandleForHeapStart().ptr;
 		SIZE_T num = (SIZE_T)(diff / m_pRealDevice->GetDescriptorHandleIncrementSize(desc.Type));
 		Assert(num >= 0 && num < desc.NumDescriptors);
@@ -81,7 +81,7 @@ public: // function
 	}
 
 public: //framework:
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
 	std::vector<DescriptorHeapSlotDesc> m_slotDesc;

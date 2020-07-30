@@ -28,7 +28,7 @@ public:
     std::shared_ptr<Window>									GetWindowByName(const std::wstring& windowName);
     int																		Run(std::shared_ptr<Game> pGame);
     void																		Quit(int exitCode = 0);
-    Microsoft::WRL::ComPtr<ID3D12Device1>		GetDevice() const;
+    Microsoft::WRL::ComPtr<ID3D12Device>		GetDevice() const;
     std::shared_ptr<CommandQueue>					GetCommandQueue(D3D12_COMMAND_LIST_TYPE type = D3D12_COMMAND_LIST_TYPE_DIRECT) const;
     void																		Flush();
     DescriptorAllocation											AllocateDescriptors(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors = 1);
@@ -42,7 +42,7 @@ protected:
     virtual ~Application();
     void																		Initialize();
     Microsoft::WRL::ComPtr<IDXGIAdapter4>			GetAdapter(bool bUseWarp);
-    Microsoft::WRL::ComPtr<ID3D12Device1>		CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
+    Microsoft::WRL::ComPtr<ID3D12Device>		CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
     bool																		CheckTearingSupport();
 	
 
@@ -54,7 +54,7 @@ private:
 private:
     HINSTANCE m_hInstance;
 
-    Microsoft::WRL::ComPtr<ID3D12Device1> m_d3d12Device;
+    Microsoft::WRL::ComPtr<ID3D12Device> m_d3d12Device;
 
     std::shared_ptr<CommandQueue> m_DirectCommandQueue;
     std::shared_ptr<CommandQueue> m_ComputeCommandQueue;

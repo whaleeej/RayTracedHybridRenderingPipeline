@@ -71,10 +71,10 @@ public: //framework
 		IDXGIFactory2* pDXGIFactory, HWND hWnd, 
 		const DXGI_SWAP_CHAIN_DESC1 *pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc, 
 		IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain);
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
-	WrappedD3D12DXGISwapChain* m_pWrappedSwapChain;//TODO: support more swapchain? //reffed
+	COMPtr<WrappedD3D12DXGISwapChain> m_pWrappedSwapChain;
 };
 
 RDCBOOST_NAMESPACE_END

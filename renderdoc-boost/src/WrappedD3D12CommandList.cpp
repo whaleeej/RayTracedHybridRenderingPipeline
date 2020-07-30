@@ -8,11 +8,12 @@ WrappedD3D12CommandAllocator::WrappedD3D12CommandAllocator(ID3D12CommandAllocato
 {
 
 }
+
 WrappedD3D12CommandAllocator::~WrappedD3D12CommandAllocator() {
 
 }
 
-ID3D12DeviceChild* WrappedD3D12CommandAllocator::CopyToDevice(ID3D12Device* pNewDevice) {
+COMPtr<ID3D12DeviceChild> WrappedD3D12CommandAllocator::CopyToDevice(ID3D12Device* pNewDevice) {
 	//¶ªÆú²»¿½±´
 	ID3D12CommandAllocator* pvNewCommandAllocator;
 	HRESULT ret = pNewDevice->CreateCommandAllocator(m_type, IID_PPV_ARGS(&pvNewCommandAllocator));

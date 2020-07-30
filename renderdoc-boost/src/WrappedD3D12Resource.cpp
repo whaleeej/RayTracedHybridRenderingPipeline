@@ -8,7 +8,7 @@ WrappedD3D12Resource::WrappedD3D12Resource(
 	ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
 	WrappedD3D12Heap* pHeap,
 	WrappedD3D12ResourceType type,
-	D3D12_RESOURCE_STATES state ,
+	D3D12_RESOURCE_STATES state,
 	const D3D12_CLEAR_VALUE *pClearValue,
 	UINT64 heapOffset)
 	:WrappedD3D12DeviceChild(pReal, pDevice),
@@ -26,27 +26,28 @@ WrappedD3D12Resource::~WrappedD3D12Resource() {
 }
 
 
-ID3D12DeviceChild* WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
+COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
 	D3D12_RESOURCE_DESC resDesc = GetReal()->GetDesc();
-	ID3D12Resource* pvResource;
+	COMPtr<ID3D12Resource> pvResource;
 	switch (m_Type)
 	{
-	//TODO Copy to new device
+	//创建D3D12_RESOURCE_STATE_COPY_DEST状态的资源，方便在device的switch中拷贝
 	case CommittedWrappedD3D12Resource:
 		D3D12_HEAP_PROPERTIES heapProperties;
 		D3D12_HEAP_FLAGS heapFlags;
 		GetReal()->GetHeapProperties(&heapProperties, &heapFlags);
 		pNewDevice->CreateCommittedResource(
-			&heapProperties, heapFlags, &resDesc, m_State, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			&heapProperties, heapFlags, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case PlacedWrappedD3D12Resource:
-		Assert(m_pWrappedHeap&&m_pWrappedHeap->GetReal());
+		Assert(m_pWrappedHeap.Get()&&m_pWrappedHeap->GetReal().Get());
 		pNewDevice->CreatePlacedResource(
-			m_pWrappedHeap->GetReal(), m_heapOffset, &resDesc, m_State, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			m_pWrappedHeap->GetReal().Get(), m_heapOffset, &resDesc, 
+			D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case ReservedWrappedD3D12Resource:
 		pNewDevice->CreateReservedResource(
-			&resDesc, m_State, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			&resDesc, D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case BackBufferWrappedD3D12Resource:
 		//do nothing
@@ -63,11 +64,9 @@ void WrappedD3D12Resource::SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3
 	if (pNewSwapChain == m_pRealSwapChain)
 		return;
 	Assert(pNewResource != NULL);
-	//TODO: copy content in the swapchain buffer //no need by now
+	//TODO: copy content in the swapchain buffers
 	m_PrivateData.CopyPrivateData(pNewResource);
-	m_pReal->Release();
 	m_pReal = pNewResource;
-	m_pReal->AddRef();
 	m_pRealSwapChain = pNewSwapChain;
 }
 

@@ -6,6 +6,7 @@
 RDCBOOST_NAMESPACE_BEGIN
 
 class WrappedD3D12DescriptorHeap;
+
 class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
 public:
 	WrappedD3D12Device(ID3D12Device* pRealDevice, const SDeviceCreateParams& param);
@@ -225,10 +226,19 @@ public: // framework
 	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
 
 private:
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heaps;//reffed
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resources;//reffed
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeaps;//reffed
-	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Others;//reffed
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_RootSignature;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_PipelineState;
+
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heap;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resource;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeap;
+
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandAllocator;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandList;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Fence;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandQueue;
+
+	//std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Others;
 
 	SDeviceCreateParams m_DeviceCreateParams;
 	bool m_bRenderDocDevice;

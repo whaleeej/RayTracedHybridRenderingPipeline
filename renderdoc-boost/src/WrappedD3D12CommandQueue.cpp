@@ -1,6 +1,9 @@
 #include "WrappedD3D12CommandQueue.h"
 #include "WrappedD3D12DXGISwapChain.h"
-
+#include "WrappedD3D12Resource.h"
+#include "WrappedD3D12Heap.h"
+#include "WrappedD3D12CommandList.h"
+#include "WrappedD3D12Fence.h"
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12CommandQueue::WrappedD3D12CommandQueue(ID3D12CommandQueue* pRealD3D12CommandQueue, WrappedD3D12Device* pDevice) :
@@ -12,8 +15,6 @@ WrappedD3D12CommandQueue::WrappedD3D12CommandQueue(ID3D12CommandQueue* pRealD3D1
 
 WrappedD3D12CommandQueue::~WrappedD3D12CommandQueue()
 {
-	if(m_pWrappedSwapChain)
-		m_pWrappedSwapChain->Release();
 }
 
 HRESULT  WrappedD3D12CommandQueue::createSwapChain(
@@ -21,31 +22,30 @@ HRESULT  WrappedD3D12CommandQueue::createSwapChain(
 	const DXGI_SWAP_CHAIN_DESC1 *pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc, 
 	IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain)
 {
-	IDXGISwapChain1* swapChain1;
+	COMPtr<IDXGISwapChain1> swapChain1;
 	HRESULT ret = pDXGIFactory->CreateSwapChainForHwnd(
-		GetReal(), hWnd,
+		GetReal().Get(), hWnd,
 		pDesc, pFullscreenDesc,
-		pRestrictToOutput, &swapChain1);
+		pRestrictToOutput, &swapChain1);//创建之后swapchain1的ref是1
 	if (FAILED(ret)) {
 		LogError("Initialzation: create swapchain1 failed");
 	}
-	Assert(swapChain1);
-	m_pWrappedSwapChain = new WrappedD3D12DXGISwapChain(swapChain1, this);
+	Assert(swapChain1.Get());
+	m_pWrappedSwapChain = new WrappedD3D12DXGISwapChain(swapChain1.Get(), this);
 	return ret;
 }
 
-ID3D12DeviceChild* WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12CommandQueue* pNewCommandQueue = NULL;
+COMPtr<ID3D12DeviceChild> WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12CommandQueue> pNewCommandQueue = NULL;
 	D3D12_COMMAND_QUEUE_DESC newDesc = GetDesc();
 	HRESULT ret = pNewDevice->CreateCommandQueue(&newDesc, IID_PPV_ARGS(&pNewCommandQueue));
-	//TODO: recover other stuff
 	if (FAILED(ret)) {
 		LogError("create new commandqueue failed");
 		return NULL;
 	}
 	// switch swapchain
-	Assert(pNewCommandQueue);
-	m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue);
+	Assert(pNewCommandQueue.Get());
+	m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue.Get());
 	return pNewCommandQueue;
 }
 
@@ -64,8 +64,10 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::UpdateTileMappings(
 	_In_reads_opt_(NumRanges)  const UINT *pHeapRangeStartOffsets,
 	_In_reads_opt_(NumRanges)  const UINT *pRangeTileCounts,
 	D3D12_TILE_MAPPING_FLAGS Flags) {
-	GetReal()->UpdateTileMappings(pResource, NumResourceRegions, pResourceRegionStartCoordinates, 
-		pResourceRegionSizes, pHeap, NumRanges, pRangeFlags, pHeapRangeStartOffsets, pRangeTileCounts, Flags);
+	GetReal()->UpdateTileMappings(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get() 
+		, NumResourceRegions, pResourceRegionStartCoordinates,pResourceRegionSizes, 
+		static_cast<WrappedD3D12Heap*>(pHeap)->GetReal().Get(),
+		NumRanges, pRangeFlags, pHeapRangeStartOffsets, pRangeTileCounts, Flags);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12CommandQueue::CopyTileMappings(
@@ -75,14 +77,21 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::CopyTileMappings(
 	_In_  const D3D12_TILED_RESOURCE_COORDINATE *pSrcRegionStartCoordinate,
 	_In_  const D3D12_TILE_REGION_SIZE *pRegionSize,
 	D3D12_TILE_MAPPING_FLAGS Flags) {
-	GetReal()->CopyTileMappings(pDstResource, pDstRegionStartCoordinate, pSrcResource, pSrcRegionStartCoordinate, pRegionSize, Flags);
+	GetReal()->CopyTileMappings(static_cast<WrappedD3D12Resource*>(pDstResource)->GetReal().Get(), pDstRegionStartCoordinate,
+		static_cast<WrappedD3D12Resource *>(pSrcResource)->GetReal().Get(), pSrcRegionStartCoordinate,
+		pRegionSize, Flags);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12CommandQueue::ExecuteCommandLists(
 	_In_  UINT NumCommandLists,
 	_In_reads_(NumCommandLists)  ID3D12CommandList *const *ppCommandLists) {
 	//TODO: storage commandlists for recover
-	GetReal()->ExecuteCommandLists(NumCommandLists, ppCommandLists);
+	std::vector<ID3D12CommandList*> listArray(NumCommandLists);
+	for (UINT i=0; i<NumCommandLists; i++)
+	{
+		listArray[i] = static_cast<WrappedD3D12CommandList *>(ppCommandLists[i])->GetReal().Get();
+	}
+	GetReal()->ExecuteCommandLists(NumCommandLists, listArray.data());
 }
 
 void STDMETHODCALLTYPE WrappedD3D12CommandQueue::SetMarker(
@@ -106,13 +115,13 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::EndEvent(void) {
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::Signal(
 	ID3D12Fence *pFence,
 	UINT64 Value) {
-	return GetReal()->Signal(pFence, Value);
+	return GetReal()->Signal(static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), Value);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::Wait(
 	ID3D12Fence *pFence,
 	UINT64 Value) {
-	return GetReal()->Wait(pFence, Value);
+	return GetReal()->Wait(static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), Value);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::GetTimestampFrequency(
