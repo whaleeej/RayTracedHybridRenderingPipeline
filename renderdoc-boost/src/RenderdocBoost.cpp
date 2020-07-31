@@ -211,7 +211,7 @@ HRESULT  D3D12CreateDevice(
 	}
 
 	if (pWrappedDevice&&ppDevice) {
-		*ppDevice = pWrappedDevice;
+		*ppDevice = static_cast<ID3D12Device*>(pWrappedDevice);
 	}
 	else if (pWrappedDevice) {
 		pWrappedDevice->Release();

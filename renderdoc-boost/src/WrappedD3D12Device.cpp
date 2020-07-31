@@ -205,7 +205,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	HRESULT ret = GetReal()->CreateCommandQueue(pDesc, IID_PPV_ARGS(&pCommandQueue));
 	if (!FAILED(ret)) {
 		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue.Get(), this);
-		*ppCommandQueue = wrapped;
+		*ppCommandQueue = static_cast<ID3D12CommandQueue*>(wrapped);
 		m_BackRefs_CommandQueue[pCommandQueue.Get()] = wrapped;
 	}
 	else {
@@ -225,7 +225,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 	HRESULT ret = GetReal()->CreateCommandAllocator(type, IID_PPV_ARGS(&pCommandAllocator));
 	if (!FAILED(ret)) {
 		WrappedD3D12CommandAllocator* wrapped = new WrappedD3D12CommandAllocator(pCommandAllocator.Get(), this, type);
-		*ppCommandAllocator = wrapped;
+		*ppCommandAllocator = static_cast<ID3D12CommandAllocator *>(wrapped);
 		m_BackRefs_CommandAllocator[pCommandAllocator.Get()] = wrapped;
 	}
 	else {
@@ -250,7 +250,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
 		);
-		*ppPipelineState = wrapped;
+		*ppPipelineState = static_cast<ID3D12PipelineState *>(wrapped);
 		m_BackRefs_PipelineState[pPipelineState.Get()] = wrapped;
 	}
 	else {
@@ -276,7 +276,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 			pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
 			);
-		*ppPipelineState = wrapped;
+		*ppPipelineState = static_cast<ID3D12PipelineState *>(wrapped);
 		m_BackRefs_PipelineState[pPipelineState.Get()] = wrapped;
 	}
 	else {
@@ -292,26 +292,50 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 	_In_opt_  ID3D12PipelineState *pInitialState,
 	REFIID riid,
 	_COM_Outptr_  void **ppCommandList){
+	Assert(riid == __uuidof(ID3D12CommandList) || riid == __uuidof(ID3D12GraphicsCommandList));
+
 	if (ppCommandList == NULL)
 		return GetReal()->CreateCommandList(nodeMask, type, pCommandAllocator, pInitialState, riid, NULL);
 
-	COMPtr < ID3D12CommandList> pCommandList = NULL;
-	HRESULT ret = GetReal()->CreateCommandList(nodeMask, type, 
-		static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
-		static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
-		IID_PPV_ARGS(&pCommandList));
-	if (!FAILED(ret)) {
-		WrappedD3D12CommandList* wrapped = new WrappedD3D12CommandList(//默认这里的Allocator是Wrapped的
-			pCommandList.Get(), this,
-			static_cast<WrappedD3D12CommandAllocator* >(pCommandAllocator), nodeMask
-		);
-		*ppCommandList = wrapped;
-		m_BackRefs_CommandList[pCommandList.Get()] = wrapped;
+	if (riid == __uuidof(ID3D12CommandList)) {
+		COMPtr < ID3D12CommandList> pCommandList = NULL;
+		HRESULT ret = GetReal()->CreateCommandList(nodeMask, type, 
+			static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
+			static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
+			IID_PPV_ARGS(&pCommandList));
+		if (!FAILED(ret)) {
+			WrappedD3D12CommandList* wrapped = new WrappedD3D12CommandList(//默认这里的Allocator是Wrapped的
+				pCommandList.Get(), this,
+				static_cast<WrappedD3D12CommandAllocator* >(pCommandAllocator), nodeMask
+			);
+			*ppCommandList = static_cast<ID3D12CommandList*>(wrapped);
+			m_BackRefs_CommandList[pCommandList.Get()] = wrapped;
+		}
+		else {
+			*ppCommandList = NULL;
+		}
+		return ret;
 	}
 	else {
-		*ppCommandList = NULL;
+		COMPtr < ID3D12GraphicsCommandList> pCommandList = NULL;
+		HRESULT ret = GetReal()->CreateCommandList(nodeMask, type,
+			static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
+			static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
+			IID_PPV_ARGS(&pCommandList));
+		if (!FAILED(ret)) {
+			WrappedD3D12GraphicsCommansList* wrapped = new WrappedD3D12GraphicsCommansList(//默认这里的Allocator是Wrapped的
+				pCommandList.Get(), this,
+				static_cast<WrappedD3D12CommandAllocator*>(pCommandAllocator), nodeMask
+			);
+			*ppCommandList = static_cast<ID3D12GraphicsCommandList*>(wrapped);
+			m_BackRefs_CommandList[pCommandList.Get()] = wrapped;
+		}
+		else {
+			*ppCommandList = NULL;
+		}
+		return ret;
 	}
-	return ret;
+	
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
@@ -325,7 +349,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	HRESULT ret = GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, IID_PPV_ARGS(&pvHeap));
 	if (!FAILED(ret)) {
 		WrappedD3D12DescriptorHeap* wrapped = new WrappedD3D12DescriptorHeap(pvHeap.Get(), this);
-		*ppvHeap = wrapped;
+		*ppvHeap = static_cast<ID3D12DescriptorHeap*>(wrapped);
 		m_BackRefs_DescriptorHeap[pvHeap.Get()] = wrapped;
 	}
 	else {
@@ -350,7 +374,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 			pvRootSignature.Get(), this,
 			nodeMask, pBlobWithRootSignature, blobLengthInBytes
 		);
-		*ppvRootSignature = wrapped;
+		*ppvRootSignature = static_cast<ID3D12RootSignature*>(wrapped);
 		m_BackRefs_RootSignature[pvRootSignature.Get()] = wrapped;
 	}
 	else {
@@ -380,7 +404,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 			pOptimizedClearValue,
 			0
 		);
-		*ppvResource = wrapped;
+		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
@@ -400,7 +424,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
 	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
 	if (!FAILED(ret)) {
 		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap.Get(), this);
-		*ppvHeap = wrapped;
+		*ppvHeap = static_cast<ID3D12Heap*>(wrapped);
 		m_BackRefs_Heap[pvHeap.Get()] = wrapped;
 	}
 	else {
@@ -432,7 +456,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 			pOptimizedClearValue,
 			HeapOffset
 		);
-		*ppvResource = wrapped;
+		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
@@ -460,7 +484,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 			pOptimizedClearValue,
 			0
 		);
-		*ppvResource = wrapped;
+		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
@@ -489,7 +513,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
 	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
 	if (!FAILED(ret)) {
 		WrappedD3D12Fence* wrapped = new WrappedD3D12Fence(pFence.Get(), this, InitialValue, Flags);
-		*ppFence = wrapped;
+		*ppFence = static_cast<ID3D12Fence*>(wrapped);
 		m_BackRefs_Fence[pFence.Get()] = wrapped;
 	}
 	else {
