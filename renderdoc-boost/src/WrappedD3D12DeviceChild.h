@@ -31,7 +31,7 @@ public: //function
 	COMPtr<WrappedD3D12Device> GetWrappedDevice() { return m_pWrappedDevice; }
 
 public: //framework
-	virtual void SwitchToDevice(ID3D12Device* pNewDevice)
+	virtual void SwitchToDeviceRdc(ID3D12Device* pNewDevice)
 	{
 		if (m_pRealDevice == pNewDevice)
 			return;

@@ -14,7 +14,7 @@ public: //func
 	COMPtr<ID3D12Object> GetRealObject() { return m_pReal; }
 
 public: //framework
-	virtual void SwitchToDevice(ID3D12Device* pNewDevice) = 0;
+	virtual void SwitchToDeviceRdc(ID3D12Device* pNewDevice) = 0;
 
 protected:
 	COMPtr<ID3D12Object> m_pReal;
@@ -56,7 +56,7 @@ public: // override for IUnknown
 
 	virtual ULONG STDMETHODCALLTYPE Release(void)
 	{
-		unsigned int ret = InterlockedDecrement(&m_Ref);
+		LONG ret = InterlockedDecrement(&m_Ref);
 		if (ret == 0)
 			delete this;
 		return ret;
@@ -108,7 +108,7 @@ public: // func
 	COMPtr<NestedType> GetReal() { return COMPtr<NestedType>(static_cast<NestedType*>(m_pReal.Get())); } //这里先临时控制成返回ComPtr， 后续如果性能有问题就改裸指针
 
 protected:
-	unsigned int m_Ref;
+	LONG m_Ref;
 	std::wstring m_ObjectName;
 	PrivateDataMap m_PrivateData;
 };

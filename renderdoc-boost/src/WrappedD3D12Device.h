@@ -222,7 +222,7 @@ public: //func
 	WrappedD3D12DescriptorHeap* findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 
 public: // framework
-	virtual void SwitchToDevice(ID3D12Device* pNewDevice);
+	virtual void SwitchToDeviceRdc(ID3D12Device* pNewDevice);
 	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
 
 private:

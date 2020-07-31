@@ -37,7 +37,7 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	return;
 }
 
-void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
+void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//create new device(done)
 	Assert(pNewDevice != NULL);
 
@@ -51,7 +51,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs;
 			int progress=0; int idx=0;
 			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
-				it->second->SwitchToDevice(pNewDevice);//key of the framework
+				it->second->SwitchToDeviceRdc(pNewDevice);//key of the framework
 				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
 				// sequencing
 				++idx;
@@ -71,7 +71,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
 			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12DeviceChild>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
-			//因为这个生命周期在switchToDevice框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
+			//因为这个生命周期在switchToDevice1框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
 			
 			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
 			/*.Type = */D3D12_COMMAND_LIST_TYPE_COPY,
@@ -94,7 +94,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 				newBackRefsReflection[it->second] = it->first; 
 				
 				//key of the framework
-				it->second->SwitchToDevice(pNewDevice);
+				it->second->SwitchToDeviceRdc(pNewDevice);
 				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
 				
 				// sequencing

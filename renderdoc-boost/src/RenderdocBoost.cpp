@@ -273,7 +273,7 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 	}
 
 	pWrappedDevice->SetAsRenderDocDevice(d3d12InRenderdocFlg);
-	pWrappedDevice->SwitchToDevice(pRealDevice.Get());
+	pWrappedDevice->SwitchToDeviceRdc(pRealDevice.Get());
 }
 //*************************************d3d12*************************************//
 
