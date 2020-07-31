@@ -57,7 +57,7 @@ public: //override
 public: // function
 	bool handleInDescriptorHeapRange(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
 		auto& desc = GetReal()->GetDesc();
-		UINT perSize = m_pRealDevice->GetDescriptorHandleIncrementSize(desc.Type);
+		UINT perSize = m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type);
 		return handle.ptr >= GetReal()->GetCPUDescriptorHandleForHeapStart().ptr && handle.ptr < (GetReal()->GetCPUDescriptorHandleForHeapStart().ptr + desc.NumDescriptors *perSize);
 	}
 
@@ -74,7 +74,7 @@ public: // function
 	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc& slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
 		auto& desc = GetReal()->GetDesc();
 		auto diff = handle.ptr - GetReal()->GetCPUDescriptorHandleForHeapStart().ptr;
-		SIZE_T num = (SIZE_T)(diff / m_pRealDevice->GetDescriptorHandleIncrementSize(desc.Type));
+		SIZE_T num = (SIZE_T)(diff / m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type));
 		Assert(num >= 0 && num < desc.NumDescriptors);
 		//m_slotDesc[num] = slotDesc;
 		cacheDescriptorCreateParamByIndex(slotDesc, num);
