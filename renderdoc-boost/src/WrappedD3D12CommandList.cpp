@@ -270,6 +270,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 		D3D12_RESOURCE_BARRIER& _Barriers = barriers[i];
 		switch (_Barriers.Type) {
 		case D3D12_RESOURCE_BARRIER_TYPE_TRANSITION:
+			static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
 			_Barriers.Transition.pResource = static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get();
 			break;
 		case D3D12_RESOURCE_BARRIER_TYPE_ALIASING:

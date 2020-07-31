@@ -33,6 +33,7 @@ public:
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
 		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
 		ViewDescType viewDescType = ViewDesc_Unknown;
+		bool isViewDescNull = false;
 		union ConcreteViewDesc{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv;
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv;

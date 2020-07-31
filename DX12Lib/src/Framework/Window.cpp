@@ -330,6 +330,16 @@ Microsoft::WRL::ComPtr<IDXGISwapChain4> Window::CreateSwapChain()
     ID3D12CommandQueue* pCommandQueue = app.GetCommandQueue()->GetD3D12CommandQueue().Get();
 
     ComPtr<IDXGISwapChain1> swapChain1;
+#ifdef ENABLE_RENDERDOC
+	ThrowIfFailed(rdcboost::CreateSwapChainForHwnd(
+		dxgiFactory4.Get(),
+		pCommandQueue,
+		m_hWnd,
+		&swapChainDesc,
+		nullptr,
+		nullptr,
+		&swapChain1));
+#elif
     ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd(
         pCommandQueue,
         m_hWnd,
@@ -337,7 +347,7 @@ Microsoft::WRL::ComPtr<IDXGISwapChain4> Window::CreateSwapChain()
         nullptr,
         nullptr,
         &swapChain1));
-
+#endif
     // Disable the Alt+Enter fullscreen toggle feature. Switching to fullscreen
     // will be handled manually.
     ThrowIfFailed(dxgiFactory4->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER));

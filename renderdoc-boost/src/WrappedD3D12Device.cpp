@@ -590,7 +590,10 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SRV;
 	slotDesc.pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);//TODO: try dynamic cast
-	slotDesc.concreteViewDesc.srv = *pDesc;
+	if (pDesc)
+		slotDesc.concreteViewDesc.srv = *pDesc;
+	else
+		slotDesc.isViewDescNull = true;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
 	GetReal()->CreateShaderResourceView(static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
@@ -611,12 +614,15 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_UAV;
 	slotDesc.pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);//TODO: try dynamic cast
 	slotDesc.pWrappedD3D12CounterResource = static_cast<WrappedD3D12Resource*>(pCounterResource);
-	slotDesc.concreteViewDesc.uav = *pDesc;
+	if (pDesc)
+		slotDesc.concreteViewDesc.uav = *pDesc;
+	else
+		slotDesc.isViewDescNull = true;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
 	GetReal()->CreateUnorderedAccessView(
 		static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), 
-		static_cast<WrappedD3D12Resource*>(pCounterResource)->GetReal().Get(),
+		pCounterResource?static_cast<WrappedD3D12Resource*>(pCounterResource)->GetReal().Get():pCounterResource,
 		pDesc, DestDescriptor);
 }
 
@@ -633,7 +639,10 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_RTV;
 	slotDesc.pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);//TODO: try dynamic cast
-	slotDesc.concreteViewDesc.rtv = *pDesc;
+	if (pDesc)
+		slotDesc.concreteViewDesc.rtv = *pDesc;
+	else
+		slotDesc.isViewDescNull = true;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
 	GetReal()->CreateRenderTargetView(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
@@ -651,8 +660,11 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_DSV;
-	slotDesc.pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);//TODO: try dynamic cast
-	slotDesc.concreteViewDesc.dsv = *pDesc;
+	slotDesc.pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
+	if (pDesc)
+		slotDesc.concreteViewDesc.dsv = *pDesc;
+	else
+		slotDesc.isViewDescNull = true;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
 	GetReal()->CreateDepthStencilView(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
