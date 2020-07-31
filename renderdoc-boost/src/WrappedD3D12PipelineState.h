@@ -43,11 +43,11 @@ public://override
 public://function
 
 public://framewokr
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
 	PipelineStateTypeDesc m_typeDesc;
-	WrappedD3D12RootSignature* m_pWrappedRootSignature;
+	COMPtr<WrappedD3D12RootSignature> m_pWrappedRootSignature;
 };
 
 RDCBOOST_NAMESPACE_END

@@ -21,8 +21,8 @@ WrappedD3D12RootSignature::~WrappedD3D12RootSignature() {
 }
 
 
-ID3D12DeviceChild* WrappedD3D12RootSignature::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12RootSignature * pvRootSignature;
+COMPtr<ID3D12DeviceChild> WrappedD3D12RootSignature::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12RootSignature> pvRootSignature;
 	HRESULT ret = pNewDevice->CreateRootSignature(m_NodeMask, m_pBlobWithRootSignature, m_BlobLengthInBytes, IID_PPV_ARGS(&pvRootSignature));
 	if (FAILED(ret)) {
 		LogError("create new D3D12RootSignature failed");

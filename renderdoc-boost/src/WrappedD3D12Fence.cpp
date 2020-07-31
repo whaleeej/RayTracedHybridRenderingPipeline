@@ -14,9 +14,9 @@ WrappedD3D12Fence::~WrappedD3D12Fence() {
 
 }
 
-ID3D12DeviceChild* WrappedD3D12Fence::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12Fence * pvFence;
-	HRESULT ret = pNewDevice->CreateFence(m_InitialValue, m_Flags, IID_PPV_ARGS(&pvFence));
+COMPtr<ID3D12DeviceChild> WrappedD3D12Fence::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12Fence> pvFence;
+	HRESULT ret = pNewDevice->CreateFence(m_AppFenceValue, m_Flags, IID_PPV_ARGS(&pvFence));
 	if (FAILED(ret)) {
 		LogError("create new D3D12Fence failed");
 		return NULL;

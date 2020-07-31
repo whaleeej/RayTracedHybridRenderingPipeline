@@ -33,7 +33,7 @@ public://function
 	}
 
 public://framewokr
-	virtual ID3D12DeviceChild* CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
 	UINT64 m_InitialValue;

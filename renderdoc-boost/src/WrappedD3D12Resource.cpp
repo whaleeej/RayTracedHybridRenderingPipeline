@@ -22,9 +22,9 @@ WrappedD3D12Resource::WrappedD3D12Resource(
 		m_ClearValue = *pClearValue;
 	}
 }
+
 WrappedD3D12Resource::~WrappedD3D12Resource() {
 }
-
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
 	D3D12_RESOURCE_DESC resDesc = GetReal()->GetDesc();
@@ -56,6 +56,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewD
 
 	return pvResource;
 }
+
 void WrappedD3D12Resource::InitSwapChain(IDXGISwapChain1* pRealSwapChain) {
 	m_pRealSwapChain = pRealSwapChain;
 }

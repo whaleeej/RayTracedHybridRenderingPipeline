@@ -18,21 +18,23 @@ WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDevice
 }
 
 WrappedD3D12Device::~WrappedD3D12Device() {
-	//for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
-	//	if (it->second) {
-	//		//it->second->Release// TODO: release backrefs
-	//	}
-	//}
 }
 
 void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
-	//if (m_BackRefs.erase(pReal) !=0) return;
-
-	//TODO not in backRefs, then it will be in backbuffer for swapchain, try erase in it
+	if (m_BackRefs_RootSignature.erase(pReal) !=0) return;
+	if (m_BackRefs_PipelineState.erase(pReal) != 0) return;
+	if (m_BackRefs_Heap.erase(pReal) != 0) return;
+	if (m_BackRefs_Resource.erase(pReal) != 0) return;
+	if (m_BackRefs_DescriptorHeap.erase(pReal) != 0) return;
+	if (m_BackRefs_CommandAllocator.erase(pReal) != 0) return;
+	if (m_BackRefs_CommandList.erase(pReal) != 0) return;
+	if (m_BackRefs_Fence.erase(pReal) != 0) return;
+	if (m_BackRefs_CommandQueue.erase(pReal) != 0) return;
 
 	//TODO unknown wrapped devicechild released error
 	LogError("Unknown device child released.");
 	Assert(false);
+	return;
 }
 
 void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
@@ -50,7 +52,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 			int progress=0; int idx=0;
 			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
 				it->second->SwitchToDevice(pNewDevice);//key of the framework
-				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject())] = it->second;
+				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
 				// sequencing
 				++idx;
 				while (progress < (int)(idx * 50 / m_BackRefs.size()))
@@ -93,7 +95,7 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 				
 				//key of the framework
 				it->second->SwitchToDevice(pNewDevice);
-				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject())] = it->second;
+				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
 				
 				// sequencing
 				++idx;
@@ -114,13 +116,13 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 				srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 				copyCommandList->ResourceBarrier(1,   &srcResourceBarrier);
 
-				copyCommandList->CopyResource(static_cast<WrappedD3D12Resource*>(it->second)->GetReal(), static_cast<ID3D12Resource*>(it->first));
+				copyCommandList->CopyResource(static_cast<WrappedD3D12Resource*>(it->second)->GetReal().Get(), static_cast<ID3D12Resource*>(it->first));
 
 				D3D12_RESOURCE_BARRIER destResourceBarrier;
 				ZeroMemory(&destResourceBarrier, sizeof(destResourceBarrier));
 				destResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 				destResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject());
+				destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject().Get());
 				destResourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 				destResourceBarrier.Transition.StateAfter = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
 				destResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -169,14 +171,11 @@ void WrappedD3D12Device::SwitchToDevice(ID3D12Device* pNewDevice) {
 	backRefTransferFunc(m_BackRefs_CommandQueue, "CommandQueue");
 
 	//5.pReal substitute
-	ULONG refs = m_pReal->Release();
-	if (refs != 0)
-		LogError("Previous real device ref count: %d", static_cast<int>(refs));
 	m_pReal = pNewDevice;
-	m_pReal->AddRef();
 }
 
 WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
+	//TODO 加速结构
 	for (auto it = m_BackRefs_DescriptorHeap.begin(); it != m_BackRefs_DescriptorHeap.end(); it++) {
 		if (it->second) {
 			WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
@@ -202,13 +201,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	if (ppCommandQueue == NULL)
 		return GetReal()->CreateCommandQueue(pDesc, riid, NULL);
 
-	ID3D12CommandQueue* pCommandQueue = NULL;
+	COMPtr<ID3D12CommandQueue> pCommandQueue = NULL;
 	HRESULT ret = GetReal()->CreateCommandQueue(pDesc, IID_PPV_ARGS(&pCommandQueue));
-	if (pCommandQueue) {
-		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue, this);
+	if (ret) {
+		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue.Get(), this);
 		*ppCommandQueue = wrapped;
-		m_BackRefs_CommandQueue[pCommandQueue] = wrapped;
-		pCommandQueue->Release();
+		m_BackRefs_CommandQueue[pCommandQueue.Get()] = wrapped;
 	}
 	else {
 		*ppCommandQueue = NULL;
@@ -223,13 +221,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 	if (ppCommandAllocator == NULL)
 		return GetReal()->CreateCommandAllocator(type, riid, NULL);
 
-	ID3D12CommandAllocator* pCommandAllocator = NULL;
+	COMPtr < ID3D12CommandAllocator> pCommandAllocator = NULL;
 	HRESULT ret = GetReal()->CreateCommandAllocator(type, IID_PPV_ARGS(&pCommandAllocator));
-	if (pCommandAllocator) {
-		WrappedD3D12CommandAllocator* wrapped = new WrappedD3D12CommandAllocator(pCommandAllocator, this, type);
+	if (ret) {
+		WrappedD3D12CommandAllocator* wrapped = new WrappedD3D12CommandAllocator(pCommandAllocator.Get(), this, type);
 		*ppCommandAllocator = wrapped;
-		m_BackRefs_CommandAllocator[pCommandAllocator] = wrapped;
-		pCommandAllocator->Release();
+		m_BackRefs_CommandAllocator[pCommandAllocator.Get()] = wrapped;
 	}
 	else {
 		*ppCommandAllocator = NULL;
@@ -244,18 +241,17 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 	if (ppPipelineState == NULL)
 		return GetReal()->CreateGraphicsPipelineState(pDesc, riid, NULL);
 
-	ID3D12PipelineState* pPipelineState = NULL;
+	COMPtr < ID3D12PipelineState> pPipelineState = NULL;
 	auto pWrappedRootSignature = static_cast<WrappedD3D12RootSignature*>(pDesc->pRootSignature);//这里因为Desc里指向的RootSignature是Wrapped的，所以他要做替换
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC  tmpDesc = *pDesc;
-	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal();
+	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal().Get();
 	HRESULT ret = GetReal()->CreateGraphicsPipelineState(&tmpDesc, IID_PPV_ARGS(&pPipelineState));
-	if (pPipelineState) {
-		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(pPipelineState, this,
+	if (ret) {
+		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
 		);
 		*ppPipelineState = wrapped;
-		m_BackRefs_PipelineState[pPipelineState] = wrapped;
-		pPipelineState->Release();
+		m_BackRefs_PipelineState[pPipelineState.Get()] = wrapped;
 	}
 	else {
 		*ppPipelineState = NULL;
@@ -270,18 +266,18 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 	if (ppPipelineState == NULL)
 		return GetReal()->CreateComputePipelineState(pDesc, riid, NULL);
 
-	ID3D12PipelineState* pPipelineState = NULL;
+	COMPtr < ID3D12PipelineState> pPipelineState = NULL;
 	auto pWrappedRootSignature = static_cast<WrappedD3D12RootSignature*>(pDesc->pRootSignature);//这里因为Desc里指向的RootSignature是Wrapped的，所以他要做替换
 	D3D12_COMPUTE_PIPELINE_STATE_DESC  tmpDesc = *pDesc;
-	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal();
+	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal().Get();
 	HRESULT ret = GetReal()->CreateComputePipelineState(&tmpDesc, IID_PPV_ARGS(&pPipelineState));
-	if (pPipelineState) {
-		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(pPipelineState, this,
+	if (ret) {
+		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(
+			pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
 			);
 		*ppPipelineState = wrapped;
-		m_BackRefs_PipelineState[pPipelineState] = wrapped;
-		pPipelineState->Release();
+		m_BackRefs_PipelineState[pPipelineState.Get()] = wrapped;
 	}
 	else {
 		*ppPipelineState = NULL;
@@ -299,16 +295,18 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 	if (ppCommandList == NULL)
 		return GetReal()->CreateCommandList(nodeMask, type, pCommandAllocator, pInitialState, riid, NULL);
 
-	ID3D12CommandList* pCommandList = NULL;
-	HRESULT ret = GetReal()->CreateCommandList(nodeMask, type, pCommandAllocator, pInitialState, IID_PPV_ARGS(&pCommandList));
-	if (pCommandList) {
+	COMPtr < ID3D12CommandList> pCommandList = NULL;
+	HRESULT ret = GetReal()->CreateCommandList(nodeMask, type, 
+		static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
+		static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
+		IID_PPV_ARGS(&pCommandList));
+	if (ret) {
 		WrappedD3D12CommandList* wrapped = new WrappedD3D12CommandList(//默认这里的Allocator是Wrapped的
-			pCommandList, this,
+			pCommandList.Get(), this,
 			static_cast<WrappedD3D12CommandAllocator* >(pCommandAllocator), nodeMask
 		);
 		*ppCommandList = wrapped;
-		m_BackRefs_CommandList[pCommandList] = wrapped;
-		pCommandList->Release();
+		m_BackRefs_CommandList[pCommandList.Get()] = wrapped;
 	}
 	else {
 		*ppCommandList = NULL;
@@ -323,13 +321,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	if (ppvHeap == NULL)
 		return GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, riid, NULL);
 
-	ID3D12DescriptorHeap* pvHeap = NULL;
+	COMPtr<ID3D12DescriptorHeap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, IID_PPV_ARGS(&pvHeap));
-	if (pvHeap) {
-		WrappedD3D12DescriptorHeap* wrapped = new WrappedD3D12DescriptorHeap(pvHeap, this);
+	if (ret) {
+		WrappedD3D12DescriptorHeap* wrapped = new WrappedD3D12DescriptorHeap(pvHeap.Get(), this);
 		*ppvHeap = wrapped;
-		m_BackRefs_DescriptorHeap[pvHeap] = wrapped;
-		pvHeap->Release();
+		m_BackRefs_DescriptorHeap[pvHeap.Get()] = wrapped;
 	}
 	else {
 		*ppvHeap = NULL;
@@ -346,15 +343,15 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 	if (ppvRootSignature == NULL)
 		return GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, riid, NULL);
 
-	ID3D12RootSignature* pvRootSignature = NULL;
+	COMPtr<ID3D12RootSignature> pvRootSignature = NULL;
 	HRESULT ret = GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, IID_PPV_ARGS(&pvRootSignature));
-	if (pvRootSignature) {
-		WrappedD3D12RootSignature* wrapped = new WrappedD3D12RootSignature(pvRootSignature, this,
+	if (ret) {
+		WrappedD3D12RootSignature* wrapped = new WrappedD3D12RootSignature(
+			pvRootSignature.Get(), this,
 			nodeMask, pBlobWithRootSignature, blobLengthInBytes
 		);
 		*ppvRootSignature = wrapped;
-		m_BackRefs_RootSignature[pvRootSignature] = wrapped;
-		pvRootSignature->Release();
+		m_BackRefs_RootSignature[pvRootSignature.Get()] = wrapped;
 	}
 	else {
 		*ppvRootSignature = NULL;
@@ -373,19 +370,18 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 	if (ppvResource == NULL)
 		return GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, NULL);
 
-	ID3D12Resource* pvResource = NULL;
+	COMPtr<ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
+	if (ret) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource, this, NULL,
+			pvResource.Get(), this, NULL,
 			WrappedD3D12Resource::CommittedWrappedD3D12Resource,
 			InitialResourceState,
 			pOptimizedClearValue,
 			0
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resource[pvResource] = wrapped;
-		pvResource->Release();
+		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
 		*ppvResource = NULL;
@@ -400,13 +396,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
 	if (ppvHeap == NULL)
 		return GetReal()->CreateHeap(pDesc, riid, NULL);
 
-	ID3D12Heap* pvHeap = NULL;
+	COMPtr<ID3D12Heap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
-	if (pvHeap) {
-		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap, this);
+	if (ret) {
+		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap.Get(), this);
 		*ppvHeap = wrapped;
-		m_BackRefs_Heap[pvHeap] = wrapped;
-		pvHeap->Release();
+		m_BackRefs_Heap[pvHeap.Get()] = wrapped;
 	}
 	else {
 		*ppvHeap = NULL;
@@ -422,23 +417,23 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 	_In_opt_  const D3D12_CLEAR_VALUE *pOptimizedClearValue,
 	REFIID riid,
 	_COM_Outptr_opt_  void **ppvResource) {
-	//TODO: 实际的API call要把wrapped换成非wrapped
 	if (ppvResource == NULL)
-		return GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, riid, NULL);
+		return GetReal()->CreatePlacedResource(
+			static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), 
+			HeapOffset, pDesc, InitialState, pOptimizedClearValue, riid, NULL);
 
-	ID3D12Resource* pvResource = NULL;
-	HRESULT ret = GetReal()->CreatePlacedResource(pHeap, HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
+	COMPtr<ID3D12Resource> pvResource = NULL;
+	HRESULT ret = GetReal()->CreatePlacedResource(static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
+	if (ret) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource, this, static_cast<WrappedD3D12Heap*>(pHeap),
+			pvResource.Get(), this, static_cast<WrappedD3D12Heap*>(pHeap),
 			WrappedD3D12Resource::PlacedWrappedD3D12Resource,
 			InitialState,
 			pOptimizedClearValue,
 			HeapOffset
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resource[pvResource] = wrapped;
-		pvResource->Release();
+		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
 		*ppvResource = NULL;
@@ -455,19 +450,18 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 	if (ppvResource == NULL)
 		return GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, riid, NULL);
 
-	ID3D12Resource* pvResource = NULL;
+	COMPtr< ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (pvResource) {
+	if (ret) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource, this, NULL,
+			pvResource.Get(), this, NULL,
 			WrappedD3D12Resource::ReservedWrappedD3D12Resource,
 			InitialState,
 			pOptimizedClearValue,
 			0
 		);
 		*ppvResource = wrapped;
-		m_BackRefs_Resource[pvResource] = wrapped;
-		pvResource->Release();
+		m_BackRefs_Resource[pvResource.Get()] = wrapped;
 	}
 	else {
 		*ppvResource = NULL;
@@ -491,13 +485,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
 	if (ppFence == NULL)
 		return GetReal()->CreateFence(InitialValue, Flags, riid, NULL);
 
-	ID3D12Fence* pFence = NULL;
+	COMPtr< ID3D12Fence> pFence = NULL;
 	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
-	if (pFence) {
-		WrappedD3D12Fence* wrapped = new WrappedD3D12Fence(pFence, this, InitialValue, Flags);
+	if (ret) {
+		WrappedD3D12Fence* wrapped = new WrappedD3D12Fence(pFence.Get(), this, InitialValue, Flags);
 		*ppFence = wrapped;
-		m_BackRefs_Fence[pFence] = wrapped;
-		pFence->Release();
+		m_BackRefs_Fence[pFence.Get()] = wrapped;
 	}
 	else {
 		*ppFence = NULL;
@@ -511,21 +504,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateQueryHeap(
 	_COM_Outptr_opt_  void **ppvHeap) {
 	LogError("Query Heap Not supported yet");
 	return 0;
-	//if (ppvHeap == NULL)
-	//	return GetReal()->CreateQueryHeap(pDesc, riid, NULL);
-
-	//ID3D12QueryHeap* pvHeap = NULL;
-	//HRESULT ret = GetReal()->CreateQueryHeap(pDesc, IID_PPV_ARGS(&pvHeap));
-	//if (pvHeap) {
-	//	WrappedD3D12DeviceChild<ID3D12QueryHeap>* wrapped = new WrappedD3D12DeviceChild<ID3D12QueryHeap>(pvHeap, this);
-	//	*ppvHeap = wrapped;
-	//	m_BackRefs[pvHeap] = wrapped;
-	//	pvHeap->Release();
-	//}
-	//else {
-	//	*ppvHeap = NULL;
-	//}
-	//return ret;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
@@ -535,21 +513,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
 	_COM_Outptr_opt_  void **ppvCommandSignature) {
 	LogError("Command Signature Not supported yet");
 	return 0;
-	//if (ppvCommandSignature == NULL)
-	//	return GetReal()->CreateCommandSignature(pDesc, pRootSignature, riid, NULL);
-
-	//ID3D12CommandSignature* pCommandSignature = NULL;
-	//HRESULT ret = GetReal()->CreateCommandSignature(pDesc, pRootSignature, IID_PPV_ARGS(&pCommandSignature));
-	//if (pCommandSignature) {
-	//	WrappedD3D12DeviceChild<ID3D12CommandSignature>* wrapped = new WrappedD3D12DeviceChild<ID3D12CommandSignature>(pCommandSignature, this);
-	//	*ppvCommandSignature = wrapped;
-	//	m_BackRefs[pCommandSignature] = wrapped;
-	//	pCommandSignature->Release();
-	//}
-	//else {
-	//	*ppvCommandSignature = NULL;
-	//}
-	//return ret;
 }
 
 
@@ -561,7 +524,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_CBV;
@@ -573,13 +536,14 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 			auto pTmpRes = static_cast<WrappedD3D12Resource*>(it->second);
 			if (pTmpRes->GetGPUVirtualAddress() == pDesc->BufferLocation) {
 				pWrappedD3D12Res = pTmpRes;
+				break;
 			}
 		}
 	}
 	if (!pWrappedD3D12Res)
 	{
 		LogError("Error when create CBV descriptor");
-		Assert(pWrappedD3D12Res);
+		return; 
 	}
 
 	slotDesc.pWrappedD3D12Resource = pWrappedD3D12Res;
@@ -597,7 +561,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SRV;
@@ -605,7 +569,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	slotDesc.concreteViewDesc.srv = *pDesc;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
-	GetReal()->CreateShaderResourceView(pResource, pDesc, DestDescriptor);
+	GetReal()->CreateShaderResourceView(static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
@@ -617,7 +581,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_UAV;
@@ -626,7 +590,10 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
 	slotDesc.concreteViewDesc.uav = *pDesc;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
-	GetReal()->CreateUnorderedAccessView(pResource, pCounterResource ,pDesc, DestDescriptor);
+	GetReal()->CreateUnorderedAccessView(
+		static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), 
+		static_cast<WrappedD3D12Resource*>(pCounterResource)->GetReal().Get(),
+		pDesc, DestDescriptor);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
@@ -637,7 +604,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_RTV;
@@ -645,7 +612,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
 	slotDesc.concreteViewDesc.rtv = *pDesc;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
-	GetReal()->CreateRenderTargetView(pResource, pDesc, DestDescriptor);
+	GetReal()->CreateRenderTargetView(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
@@ -656,7 +623,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_DSV;
@@ -664,7 +631,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
 	slotDesc.concreteViewDesc.dsv = *pDesc;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
-	GetReal()->CreateDepthStencilView(pResource, pDesc, DestDescriptor);
+	GetReal()->CreateDepthStencilView(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get(), pDesc, DestDescriptor);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateSampler(
@@ -674,7 +641,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateSampler(
 	if (!pWrappedHeap)
 	{
 		LogError("Error when create descriptor");
-		Assert(pWrappedHeap);
+		return;
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SamplerV;
@@ -747,17 +714,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CopyDescriptors(
 	};
 	RangeIndexImpl srcRangeIndex(NumSrcDescriptorRanges, pSrcDescriptorRangeSizes);
 	RangeIndexImpl destRangeIndex(NumDestDescriptorRanges, pDestDescriptorRangeSizes);
-	
-	//NumDestDescriptorRanges
-	//destHeapsPtr
-	//destHeapsStartIndex
-	//pDestDescriptorRangeSizes
 
-	//NumSrcDescriptorRanges
-	//srcHeapsPtr
-	//srcHeapsStartIndex
-	//pSrcDescriptorRangeSizes
-	//ready. start copying!
 	do {
 		auto pSrcDescriptorHeap = srcHeapsPtr[srcRangeIndex.rangeNum];
 		auto srcStart = srcHeapsStartIndex[srcRangeIndex.rangeNum];
@@ -821,13 +778,13 @@ D3D12_RESOURCE_ALLOCATION_INFO STDMETHODCALLTYPE WrappedD3D12Device::GetResource
 	_In_  UINT visibleMask,
 	_In_  UINT numResourceDescs,
 	_In_reads_(numResourceDescs)  const D3D12_RESOURCE_DESC *pResourceDescs){
-	return GetResourceAllocationInfo(visibleMask, numResourceDescs, pResourceDescs);
+	return  GetReal()->GetResourceAllocationInfo(visibleMask, numResourceDescs, pResourceDescs);
 }
 
 D3D12_HEAP_PROPERTIES STDMETHODCALLTYPE WrappedD3D12Device::GetCustomHeapProperties(
 	_In_  UINT nodeMask,
 	D3D12_HEAP_TYPE heapType){
-	return GetCustomHeapProperties(nodeMask, heapType);
+	return  GetReal()->GetCustomHeapProperties(nodeMask, heapType);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateSharedHandle(
@@ -837,7 +794,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateSharedHandle(
 	_In_opt_  LPCWSTR Name,
 	_Out_  HANDLE *pHandle){
 	LogError("CreateSharedHandle not supported yet");
-	return GetReal()->CreateSharedHandle(pObject, pAttributes, Access, Name, pHandle);
+	return NULL;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::OpenSharedHandleByName(
@@ -846,23 +803,28 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::OpenSharedHandleByName(
 	/* [annotation][out] */
 	_Out_  HANDLE *pNTHandle) {
 	LogError("OpenSharedHandleByName not supported yet");
-	return GetReal()->OpenSharedHandleByName(Name, Access, pNTHandle);
+	//return GetReal()->OpenSharedHandleByName(Name, Access, pNTHandle);
+	return NULL;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::MakeResident(
 	UINT NumObjects,
 	_In_reads_(NumObjects)  ID3D12Pageable *const *ppObjects){
-	return GetReal()->MakeResident(NumObjects, ppObjects);
+	LogError("MakeResident not supported yet");
+	//return GetReal()->MakeResident(NumObjects, ppObjects);
+	return NULL;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::Evict(
 	UINT NumObjects,
 	_In_reads_(NumObjects)  ID3D12Pageable *const *ppObjects){
-	return GetReal()->MakeResident(NumObjects, ppObjects);
+	LogError("Evict not supported yet");
+	return NULL;
+	//return GetReal()->MakeResident(NumObjects, ppObjects);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::GetDeviceRemovedReason(void){
-	return GetDeviceRemovedReason();
+	return GetReal()->GetDeviceRemovedReason();
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::GetCopyableFootprints(
@@ -874,12 +836,13 @@ void STDMETHODCALLTYPE WrappedD3D12Device::GetCopyableFootprints(
 	_Out_writes_opt_(NumSubresources)  UINT *pNumRows,
 	_Out_writes_opt_(NumSubresources)  UINT64 *pRowSizeInBytes,
 	_Out_opt_  UINT64 *pTotalBytes){
-	return GetCopyableFootprints(pResourceDesc, FirstSubresource, NumSubresources, BaseOffset, pLayouts, pNumRows, pRowSizeInBytes, pTotalBytes);
+	return GetReal()->GetCopyableFootprints(
+		pResourceDesc, FirstSubresource, NumSubresources, BaseOffset, pLayouts, pNumRows, pRowSizeInBytes, pTotalBytes);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::SetStablePowerState(
 	BOOL Enable){
-	return SetStablePowerState(Enable);
+	return GetReal()->SetStablePowerState(Enable);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::GetResourceTiling(
@@ -890,16 +853,16 @@ void STDMETHODCALLTYPE WrappedD3D12Device::GetResourceTiling(
 	_Inout_opt_  UINT *pNumSubresourceTilings,
 	_In_  UINT FirstSubresourceTilingToGet,
 	_Out_writes_(*pNumSubresourceTilings)  D3D12_SUBRESOURCE_TILING *pSubresourceTilingsForNonPackedMips){
-	LogError("ResourceTiling unsupportted now");
-	return GetResourceTiling(
-		pTiledResource, pNumTilesForEntireResource, pPackedMipDesc, 
+	return GetReal()->GetResourceTiling(
+		static_cast<WrappedD3D12Resource *>(pTiledResource)->GetReal().Get()
+		, pNumTilesForEntireResource, pPackedMipDesc,
 		pStandardTileShapeForNonPackedMips, pNumSubresourceTilings, 
 		FirstSubresourceTilingToGet, pSubresourceTilingsForNonPackedMips
 	);
 }
 
 LUID STDMETHODCALLTYPE WrappedD3D12Device::GetAdapterLuid(void){
-	return GetAdapterLuid();
+	return  GetReal()->GetAdapterLuid();
 }
 
 RDCBOOST_NAMESPACE_END

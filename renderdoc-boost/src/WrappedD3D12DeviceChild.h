@@ -28,6 +28,7 @@ public: //override for ID3D12DeviceChild
 	}
 
 public: //function
+	COMPtr<WrappedD3D12Device> GetWrappedDevice() { return m_pWrappedDevice; }
 
 public: //framework
 	virtual void SwitchToDevice(ID3D12Device* pNewDevice)
@@ -39,7 +40,9 @@ public: //framework
 		Assert(pCopied.Get() != NULL);
 		m_PrivateData.CopyPrivateData(pCopied);
 		m_pReal = pCopied;
+		pCopied->SetName(m_ObjectName);
 		m_pRealDevice = pNewDevice;//根据框架, 这里WrappedDevice没有变，只是内部的pReal变了
+
 	}
 
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice) = 0;

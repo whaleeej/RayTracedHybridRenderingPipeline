@@ -10,8 +10,6 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	, m_pWrappedCommandQueue(pCommandQueue)
 	, m_Ref(1)
 {
-	m_pRealSwapChain->AddRef();
-	m_pWrappedCommandQueue->AddRef();
 
 	m_ResizeParam.Valid = false;
 
@@ -20,38 +18,35 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	m_pRealSwapChain->GetDesc1(&swapchainDesc);
 	m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
 	for (UINT i = 0; i < swapchainDesc.BufferCount; i++) {
-		ID3D12Resource* pvResource ;
+		COMPtr<ID3D12Resource> pvResource ;
 		m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
 
-		WrappedD3D12Device* pvDevice;
-		m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
+		COMPtr<WrappedD3D12Device> pvDevice = m_pWrappedCommandQueue->GetWrappedDevice();
 
-		m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
-		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
-		pvResource->Release(); pvDevice->Release();
+		m_SwapChainBuffers[i] = new WrappedD3D12Resource(
+			pvResource.Get(), pvDevice.Get(), NULL, 
+			WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain.Get());
 	}
 }
 
 WrappedD3D12DXGISwapChain::~WrappedD3D12DXGISwapChain()
 {
-	m_pRealSwapChain->Release();
-	m_pWrappedCommandQueue->Release();
 }
 
 void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue)
 {
-	if (pRealCommandQueue == m_pWrappedCommandQueue->GetReal()) {
+	//这里我们假设创建用的commandQueue并没有改变
+	if (pRealCommandQueue == m_pWrappedCommandQueue->GetReal().Get()) {
 		return;
 	}
 
-	IDXGISwapChain1* pNewSwapChain = CopyToCommandQueue(pRealCommandQueue);
+	COMPtr<IDXGISwapChain1> pNewSwapChain = CopyToCommandQueue(pRealCommandQueue);
 
 	{ //TODO handle resize/fullscreen
-		Assert(pNewSwapChain);
+		Assert(pNewSwapChain.Get());
 
-		m_pRealSwapChain->Release();
 		m_pRealSwapChain = pNewSwapChain;
-		m_pRealSwapChain->AddRef();
 
 		if (m_ResizeParam.Valid) //TODO: support resize
 		{
@@ -69,30 +64,27 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 			m_SwapChainBuffers.resize(swapchainDesc.BufferCount);
 		}
 		for (UINT i = 0; i < swapchainDesc.BufferCount; i++) {
-			ID3D12Resource* pvResource = 0;
+			COMPtr<ID3D12Resource> pvResource = 0;
 			m_pRealSwapChain->GetBuffer(i, IID_PPV_ARGS(&pvResource));
-			Assert(pvResource);
-			if (m_SwapChainBuffers[i]) {
-				m_SwapChainBuffers[i]->SwitchToSwapChain(m_pRealSwapChain, pvResource);
+			Assert(pvResource.Get());
+			if (m_SwapChainBuffers[i].Get()) {
+				m_SwapChainBuffers[i]->SwitchToSwapChain(m_pRealSwapChain.Get(), pvResource.Get());
 			}
 			else {
-				WrappedD3D12Device* pvDevice;
-				m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)& pvDevice);
-				Assert(pvDevice);
-				m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
-				m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain);
-				pvDevice->Release();
+				COMPtr<WrappedD3D12Device> pvDevice=m_pWrappedCommandQueue->GetWrappedDevice();
+				Assert(pvDevice.Get());
+				m_SwapChainBuffers[i] = new WrappedD3D12Resource(pvResource.Get(), pvDevice.Get(), NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+				m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain.Get());
 			}
-			pvResource->Release();
 		}
 	}
 }
 
-IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue) {
+COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue) {
 	/************************************************************************/
 	/*          only support DxgiFacotry4 and DxgiSwapchain 4 here            */
 	/************************************************************************/
-	//TODO:dxgi factory suppot more?
+	//TODO:dxgi factory compatibility
 	IDXGIFactory4* dxgiFactory4;
 	UINT createFactoryFlags = 0;
 	HRESULT ret = CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory4));
@@ -104,9 +96,8 @@ IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueu
 	IDXGISwapChain1* swapChain1;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
 	HWND hWnd;
-	//TODO: dxgi swapchain1?2?3?4?
-	static_cast<IDXGISwapChain1*>(m_pRealSwapChain)->GetDesc1(&swapChainDesc);
-	static_cast<IDXGISwapChain1*>(m_pRealSwapChain)->GetHwnd(&hWnd);
+	m_pRealSwapChain->GetDesc1(&swapChainDesc);
+	m_pRealSwapChain->GetHwnd(&hWnd);
 	Assert(hWnd);
 	dxgiFactory4->CreateSwapChainForHwnd(
 		pRealCommandQueue,
@@ -116,25 +107,12 @@ IDXGISwapChain1* WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueu
 		nullptr,
 		&swapChain1);
 
-	//TODO: Disable the Alt+Enter fullscreen toggle feature. Switching to fullscreen
-	// will be handled manually.
-	// need to depend on situation!!!
-	ret = dxgiFactory4->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+	//TODO: Disable the Alt+Enter fullscreen toggle feature eg. DXGI_MWA_NO_ALT_ENTER
+	ret = dxgiFactory4->MakeWindowAssociation(hWnd, /*DXGI_MWA_NO_ALT_ENTER*/0);
 	if (FAILED(ret)) {
 		LogError("Failed to make window association with newly created swap chain");
 		return NULL;
 	}
-
-
-	//IDXGISwapChain4* swapChain4;
-	//ret = swapChain1->QueryInterface(__uuidof(IDXGISwapChain4), (void**)&swapChain4);
-	//if (FAILED(ret)) {
-	//	LogError("Fail to As create swapchain1 to swapchain4");
-	//	return NULL;
-	//}
-
-	//return static_cast<IDXGISwapChain1*>(swapChain4);
-
 	return swapChain1;
 }
 
@@ -152,10 +130,10 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REF
 		return E_NOINTERFACE;
 	}
 
-	ID3D12Resource *realSurface = NULL;
+	COMPtr<ID3D12Resource>realSurface = NULL;
 	HRESULT ret = m_pRealSwapChain->GetBuffer(Buffer, riid, (void**)&realSurface);
 
-	ID3D12Resource *wrappedTex = NULL;
+	WrappedD3D12Resource *wrappedTex = NULL;
 	if (FAILED(ret))
 	{
 		LogError("Failed to get swapchain backbuffer %d: %08x", Buffer, ret);
@@ -163,45 +141,42 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REF
 	}
 	else
 	{
-		//wrappedTex = m_pWrappedDevice->GetWrappedSwapChainBuffer(Buffer, realSurface);
-
 		Assert(realSurface != NULL);
 		if (Buffer < m_SwapChainBuffers.size() && m_SwapChainBuffers[Buffer] != NULL)
 		{
-			if (m_SwapChainBuffers[Buffer]->GetReal() == realSurface)
+			if (m_SwapChainBuffers[Buffer]->GetReal().Get() == realSurface.Get())
 			{
-				wrappedTex = m_SwapChainBuffers[Buffer];
+				wrappedTex = m_SwapChainBuffers[Buffer].Get();
 				wrappedTex->AddRef();
 			}
 			else
 			{
 				LogWarn("Previous swap chain buffer isn't released by user.");
-				m_SwapChainBuffers[Buffer] = NULL;
+				m_SwapChainBuffers[Buffer].Reset();
 			}
 		}
 
 		if (wrappedTex == NULL)
 		{
 			m_SwapChainBuffers.resize((size_t)Buffer + 1);
-			WrappedD3D12Device* pvDevice;
-			m_pWrappedCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)&pvDevice);
-			Assert(pvDevice);
-			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface, pvDevice, NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
-			m_SwapChainBuffers[Buffer]->InitSwapChain(m_pRealSwapChain);
-			wrappedTex = m_SwapChainBuffers[Buffer];
+			COMPtr<WrappedD3D12Device> pvDevice = m_pWrappedCommandQueue->GetWrappedDevice();
+			Assert(pvDevice.Get());
+			m_SwapChainBuffers[Buffer] = new WrappedD3D12Resource(realSurface.Get(), pvDevice.Get(), NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+			m_SwapChainBuffers[Buffer]->InitSwapChain(m_pRealSwapChain.Get());
+			wrappedTex = m_SwapChainBuffers[Buffer].Get();
+			wrappedTex->AddRef();
 		}
 
 
 		if (riid == __uuidof(ID3D12Resource))
 			*ppSurface = static_cast<ID3D12Resource*>(wrappedTex);
+		else {
+			*ppSurface = NULL;
+			wrappedTex->Release();
+			LogError("Unsupported or unrecognised UUID passed to IDXGISwapChain::GetBuffer");
+			return E_NOINTERFACE;
+		}
 	}
-
-	if (realSurface != NULL)
-	{
-		realSurface->Release();
-		realSurface = NULL;
-	}
-
 	return ret;
 }
 
@@ -252,9 +227,9 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetDevice(REFIID riid, voi
 
 HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetParent(REFIID riid, void **ppParent)
 {
-	// 		*ppParent = NULL;
-	// 		LogError("IDXGISwapChain::GetParent is not supported by now.");
-	// 		return E_FAIL;
+	*ppParent = NULL;
+	LogError("IDXGISwapChain::GetParent is not supported by now.");
+	return E_FAIL;
 	return m_pRealSwapChain->GetParent(riid, ppParent);
 }
 
@@ -268,7 +243,6 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::QueryInterface(
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
 {
-	//m_pWrappedDevice->OnFramePresent();//TODO: need update counter here?
 	return m_pRealSwapChain->Present(SyncInterval, Flags);
 }
 

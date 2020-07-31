@@ -29,7 +29,7 @@ public:
 		ViewDesc_SamplerV,
 		ViewDesc_Unknown
 	};
-	struct DescriptorHeapSlotDesc{
+	struct DescriptorHeapSlotDesc{ // TODO 把WrappedD3D12Resource的生命拥有起来，改成ComPtr
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
 		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
 		ViewDescType viewDescType = ViewDesc_Unknown;

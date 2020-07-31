@@ -1,5 +1,5 @@
 #pragma once
-#include <dxgi.h>
+#include <dxgi1_6.h>
 #include "RdcBoostPCH.h"
 
 RDCBOOST_NAMESPACE_BEGIN

@@ -238,11 +238,8 @@ private:
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Fence;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandQueue;
 
-	//std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Others;
-
 	SDeviceCreateParams m_DeviceCreateParams;
 	bool m_bRenderDocDevice;
-	//DummyID3D12InfoQueue m_DummyInfoQueue;
 };
 
 RDCBOOST_NAMESPACE_END

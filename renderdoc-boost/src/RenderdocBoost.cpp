@@ -1,5 +1,4 @@
 #include <set>
-
 #include "RenderdocBoost.h"
 #include "DeviceCreateParams.h"
 //d3d11 wrapper
@@ -195,22 +194,20 @@ HRESULT  D3D12CreateDevice(
 	D3D_FEATURE_LEVEL MinimumFeatureLevel,
 	_In_ REFIID riid, // Expected: ID3D12Device
 	_COM_Outptr_opt_ void** ppDevice) {
-	//TODO: ID3D12Device1, ID3D12Device2 and etc.
-	Assert(riid == __uuidof(ID3D12Device) || riid == __uuidof(ID3D12Device1));
+	Assert(riid == __uuidof(ID3D12Device));
 
 	if (pfnD3D12CreateDevice == NULL) {
 		HMODULE d3d12Module = GetModuleHandle("d3d12.dll");
 		pfnD3D12CreateDevice = (tD3D12CreateDevice)GetProcAddress(d3d12Module, "D3D12CreateDevice");
 	}
 
-	ID3D12Device* pRealDevice = NULL;
-	HRESULT res = pfnD3D12CreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
+	COMPtr<ID3D12Device> pRealDevice = NULL;
+	HRESULT ret = pfnD3D12CreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
 
 	WrappedD3D12Device* pWrappedDevice = NULL;
-	if (pRealDevice) {
-		pWrappedDevice = new WrappedD3D12Device(pRealDevice, 
+	if (ret) {
+		pWrappedDevice = new WrappedD3D12Device(pRealDevice.Get(), 
 			SDeviceCreateParams(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, 0, 0, &MinimumFeatureLevel, 1, 0, 0));
-		pRealDevice->Release();
 	}
 
 	if (pWrappedDevice&&ppDevice) {
@@ -222,10 +219,10 @@ HRESULT  D3D12CreateDevice(
 	else
 		LogError("Unable to create wrapped ID3D12Device");
 
-	return res;
+	return ret;
 }
 
-HRESULT  CreateSwapChainForHwnd(//only support old than dxgifacotry2 and dxgiswapchain1 -> use of CreateSwapChainforHwnd
+HRESULT  CreateSwapChainForHwnd(
 	IDXGIFactory2* pDXGIFactory, ID3D12CommandQueue *pCommandQueue, HWND hWnd,
 	const DXGI_SWAP_CHAIN_DESC1 *pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc,
 	IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain)
@@ -267,18 +264,16 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 		return;
 	}
 
-	ID3D12Device* pRealDevice = NULL;
-	HRESULT res = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
+	COMPtr<ID3D12Device> pRealDevice = NULL;
+	HRESULT ret = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
 
-	if (FAILED(res)) {
+	if (FAILED(ret)) {
 		LogError("Create new device failed.");
 		return;
 	}
 
-	pWrappedDevice->SwitchToDevice(pRealDevice);
-	pRealDevice->Release();
 	pWrappedDevice->SetAsRenderDocDevice(d3d12InRenderdocFlg);
-
+	pWrappedDevice->SwitchToDevice(pRealDevice.Get());
 }
 //*************************************d3d12*************************************//
 

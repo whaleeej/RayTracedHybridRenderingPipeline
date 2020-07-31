@@ -26,12 +26,21 @@ HRESULT  WrappedD3D12CommandQueue::createSwapChain(
 	HRESULT ret = pDXGIFactory->CreateSwapChainForHwnd(
 		GetReal().Get(), hWnd,
 		pDesc, pFullscreenDesc,
-		pRestrictToOutput, &swapChain1);//创建之后swapchain1的ref是1
+		pRestrictToOutput, &swapChain1);
 	if (FAILED(ret)) {
 		LogError("Initialzation: create swapchain1 failed");
 	}
 	Assert(swapChain1.Get());
-	m_pWrappedSwapChain = new WrappedD3D12DXGISwapChain(swapChain1.Get(), this);
+	auto pSwapChain = new WrappedD3D12DXGISwapChain(swapChain1.Get(), this);//ref=1
+	m_pWrappedSwapChain = pSwapChain;//ref=2
+	if (pSwapChain&& ppSwapChain) {
+		*ppSwapChain = static_cast<IDXGISwapChain1*>(m_pWrappedSwapChain.Get());
+		pSwapChain->AddRef();//here ref should be 3
+	}
+	else
+		m_pWrappedSwapChain.Reset();//here ref should be 1
+	pSwapChain->Release();// 1. ref=2, else ref=0
+	pSwapChain = 0;//safe release
 	return ret;
 }
 
@@ -64,7 +73,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::UpdateTileMappings(
 	_In_reads_opt_(NumRanges)  const UINT *pHeapRangeStartOffsets,
 	_In_reads_opt_(NumRanges)  const UINT *pRangeTileCounts,
 	D3D12_TILE_MAPPING_FLAGS Flags) {
-	GetReal()->UpdateTileMappings(static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get() 
+	GetReal()->UpdateTileMappings(
+		static_cast<WrappedD3D12Resource*>(pResource)->GetReal().Get() 
 		, NumResourceRegions, pResourceRegionStartCoordinates,pResourceRegionSizes, 
 		static_cast<WrappedD3D12Heap*>(pHeap)->GetReal().Get(),
 		NumRanges, pRangeFlags, pHeapRangeStartOffsets, pRangeTileCounts, Flags);
@@ -77,7 +87,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::CopyTileMappings(
 	_In_  const D3D12_TILED_RESOURCE_COORDINATE *pSrcRegionStartCoordinate,
 	_In_  const D3D12_TILE_REGION_SIZE *pRegionSize,
 	D3D12_TILE_MAPPING_FLAGS Flags) {
-	GetReal()->CopyTileMappings(static_cast<WrappedD3D12Resource*>(pDstResource)->GetReal().Get(), pDstRegionStartCoordinate,
+	GetReal()->CopyTileMappings(
+		static_cast<WrappedD3D12Resource*>(pDstResource)->GetReal().Get(), pDstRegionStartCoordinate,
 		static_cast<WrappedD3D12Resource *>(pSrcResource)->GetReal().Get(), pSrcRegionStartCoordinate,
 		pRegionSize, Flags);
 }
@@ -85,7 +96,6 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::CopyTileMappings(
 void STDMETHODCALLTYPE WrappedD3D12CommandQueue::ExecuteCommandLists(
 	_In_  UINT NumCommandLists,
 	_In_reads_(NumCommandLists)  ID3D12CommandList *const *ppCommandLists) {
-	//TODO: storage commandlists for recover
 	std::vector<ID3D12CommandList*> listArray(NumCommandLists);
 	for (UINT i=0; i<NumCommandLists; i++)
 	{
@@ -115,24 +125,31 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::EndEvent(void) {
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::Signal(
 	ID3D12Fence *pFence,
 	UINT64 Value) {
-	return GetReal()->Signal(static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), Value);
+	return GetReal()->Signal(
+		static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), 
+		Value);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::Wait(
 	ID3D12Fence *pFence,
 	UINT64 Value) {
-	return GetReal()->Wait(static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), Value);
+	return GetReal()->Wait(
+		static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), 
+		Value);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::GetTimestampFrequency(
 	_Out_  UINT64 *pFrequency) {
-	return GetReal()->GetTimestampFrequency(pFrequency);
+	return GetReal()->GetTimestampFrequency(
+		pFrequency);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::GetClockCalibration(
 	_Out_  UINT64 *pGpuTimestamp,
 	_Out_  UINT64 *pCpuTimestamp) {
-	return GetReal()->GetClockCalibration(pGpuTimestamp, pCpuTimestamp);
+	return GetReal()->GetClockCalibration(
+		pGpuTimestamp, 
+		pCpuTimestamp);
 }
 
 D3D12_COMMAND_QUEUE_DESC STDMETHODCALLTYPE WrappedD3D12CommandQueue::GetDesc(void) {

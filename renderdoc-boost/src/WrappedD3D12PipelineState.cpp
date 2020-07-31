@@ -8,7 +8,6 @@ WrappedD3D12PipelineState::WrappedD3D12PipelineState(ID3D12PipelineState* pReal,
 	m_typeDesc(PipelineStateType_Compute, compute_desc),
 	m_pWrappedRootSignature(pWrappedRootSignature)
 {
-	m_pWrappedRootSignature->AddRef();
 }
 
 WrappedD3D12PipelineState::WrappedD3D12PipelineState(ID3D12PipelineState* pReal, WrappedD3D12Device* pDevice,
@@ -17,18 +16,16 @@ WrappedD3D12PipelineState::WrappedD3D12PipelineState(ID3D12PipelineState* pReal,
 	m_typeDesc(PipelineStateType_Graphics, graphics_desc),
 	m_pWrappedRootSignature(pWrappedRootSignature) 
 {
-	m_pWrappedRootSignature->AddRef();
 }
 
 WrappedD3D12PipelineState::~WrappedD3D12PipelineState() {
-	m_pWrappedRootSignature->Release();
 }
 
-ID3D12DeviceChild* WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDevice) {
-	ID3D12PipelineState * pvPipelineState;
+COMPtr<ID3D12DeviceChild> WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDevice) {
+	COMPtr<ID3D12PipelineState> pvPipelineState;
 	if (m_typeDesc.type ==PipelineStateType_Graphics) {
 		auto& desc = m_typeDesc.uPipelineStateDesc.graphicsDesc;
-		desc.pRootSignature = m_pWrappedRootSignature->GetReal();
+		desc.pRootSignature = m_pWrappedRootSignature->GetReal().Get();
 		HRESULT ret = pNewDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pvPipelineState));
 		if (FAILED(ret)) {
 			LogError("create new D3D12RootSignature failed");
@@ -37,7 +34,7 @@ ID3D12DeviceChild* WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDev
 	}
 	else {
 		auto& desc = m_typeDesc.uPipelineStateDesc.computeDesc;
-		desc.pRootSignature = m_pWrappedRootSignature->GetReal();
+		desc.pRootSignature = m_pWrappedRootSignature->GetReal().Get();
 		HRESULT ret = pNewDevice->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pvPipelineState));
 		if (FAILED(ret)) {
 			LogError("create new D3D12RootSignature failed");

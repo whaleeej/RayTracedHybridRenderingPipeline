@@ -133,16 +133,17 @@ public: //override for swapchain1
 
 public: // framework
 	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
-	IDXGISwapChain1* CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+	COMPtr<IDXGISwapChain1> CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
 
 protected:
-	WrappedD3D12CommandQueue* const m_pWrappedCommandQueue;//reffed
-	std::vector<WrappedD3D12Resource*> m_SwapChainBuffers;//reffed with new //TODO ref it
+	COMPtr<IDXGISwapChain1> m_pRealSwapChain;// the wrapped real swapchain
 
-	IDXGISwapChain1* m_pRealSwapChain;//reffed
+	COMPtr<WrappedD3D12CommandQueue> const m_pWrappedCommandQueue;
+	std::vector< COMPtr<WrappedD3D12Resource>> m_SwapChainBuffers;
 
-	unsigned int m_Ref;
+
 	SResizeBufferParameter m_ResizeParam;
+	unsigned int m_Ref;
 };
 
 RDCBOOST_NAMESPACE_END
