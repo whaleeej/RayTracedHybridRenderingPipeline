@@ -9,6 +9,7 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 	: m_pRealSwapChain(pReal)
 	, m_pWrappedCommandQueue(pCommandQueue)
 	, m_Ref(1)
+	, m_HighestVersion(1)
 {
 
 	m_ResizeParam.Valid = false;
@@ -30,6 +31,23 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain.Get());
 		pvWrappedRes->Release();
 	}
+
+	//check idxgi swapchain support
+	COMPtr<IDXGISwapChain2> pSwapchain2;
+	HRESULT ret = m_pRealSwapChain.As(&pSwapchain2);
+	if (!FAILED(ret))
+		m_HighestVersion++;
+	else return;
+	COMPtr<IDXGISwapChain3> pSwapchain3;
+	ret = m_pRealSwapChain.As(&pSwapchain3);
+	if (!FAILED(ret))
+		m_HighestVersion++;
+	else return;
+	COMPtr<IDXGISwapChain4> pSwapchain4;
+	ret = m_pRealSwapChain.As(&pSwapchain4);
+	if (!FAILED(ret))
+		m_HighestVersion++;
+	else return;
 }
 
 WrappedD3D12DXGISwapChain::~WrappedD3D12DXGISwapChain()
@@ -85,19 +103,15 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 }
 
 COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue) {
-	/************************************************************************/
-	/*          only support DxgiFacotry4 and DxgiSwapchain 4 here            */
-	/************************************************************************/
-	//TODO:dxgi factory compatibility
-	IDXGIFactory4* dxgiFactory4;
+	IDXGIFactory4* dxgiFactory4; //TODO: higher version of dxgi? or low compatibility
 	UINT createFactoryFlags = 0;
 	HRESULT ret = CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory4));
 	if (FAILED(ret)) {
-		LogError("the dxgi factory is not suppot by now");
+		LogError("the dxgi factory 4 is not suppot by now");
 		return NULL;
 	}
 
-	IDXGISwapChain1* swapChain1;
+	COMPtr<IDXGISwapChain1> swapChain1;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
 	HWND hWnd;
 	m_pRealSwapChain->GetDesc1(&swapChainDesc);
@@ -107,16 +121,31 @@ COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12Comm
 		pRealCommandQueue,
 		hWnd,
 		&swapChainDesc,
-		nullptr,
-		nullptr,
+		nullptr,//TDOO fullscreen desc
+		nullptr,//TODO dxgi output
 		&swapChain1);
 
-	//TODO: Disable the Alt+Enter fullscreen toggle feature eg. DXGI_MWA_NO_ALT_ENTER
-	ret = dxgiFactory4->MakeWindowAssociation(hWnd, /*DXGI_MWA_NO_ALT_ENTER*/0);
+	ret = dxgiFactory4->MakeWindowAssociation(hWnd, 0);//TODO: association flag
 	if (FAILED(ret)) {
 		LogError("Failed to make window association with newly created swap chain");
 		return NULL;
 	}
+
+	m_HighestVersion = 1;
+	COMPtr<IDXGISwapChain2> pSwapchain2;
+	ret = m_pRealSwapChain.As(&pSwapchain2);
+	if (!FAILED(ret))
+		m_HighestVersion++;
+	else return swapChain1;
+	COMPtr<IDXGISwapChain3> pSwapchain3;
+	ret = m_pRealSwapChain.As(&pSwapchain3);
+	if (!FAILED(ret))
+		m_HighestVersion++;
+	else return swapChain1;
+	COMPtr<IDXGISwapChain4> pSwapchain4;
+	ret = m_pRealSwapChain.As(&pSwapchain4);
+	if (!FAILED(ret))
+		m_HighestVersion++;
 	return swapChain1;
 }
 
@@ -126,13 +155,8 @@ COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12Comm
 /************************************************************************/
 HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void **ppSurface)
 {
+	Assert(riid == __uuidof(ID3D12Resource));
 	if (ppSurface == NULL) return E_INVALIDARG;
-
-	if (riid != __uuidof(ID3D12Resource))
-	{
-		LogError("Unsupported or unrecognised UUID passed to IDXGISwapChain::GetBuffer");
-		return E_NOINTERFACE;
-	}
 
 	COMPtr<ID3D12Resource>realSurface = NULL;
 	HRESULT ret = m_pRealSwapChain->GetBuffer(Buffer, riid, (void**)&realSurface);
@@ -241,9 +265,67 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetParent(REFIID riid, voi
 HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::QueryInterface(
 	REFIID riid, _COM_Outptr_ void __RPC_FAR *__RPC_FAR *ppvObject)
 {
-	*ppvObject = NULL;
-	LogError("IDXGISwapChain::QueryInterface is not supported by now.");
-	return E_FAIL;
+	if (riid == __uuidof(IDXGISwapChain)) {
+		if (checkVersionSupport(0)) {
+			*ppvObject = static_cast<IDXGISwapChain*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	else if (riid == __uuidof(IDXGISwapChain1)) {
+		if (checkVersionSupport(1)) {
+			*ppvObject = static_cast<IDXGISwapChain1*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	else if (riid == __uuidof(IDXGISwapChain2)) {
+		if (checkVersionSupport(2)) {
+			*ppvObject = static_cast<IDXGISwapChain2*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	else if (riid == __uuidof(IDXGISwapChain3)) {
+		if (checkVersionSupport(3)) {
+			*ppvObject = static_cast<IDXGISwapChain3*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	else if (riid == __uuidof(IDXGISwapChain4)) {
+		if (checkVersionSupport(4)) {
+			*ppvObject = static_cast<IDXGISwapChain4*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	else if (riid == __uuidof(IDXGIDeviceSubObject)) {
+		*ppvObject = static_cast<IDXGIDeviceSubObject*>(this);
+		AddRef();
+		return S_OK;
+	}
+	else if (riid == __uuidof(IDXGIObject)) {
+		*ppvObject = static_cast<IDXGIObject*>(this);
+		AddRef();
+		return S_OK;
+	}
+	else if (riid == __uuidof(IUnknown)) {
+		*ppvObject = static_cast<IUnknown*>(this);
+		AddRef();
+		return S_OK;
+	}
+	return GetReal1()->QueryInterface(riid, ppvObject);
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
@@ -361,5 +443,142 @@ HRESULT  STDMETHODCALLTYPE  WrappedD3D12DXGISwapChain::GetRotation(
 	return m_pRealSwapChain->GetRotation(pRotation);
 }
 
+
+//override for swapchain2
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetSourceSize(
+	UINT Width,
+	UINT Height) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->SetSourceSize(Width, Height);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetSourceSize(
+	/* [annotation][out] */
+	_Out_  UINT* pWidth,
+	/* [annotation][out] */
+	_Out_  UINT* pHeight) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->GetSourceSize(
+		 pWidth,
+		 pHeight);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetMaximumFrameLatency(
+	UINT MaxLatency) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->SetMaximumFrameLatency(
+		 MaxLatency);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetMaximumFrameLatency(
+	/* [annotation][out] */
+	_Out_  UINT* pMaxLatency) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->GetMaximumFrameLatency(
+		pMaxLatency);
+}
+
+HANDLE STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetFrameLatencyWaitableObject(void) {
+	if (!checkVersionSupport(2)) {
+		LogError("IDXGI SwapChain2 not supportted");
+		return 0;
+	}
+	
+	return GetReal2()->GetFrameLatencyWaitableObject();
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetMatrixTransform(
+	const DXGI_MATRIX_3X2_F* pMatrix) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->SetMatrixTransform(
+		pMatrix);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetMatrixTransform(
+	/* [annotation][out] */
+	_Out_  DXGI_MATRIX_3X2_F* pMatrix) {
+	if (!checkVersionSupport(2))
+		return E_FAIL;
+	return GetReal2()->GetMatrixTransform(
+		pMatrix);
+}
+
+//override swapchain3
+UINT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetCurrentBackBufferIndex(void) {
+	if (!checkVersionSupport(3))
+	{
+		LogError("idxgi swapchain3 not supportted");
+		return 0;
+	}
+	return GetReal3()->GetCurrentBackBufferIndex();
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::CheckColorSpaceSupport(
+	/* [annotation][in] */
+	_In_  DXGI_COLOR_SPACE_TYPE ColorSpace,
+	/* [annotation][out] */
+	_Out_  UINT* pColorSpaceSupport) {
+	if (!checkVersionSupport(3))
+		return E_FAIL;
+	return GetReal3()->CheckColorSpaceSupport(
+		ColorSpace,
+		pColorSpaceSupport);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetColorSpace1(
+	/* [annotation][in] */
+	_In_  DXGI_COLOR_SPACE_TYPE ColorSpace) {
+	if (!checkVersionSupport(3))
+		return E_FAIL;
+	return GetReal3()->SetColorSpace1(ColorSpace);
+}
+
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::ResizeBuffers1(
+	/* [annotation][in] */
+	_In_  UINT BufferCount,
+	/* [annotation][in] */
+	_In_  UINT Width,
+	/* [annotation][in] */
+	_In_  UINT Height,
+	/* [annotation][in] */
+	_In_  DXGI_FORMAT Format,
+	/* [annotation][in] */
+	_In_  UINT SwapChainFlags,
+	/* [annotation][in] */
+	_In_reads_(BufferCount)  const UINT* pCreationNodeMask,
+	/* [annotation][in] */
+	_In_reads_(BufferCount)  IUnknown* const* ppPresentQueue) {
+	if (!checkVersionSupport(3))
+		return E_FAIL;
+	return GetReal3()->ResizeBuffers1(
+		BufferCount,
+		Width,
+		Height,
+		Format,
+		SwapChainFlags,
+		pCreationNodeMask,
+		ppPresentQueue);
+}
+
+//override swapchain4
+HRESULT STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::SetHDRMetaData(
+	/* [annotation][in] */
+	_In_  DXGI_HDR_METADATA_TYPE Type,
+	/* [annotation][in] */
+	_In_  UINT Size,
+	/* [annotation][size_is][in] */
+	_In_reads_opt_(Size)  void* pMetaData) {
+	if (!checkVersionSupport(4))
+		return E_FAIL;
+	return GetReal4()->SetHDRMetaData(
+		Type,
+		Size,
+		pMetaData);
+}
 
 RDCBOOST_NAMESPACE_END

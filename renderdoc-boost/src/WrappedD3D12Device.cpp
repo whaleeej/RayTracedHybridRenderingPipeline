@@ -320,7 +320,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 		COMPtr < ID3D12GraphicsCommandList> pCommandList = NULL;
 		HRESULT ret = GetReal()->CreateCommandList(nodeMask, type,
 			static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
-			static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
+			pInitialState?static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get():NULL,
 			IID_PPV_ARGS(&pCommandList));
 		if (!FAILED(ret)) {
 			WrappedD3D12GraphicsCommansList* wrapped = new WrappedD3D12GraphicsCommansList(//默认这里的Allocator是Wrapped的

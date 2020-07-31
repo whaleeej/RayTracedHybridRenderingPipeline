@@ -7,7 +7,7 @@ RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12Resource;
 class WrappedD3D12CommandQueue;
 
-class WrappedD3D12DXGISwapChain :public IDXGISwapChain1 {
+class WrappedD3D12DXGISwapChain :public IDXGISwapChain4 { //support from swapchain1-4
 	struct SResizeBufferParameter
 	{
 		bool Valid;
@@ -22,10 +22,9 @@ public:
 	WrappedD3D12DXGISwapChain(IDXGISwapChain1* pReal, WrappedD3D12CommandQueue* pCommandQueue);
 	virtual ~WrappedD3D12DXGISwapChain();
 
-public: //override
+public: //override swapchain
 	virtual HRESULT STDMETHODCALLTYPE GetBuffer(UINT Buffer, REFIID riid, void **ppSurface);
 
-	// TODO_wzq wrap IDXGIOutput
 	virtual HRESULT STDMETHODCALLTYPE SetFullscreenState(BOOL Fullscreen,
 		IDXGIOutput *pTarget);
 
@@ -34,8 +33,6 @@ public: //override
 
 	virtual HRESULT STDMETHODCALLTYPE GetContainingOutput(IDXGIOutput **ppOutput);
 
-
-	// TODO_wzq wrap following methods.
 	virtual HRESULT STDMETHODCALLTYPE SetPrivateData(REFGUID Name, UINT DataSize,
 		const void *pData);
 
@@ -131,6 +128,93 @@ public: //override for swapchain1
 		/* [annotation][out] */
 		_Out_  DXGI_MODE_ROTATION *pRotation) ;
 
+public: //override for swapchain2
+	virtual HRESULT STDMETHODCALLTYPE SetSourceSize(
+		UINT Width,
+		UINT Height);
+
+	virtual HRESULT STDMETHODCALLTYPE GetSourceSize(
+		/* [annotation][out] */
+		_Out_  UINT* pWidth,
+		/* [annotation][out] */
+		_Out_  UINT* pHeight);
+
+	virtual HRESULT STDMETHODCALLTYPE SetMaximumFrameLatency(
+		UINT MaxLatency);
+
+	virtual HRESULT STDMETHODCALLTYPE GetMaximumFrameLatency(
+		/* [annotation][out] */
+		_Out_  UINT* pMaxLatency);
+
+	virtual HANDLE STDMETHODCALLTYPE GetFrameLatencyWaitableObject(void) ;
+
+	virtual HRESULT STDMETHODCALLTYPE SetMatrixTransform(
+		const DXGI_MATRIX_3X2_F* pMatrix);
+
+	virtual HRESULT STDMETHODCALLTYPE GetMatrixTransform(
+		/* [annotation][out] */
+		_Out_  DXGI_MATRIX_3X2_F* pMatrix);
+
+public: //override swapchain3
+	virtual UINT STDMETHODCALLTYPE GetCurrentBackBufferIndex(void);
+
+	virtual HRESULT STDMETHODCALLTYPE CheckColorSpaceSupport(
+		/* [annotation][in] */
+		_In_  DXGI_COLOR_SPACE_TYPE ColorSpace,
+		/* [annotation][out] */
+		_Out_  UINT* pColorSpaceSupport) ;
+
+	virtual HRESULT STDMETHODCALLTYPE SetColorSpace1(
+		/* [annotation][in] */
+		_In_  DXGI_COLOR_SPACE_TYPE ColorSpace) ;
+
+	virtual HRESULT STDMETHODCALLTYPE ResizeBuffers1(
+		/* [annotation][in] */
+		_In_  UINT BufferCount,
+		/* [annotation][in] */
+		_In_  UINT Width,
+		/* [annotation][in] */
+		_In_  UINT Height,
+		/* [annotation][in] */
+		_In_  DXGI_FORMAT Format,
+		/* [annotation][in] */
+		_In_  UINT SwapChainFlags,
+		/* [annotation][in] */
+		_In_reads_(BufferCount)  const UINT* pCreationNodeMask,
+		/* [annotation][in] */
+		_In_reads_(BufferCount)  IUnknown* const* ppPresentQueue);
+
+public: //override swapchain4
+	virtual HRESULT STDMETHODCALLTYPE SetHDRMetaData(
+		/* [annotation][in] */
+		_In_  DXGI_HDR_METADATA_TYPE Type,
+		/* [annotation][in] */
+		_In_  UINT Size,
+		/* [annotation][size_is][in] */
+		_In_reads_opt_(Size)  void* pMetaData);
+
+public: //func
+	bool checkVersionSupport(int _ver) { return _ver <= m_HighestVersion; };
+	COMPtr<IDXGISwapChain> GetReal() { COMPtr<IDXGISwapChain> _ret; _ret = static_cast<IDXGISwapChain*>(m_pRealSwapChain.Get()); };
+	COMPtr<IDXGISwapChain1> GetReal1() {
+		return m_pRealSwapChain;
+	};
+	COMPtr<IDXGISwapChain2> GetReal2() {
+		COMPtr<IDXGISwapChain2> _ret;
+		m_pRealSwapChain.As(&_ret);
+		return _ret;
+	};
+	COMPtr<IDXGISwapChain3> GetReal3() {
+		COMPtr<IDXGISwapChain3> _ret;
+		m_pRealSwapChain.As(&_ret);
+		return _ret;
+	};
+	COMPtr<IDXGISwapChain4> GetReal4() {
+		COMPtr<IDXGISwapChain4> _ret;
+		m_pRealSwapChain.As(&_ret);
+		return _ret;
+	};
+
 public: // framework
 	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
 	COMPtr<IDXGISwapChain1> CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
@@ -144,6 +228,8 @@ protected:
 
 	SResizeBufferParameter m_ResizeParam;
 	unsigned int m_Ref;
+
+	int m_HighestVersion;
 };
 
 RDCBOOST_NAMESPACE_END
