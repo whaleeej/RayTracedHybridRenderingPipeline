@@ -38,9 +38,9 @@ public: //framework
 
 		COMPtr<ID3D12DeviceChild> pCopied = CopyToDevice(pNewDevice);
 		Assert(pCopied.Get() != NULL);
-		m_PrivateData.CopyPrivateData(pCopied);
+		m_PrivateData.CopyPrivateData(pCopied.Get());
 		m_pReal = pCopied;
-		pCopied->SetName(m_ObjectName);
+		pCopied->SetName(m_ObjectName.c_str());
 		m_pRealDevice = pNewDevice;//根据框架, 这里WrappedDevice没有变，只是内部的pReal变了
 
 	}

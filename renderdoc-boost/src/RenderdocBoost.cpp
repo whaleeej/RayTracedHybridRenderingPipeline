@@ -205,7 +205,7 @@ HRESULT  D3D12CreateDevice(
 	HRESULT ret = pfnD3D12CreateDevice(pAdapter, MinimumFeatureLevel, IID_PPV_ARGS(&pRealDevice));
 
 	WrappedD3D12Device* pWrappedDevice = NULL;
-	if (ret) {
+	if (!FAILED(ret)) {
 		pWrappedDevice = new WrappedD3D12Device(pRealDevice.Get(), 
 			SDeviceCreateParams(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, 0, 0, &MinimumFeatureLevel, 1, 0, 0));
 	}

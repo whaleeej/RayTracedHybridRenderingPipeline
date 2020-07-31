@@ -203,7 +203,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 
 	COMPtr<ID3D12CommandQueue> pCommandQueue = NULL;
 	HRESULT ret = GetReal()->CreateCommandQueue(pDesc, IID_PPV_ARGS(&pCommandQueue));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12CommandQueue* wrapped = new WrappedD3D12CommandQueue(pCommandQueue.Get(), this);
 		*ppCommandQueue = wrapped;
 		m_BackRefs_CommandQueue[pCommandQueue.Get()] = wrapped;
@@ -223,7 +223,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 
 	COMPtr < ID3D12CommandAllocator> pCommandAllocator = NULL;
 	HRESULT ret = GetReal()->CreateCommandAllocator(type, IID_PPV_ARGS(&pCommandAllocator));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12CommandAllocator* wrapped = new WrappedD3D12CommandAllocator(pCommandAllocator.Get(), this, type);
 		*ppCommandAllocator = wrapped;
 		m_BackRefs_CommandAllocator[pCommandAllocator.Get()] = wrapped;
@@ -246,7 +246,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC  tmpDesc = *pDesc;
 	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal().Get();
 	HRESULT ret = GetReal()->CreateGraphicsPipelineState(&tmpDesc, IID_PPV_ARGS(&pPipelineState));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
 		);
@@ -271,7 +271,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 	D3D12_COMPUTE_PIPELINE_STATE_DESC  tmpDesc = *pDesc;
 	tmpDesc.pRootSignature = pWrappedRootSignature->GetReal().Get();
 	HRESULT ret = GetReal()->CreateComputePipelineState(&tmpDesc, IID_PPV_ARGS(&pPipelineState));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12PipelineState* wrapped = new WrappedD3D12PipelineState(
 			pPipelineState.Get(), this,
 			tmpDesc, pWrappedRootSignature
@@ -300,7 +300,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 		static_cast<WrappedD3D12CommandAllocator *>(pCommandAllocator)->GetReal().Get(),
 		static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get(),
 		IID_PPV_ARGS(&pCommandList));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12CommandList* wrapped = new WrappedD3D12CommandList(//默认这里的Allocator是Wrapped的
 			pCommandList.Get(), this,
 			static_cast<WrappedD3D12CommandAllocator* >(pCommandAllocator), nodeMask
@@ -323,7 +323,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 
 	COMPtr<ID3D12DescriptorHeap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, IID_PPV_ARGS(&pvHeap));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12DescriptorHeap* wrapped = new WrappedD3D12DescriptorHeap(pvHeap.Get(), this);
 		*ppvHeap = wrapped;
 		m_BackRefs_DescriptorHeap[pvHeap.Get()] = wrapped;
@@ -345,7 +345,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 
 	COMPtr<ID3D12RootSignature> pvRootSignature = NULL;
 	HRESULT ret = GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, IID_PPV_ARGS(&pvRootSignature));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12RootSignature* wrapped = new WrappedD3D12RootSignature(
 			pvRootSignature.Get(), this,
 			nodeMask, pBlobWithRootSignature, blobLengthInBytes
@@ -372,7 +372,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 
 	COMPtr<ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
 			pvResource.Get(), this, NULL,
 			WrappedD3D12Resource::CommittedWrappedD3D12Resource,
@@ -398,7 +398,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
 
 	COMPtr<ID3D12Heap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12Heap* wrapped = new WrappedD3D12Heap(pvHeap.Get(), this);
 		*ppvHeap = wrapped;
 		m_BackRefs_Heap[pvHeap.Get()] = wrapped;
@@ -424,7 +424,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 
 	COMPtr<ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreatePlacedResource(static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
 			pvResource.Get(), this, static_cast<WrappedD3D12Heap*>(pHeap),
 			WrappedD3D12Resource::PlacedWrappedD3D12Resource,
@@ -452,7 +452,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 
 	COMPtr< ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
 			pvResource.Get(), this, NULL,
 			WrappedD3D12Resource::ReservedWrappedD3D12Resource,
@@ -487,7 +487,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
 
 	COMPtr< ID3D12Fence> pFence = NULL;
 	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
-	if (ret) {
+	if (!FAILED(ret)) {
 		WrappedD3D12Fence* wrapped = new WrappedD3D12Fence(pFence.Get(), this, InitialValue, Flags);
 		*ppFence = wrapped;
 		m_BackRefs_Fence[pFence.Get()] = wrapped;
