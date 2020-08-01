@@ -11,8 +11,6 @@
 #include <Texture.h>
 #include "RenderdocBoost.h"
 
-#define ENABLE_RENDERDOC 1
-
 Window::Window(HWND hWnd, const std::wstring& windowName, int clientWidth, int clientHeight, bool vSync )
     : m_hWnd(hWnd)
     , m_WindowName(windowName)
@@ -330,24 +328,25 @@ Microsoft::WRL::ComPtr<IDXGISwapChain4> Window::CreateSwapChain()
     ID3D12CommandQueue* pCommandQueue = app.GetCommandQueue()->GetD3D12CommandQueue().Get();
 
     ComPtr<IDXGISwapChain1> swapChain1;
-#ifdef ENABLE_RENDERDOC
-	ThrowIfFailed(rdcboost::CreateSwapChainForHwnd(
-		dxgiFactory4.Get(),
-		pCommandQueue,
-		m_hWnd,
-		&swapChainDesc,
-		nullptr,
-		nullptr,
-		&swapChain1));
-#elif
-    ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd(
-        pCommandQueue,
-        m_hWnd,
-        &swapChainDesc,
-        nullptr,
-        nullptr,
-        &swapChain1));
-#endif
+	if (app.IsRenderDocEnabled()) {
+		ThrowIfFailed(rdcboost::CreateSwapChainForHwnd(
+			dxgiFactory4.Get(),
+			pCommandQueue,
+			m_hWnd,
+			&swapChainDesc,
+			nullptr,
+			nullptr,
+			&swapChain1));
+	}
+	else {
+		 ThrowIfFailed(dxgiFactory4->CreateSwapChainForHwnd(
+				pCommandQueue,
+				m_hWnd,
+				&swapChainDesc,
+				nullptr,
+				nullptr,
+				&swapChain1));
+	}
     // Disable the Alt+Enter fullscreen toggle feature. Switching to fullscreen
     // will be handled manually.
     ThrowIfFailed(dxgiFactory4->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER));
@@ -417,9 +416,8 @@ UINT Window::Present( const Texture& texture )
 
     Application::Get().ReleaseStaleDescriptors( m_FrameValues[m_CurrentBackBufferIndex] );
 
-#ifdef ENABLE_RENDERDOC
-	rdcboost::D3D12CallAtEndOfFrame(Application::Get().GetDevice().Get());
-#endif
+	if(Application::Get().IsRenderDocEnabled())
+		rdcboost::D3D12CallAtEndOfFrame(Application::Get().GetDevice().Get());
 
     return m_CurrentBackBufferIndex;
 }

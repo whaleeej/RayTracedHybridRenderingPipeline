@@ -29,10 +29,11 @@ tD3D11CreateDeviceAndSwapChain pfnRenderdocD3D11CreateDeviceAndSwapChain;
 tD3D11CreateDeviceAndSwapChain pfnD3D11CreateDeviceAndSwapChain;
 
 typedef 	HRESULT (WINAPI* tD3D12CreateDevice)(
-	IDXGIAdapter* pAdapter,
+	_In_opt_ IUnknown* pAdapter,
 	D3D_FEATURE_LEVEL MinimumFeatureLevel,
 	_In_ REFIID riid, // Expected: ID3D12Device
 	_COM_Outptr_opt_ void** ppDevice);
+
 
 tD3D12CreateDevice pfnRenderdocD3D12CreateDevice;
 tD3D12CreateDevice pfnD3D12CreateDevice;
@@ -198,6 +199,7 @@ HRESULT  D3D12CreateDevice(
 
 	if (pfnD3D12CreateDevice == NULL) {
 		HMODULE d3d12Module = GetModuleHandle("d3d12.dll");
+		Assert(d3d12Module);
 		pfnD3D12CreateDevice = (tD3D12CreateDevice)GetProcAddress(d3d12Module, "D3D12CreateDevice");
 	}
 

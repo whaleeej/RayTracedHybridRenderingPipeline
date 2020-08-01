@@ -30,6 +30,7 @@
 //copyToDevice中创建的对象，改成ComPtr直接走operator=                                                       ------>   ComPtr
 
 // update 8/1 TODO
+// 0. descriptor heap中的resource可能已经被释放了
 // 1. 支持CreateView中的参数情况
 // 2. 支持其他API的参数情况
 // 3. ID3D12Device1-6

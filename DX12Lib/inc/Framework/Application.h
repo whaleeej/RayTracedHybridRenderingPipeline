@@ -35,7 +35,7 @@ public:
     void																		ReleaseStaleDescriptors( uint64_t finishedFrame );
     UINT																	GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
     static uint64_t														GetFrameCount()  {   return ms_FrameCount; }
-
+	bool																		IsRenderDocEnabled(){ return m_EnableRenderdoc; }
 protected:
 
     Application(HINSTANCE hInst);
@@ -69,4 +69,6 @@ private:
     static uint64_t ms_FrameCount;
 
 	bool m_loadedFlg;
+
+	const bool m_EnableRenderdoc = true;
 };

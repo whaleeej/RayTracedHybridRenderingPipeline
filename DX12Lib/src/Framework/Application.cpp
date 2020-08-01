@@ -8,7 +8,6 @@
 #include <Window.h>
 #include <RenderdocBoost.h>
 
-#define ENABLE_RENDERDOC 1
 //#define ENABLE_RAYTRACING 1
 
 constexpr wchar_t WINDOW_CLASS_NAME[] = L"DX12RenderWindowClass";
@@ -188,11 +187,13 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
 Microsoft::WRL::ComPtr<ID3D12Device> Application::CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
     ComPtr<ID3D12Device> d3d12Device;
-#ifdef ENABLE_RENDERDOC
-    ThrowIfFailed(rdcboost::D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
-#else
-	ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
-#endif
+	if (IsRenderDocEnabled()) {
+		ThrowIfFailed(rdcboost::D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
+
+	}
+	else {
+		ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
+	}
     NAME_D3D12_OBJECT(d3d12Device);
 
 	// check for Device Ray Tracing Support
@@ -207,42 +208,42 @@ Microsoft::WRL::ComPtr<ID3D12Device> Application::CreateDevice(Microsoft::WRL::C
 #endif
 
     // Enable debug messages in debug mode.
-//#if defined(_DEBUG)
-//    ComPtr<ID3D12InfoQueue> pInfoQueue;
-//    if (SUCCEEDED(d3d12Device.As(&pInfoQueue)))
-//    {
-//        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-//        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
-//        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
-//
-//        // Suppress whole categories of messages
-//        //D3D12_MESSAGE_CATEGORY Categories[] = {};
-//
-//        // Suppress messages based on their severity level
-//        D3D12_MESSAGE_SEVERITY Severities[] =
-//        {
-//            D3D12_MESSAGE_SEVERITY_INFO
-//        };
-//
-//        // Suppress individual messages by their ID
-//        D3D12_MESSAGE_ID DenyIds[] = {
-//            D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
-//            D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
-//            D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
-//        };
-//
-//        D3D12_INFO_QUEUE_FILTER NewFilter = {};
-//        //NewFilter.DenyList.NumCategories = _countof(Categories);
-//        //NewFilter.DenyList.pCategoryList = Categories;
-//        NewFilter.DenyList.NumSeverities = _countof(Severities);
-//        NewFilter.DenyList.pSeverityList = Severities;
-//        NewFilter.DenyList.NumIDs = _countof(DenyIds);
-//        NewFilter.DenyList.pIDList = DenyIds;
-//
-//        ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
-//    }
-//#endif
-//
+#if defined(_DEBUG)
+    ComPtr<ID3D12InfoQueue> pInfoQueue;
+    if (SUCCEEDED(d3d12Device.As(&pInfoQueue)))
+    {
+        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
+
+        // Suppress whole categories of messages
+        //D3D12_MESSAGE_CATEGORY Categories[] = {};
+
+        // Suppress messages based on their severity level
+        D3D12_MESSAGE_SEVERITY Severities[] =
+        {
+            D3D12_MESSAGE_SEVERITY_INFO
+        };
+
+        // Suppress individual messages by their ID
+        D3D12_MESSAGE_ID DenyIds[] = {
+            D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,   // I'm really not sure how to avoid this message.
+            D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                         // This warning occurs when using capture frame while graphics debugging.
+            D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                       // This warning occurs when using capture frame while graphics debugging.
+        };
+
+        D3D12_INFO_QUEUE_FILTER NewFilter = {};
+        //NewFilter.DenyList.NumCategories = _countof(Categories);
+        //NewFilter.DenyList.pCategoryList = Categories;
+        NewFilter.DenyList.NumSeverities = _countof(Severities);
+        NewFilter.DenyList.pSeverityList = Severities;
+        NewFilter.DenyList.NumIDs = _countof(DenyIds);
+        NewFilter.DenyList.pIDList = DenyIds;
+
+        ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
+    }
+#endif
+
     return d3d12Device;
 }
 

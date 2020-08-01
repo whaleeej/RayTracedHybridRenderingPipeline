@@ -14,8 +14,6 @@
 
 #include <RenderdocBoost.h>
 
-#define ENABLE_RENDERDOC
-
 static bool g_AllowFullscreenToggle = true;
 static uint64_t frameCount = 0;
 static double totalTime = 0.0;
@@ -158,20 +156,21 @@ void HybridRenderingPipeline::OnKeyPressed(KeyEventArgs& e)
     case KeyCode::V:
         m_pWindow->ToggleVSync();
         break;
-#ifdef ENABLE_RENDERDOC
+
 	case KeyCode::C:
-		rdcboost::D3D12EnableRenderDoc(Application::Get().GetDevice().Get(), 1);
-		void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
-		RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
-		if (pAPI != NULL)
-		{
-			std::string pathTemplate = pAPI->GetLogFilePathTemplate();
-			size_t lastSep = pathTemplate.find_last_of("\\/");
-			if (lastSep != std::string::npos)
-				pAPI->SetLogFilePathTemplate(pathTemplate.substr(lastSep + 1).c_str());
+		if (Application::Get().IsRenderDocEnabled()) {
+			rdcboost::D3D12EnableRenderDoc(Application::Get().GetDevice().Get(), 1);
+			void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
+			RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
+			if (pAPI != NULL)
+			{
+				std::string pathTemplate = pAPI->GetLogFilePathTemplate();
+				size_t lastSep = pathTemplate.find_last_of("\\/");
+				if (lastSep != std::string::npos)
+					pAPI->SetLogFilePathTemplate(pathTemplate.substr(lastSep + 1).c_str());
+			}
 		}
 		break;
-#endif
     }
 }
 
