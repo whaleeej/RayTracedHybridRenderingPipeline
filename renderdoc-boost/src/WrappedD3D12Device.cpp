@@ -46,7 +46,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 
 	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
-			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr);
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs;
 			int progress=0; int idx=0;
@@ -67,23 +67,23 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	};
 	auto backRefResourcesTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
-			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr);
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
 			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12DeviceChild>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
 			//因为这个生命周期在switchToDevice1框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
 			
 			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
-			/*.Type = */D3D12_COMMAND_LIST_TYPE_COPY,
+			/*.Type = */D3D12_COMMAND_LIST_TYPE_DIRECT,
 			/*.Priority =*/ D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
 			/*.Flags =*/ D3D12_COMMAND_QUEUE_FLAG_NONE,
 			/*.NodeMask =*/ 0 };
 			COMPtr<ID3D12CommandQueue>copyCommandQueue;
 			pNewDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
 			COMPtr<ID3D12CommandAllocator> copyCommandAllocator;
-			pNewDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&copyCommandAllocator));
+			pNewDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator));
 			COMPtr<ID3D12GraphicsCommandList> copyCommandList;
-			pNewDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
+			pNewDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
 			uint64_t copyFenceValue = 0;
 			COMPtr<ID3D12Fence> copyFence;
 			pNewDevice->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));

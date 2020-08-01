@@ -256,7 +256,7 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == d3d12InRenderdocFlg))
 		return;
 
-	tD3D12CreateDevice pfnCreateDevice =
+	tD3D12CreateDevice pfnCreateDevice = /*pfnD3D12CreateDevice;*/
 		d3d12InRenderdocFlg ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
 	const SDeviceCreateParams params = pWrappedDevice->GetDeviceCreateParams();
