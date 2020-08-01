@@ -104,7 +104,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Reset(
 	_In_  ID3D12CommandAllocator *pAllocator,
 	_In_opt_  ID3D12PipelineState *pInitialState) {
 	return GetReal()->Reset(static_cast<WrappedD3D12CommandAllocator *>(pAllocator)->GetReal().Get(), 
-		static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get());
+		pInitialState?static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get():NULL);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearState(
@@ -264,21 +264,24 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetPipelineState(
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 	_In_  UINT NumBarriers,
 	_In_reads_(NumBarriers)  const D3D12_RESOURCE_BARRIER *pBarriers) {
-	std::vector<D3D12_RESOURCE_BARRIER > barriers(NumBarriers);
-	memcpy(barriers.data(), pBarriers, sizeof(barriers) * sizeof(D3D12_RESOURCE_BARRIER));
+	std::vector<D3D12_RESOURCE_BARRIER > barriers(NumBarriers+1);//TODO: why need +1??
+	memcpy(barriers.data(), pBarriers, NumBarriers * sizeof(D3D12_RESOURCE_BARRIER));
 	for (size_t i = 0; i < NumBarriers; i++) {
 		D3D12_RESOURCE_BARRIER& _Barriers = barriers[i];
 		switch (_Barriers.Type) {
 		case D3D12_RESOURCE_BARRIER_TYPE_TRANSITION:
 			static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
-			_Barriers.Transition.pResource = static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get();
+			_Barriers.Transition.pResource =
+				_Barriers.Transition.pResource ? static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get() : NULL;
 			break;
 		case D3D12_RESOURCE_BARRIER_TYPE_ALIASING:
-			_Barriers.Aliasing.pResourceAfter = static_cast<WrappedD3D12Resource *>(_Barriers.Aliasing.pResourceAfter)->GetReal().Get();
-			_Barriers.Aliasing.pResourceBefore = static_cast<WrappedD3D12Resource *>(_Barriers.Aliasing.pResourceBefore)->GetReal().Get();
+			_Barriers.Aliasing.pResourceAfter = 
+				_Barriers.Aliasing.pResourceAfter ?static_cast<WrappedD3D12Resource *>(_Barriers.Aliasing.pResourceAfter)->GetReal().Get():NULL;
+			_Barriers.Aliasing.pResourceBefore = 
+				_Barriers.Aliasing.pResourceBefore ?static_cast<WrappedD3D12Resource *>(_Barriers.Aliasing.pResourceBefore)->GetReal().Get():NULL;
 			break;
 		case D3D12_RESOURCE_BARRIER_TYPE_UAV:
-			_Barriers.UAV.pResource = static_cast<WrappedD3D12Resource *>(_Barriers.UAV.pResource)->GetReal().Get();
+			_Barriers.UAV.pResource = _Barriers.UAV.pResource ?static_cast<WrappedD3D12Resource *>(_Barriers.UAV.pResource)->GetReal().Get():NULL;
 			break;
 		default:
 			LogError("Unknown barrier type");

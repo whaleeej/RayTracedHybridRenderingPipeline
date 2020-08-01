@@ -54,42 +54,44 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	Assert(pvNewDescriptorHeap.Get());
 
 	//TODO: 这里要确认slotRes指向的Res是否已经被delete掉了，这里暂时使用Exception机制
-	for (int i = 0; i < m_slotDesc.size(); i++) {
-		auto pWrappedRes = m_slotDesc[i].pWrappedD3D12Resource;
-		if (m_slotDesc[i].viewDescType!= ViewDesc_SamplerV
-			&&!TryExistImpl().IsWrappedD3D12ResourceExisted(m_slotDesc[i].pWrappedD3D12Resource)) continue;
-
-		auto pvResource = pWrappedRes->GetReal();
+	for (size_t i = 0; i < m_slotDesc.size(); i++) {
+		
+		//if (m_slotDesc[i].viewDescType!= ViewDesc_SamplerV
+		//	&&!TryExistImpl().IsWrappedD3D12ResourceExisted(m_slotDesc[i].pWrappedD3D12Resource)) continue;
 		auto targetHandle = pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		targetHandle.ptr = targetHandle.ptr +pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type)*i;
+		targetHandle.ptr = targetHandle.ptr +(size_t)pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type)*i;
+
+		auto pWrappedRes = m_slotDesc[i].pWrappedD3D12Resource;
 
 		switch (m_slotDesc[i].viewDescType) {
-		case ViewDesc_CBV: //这里在cache的时候，通过对比GPUVAddr同时解析出来是哪个resource了
-			m_slotDesc[i].concreteViewDesc.cbv.BufferLocation = pvResource->GetGPUVirtualAddress();
+		case ViewDesc_CBV:
+			Assert(pWrappedRes);
+			m_slotDesc[i].concreteViewDesc.cbv.BufferLocation = pWrappedRes->GetReal()->GetGPUVirtualAddress();
 			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, targetHandle);
 			break;
 		case ViewDesc_SRV:
+			Assert(!(pWrappedRes==NULL && m_slotDesc[i].isViewDescNull));
 			pNewDevice->CreateShaderResourceView(
-				pvResource.Get(), 
-				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv:NULL,
+				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
+				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv : NULL,
 				targetHandle);
 			break;
 		case ViewDesc_UAV:
 			pNewDevice->CreateUnorderedAccessView(
-				pvResource.Get(), 
+				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				m_slotDesc[i].pWrappedD3D12CounterResource?m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
-				&m_slotDesc[i].concreteViewDesc.uav, 
+				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.uav : NULL,
 				targetHandle);
 			break;
 		case ViewDesc_RTV:
 			pNewDevice->CreateRenderTargetView(
-				pvResource.Get(), 
+				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.rtv:NULL,
 				targetHandle);
 			break;
 		case ViewDesc_DSV:
 			pNewDevice->CreateDepthStencilView(
-				pvResource.Get(), 
+				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.dsv:NULL,
 				targetHandle);
 			break;
