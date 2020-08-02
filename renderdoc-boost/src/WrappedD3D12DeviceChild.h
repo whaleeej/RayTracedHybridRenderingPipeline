@@ -17,6 +17,17 @@ public:
 		m_pWrappedDevice->OnDeviceChildReleased(static_cast<ID3D12DeviceChild*>(m_pReal.Get()));
 	}
 
+public: //override for ID3D12Object
+	HRESULT STDMETHODCALLTYPE WrappedD3D12Device::QueryInterface(REFIID riid, void** ppvObject) {
+		if (riid == __uuidof(ID3D12Pageable))
+		{
+			*ppvObject = static_cast<ID3D12Pageable*>(this);
+			AddRef();
+			return S_OK;
+		}
+		return WrappedD3D12Object::QueryInterface(riid, ppvObject);
+	}
+
 public: //override for ID3D12DeviceChild
 	virtual HRESULT STDMETHODCALLTYPE GetDevice(REFIID riid, void **ppvDevice) {
 		if (riid == __uuidof(ID3D12Device)) {

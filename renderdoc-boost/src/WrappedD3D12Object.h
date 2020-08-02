@@ -46,6 +46,7 @@ public: // override for IUnknown
 			AddRef();
 			return S_OK;
 		}
+		LogError("InValid Query for this Interface");
 		return m_pReal->QueryInterface(riid, ppvObject);
 	}
 

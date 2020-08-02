@@ -325,6 +325,7 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::QueryInterface(
 		AddRef();
 		return S_OK;
 	}
+	LogError("Invalid query for this interface");
 	return GetReal1()->QueryInterface(riid, ppvObject);
 }
 

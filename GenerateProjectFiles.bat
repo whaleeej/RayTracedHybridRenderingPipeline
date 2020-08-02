@@ -17,8 +17,8 @@ XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Release /I
 XCOPY .\3rd\assimp\*.exp .\%CMAKE_BINARY_DIR%\bin\Debug /I
 XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /I
 XCOPY .\3rd\assimp\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /I
-XCOPY .\3rd\renderdoc\*.dll .\%CMAKE_BINARY_DIR%\bin\Release /I
-XCOPY .\3rd\renderdoc\*.dll .\%CMAKE_BINARY_DIR%\bin\Debug /I
+XCOPY .\3rd\renderdoc\renderdoc.* .\%CMAKE_BINARY_DIR%\bin\Release /I
+XCOPY .\3rd\renderdoc\renderdoc.* .\%CMAKE_BINARY_DIR%\bin\Debug /I
 
 PAUSE
 POPD

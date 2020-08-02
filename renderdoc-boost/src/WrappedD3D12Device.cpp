@@ -15,6 +15,7 @@ WrappedD3D12Device::WrappedD3D12Device(ID3D12Device * pRealDevice, const SDevice
 	, m_DeviceCreateParams(param)
 	, m_bRenderDocDevice(false)
 {
+	m_DummyInfoQueue.m_pDevice = this;
 }
 
 WrappedD3D12Device::~WrappedD3D12Device() {
@@ -193,6 +194,17 @@ WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefDescriptorHeaps(D3D
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
+HRESULT STDMETHODCALLTYPE WrappedD3D12Device::QueryInterface(REFIID riid, void** ppvObject){
+	if (riid == __uuidof(ID3D12InfoQueue))
+	{
+		*ppvObject = static_cast<ID3D12InfoQueue*>(&m_DummyInfoQueue);
+		m_DummyInfoQueue.AddRef();
+		return S_OK;
+	}
+	return WrappedD3D12Object::QueryInterface(riid, ppvObject);
+}
+
+
 //////////////////////////////////////////////////////////////////////////Create D3D12 Object
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	_In_  const D3D12_COMMAND_QUEUE_DESC *pDesc,
