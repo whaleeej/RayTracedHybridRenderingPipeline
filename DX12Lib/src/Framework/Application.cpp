@@ -180,7 +180,6 @@ Microsoft::WRL::ComPtr<IDXGIAdapter4> Application::GetAdapter(bool bUseWarp)
             }
         }
     }
-	m_Adapter4 = dxgiAdapter4;
 
     return dxgiAdapter4;
 }

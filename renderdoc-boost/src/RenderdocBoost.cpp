@@ -256,7 +256,7 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == d3d12InRenderdocFlg))
 		return;
 
-	tD3D12CreateDevice pfnCreateDevice = /*pfnD3D12CreateDevice;*/
+	tD3D12CreateDevice pfnCreateDevice = 
 		d3d12InRenderdocFlg ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
 
 	const SDeviceCreateParams params = pWrappedDevice->GetDeviceCreateParams();
@@ -267,7 +267,8 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 	}
 
 	COMPtr<ID3D12Device> pRealDevice = NULL;
-	HRESULT ret = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
+	
+	HRESULT ret = pfnCreateDevice(NULL, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
 
 	if (FAILED(ret)) {
 		LogError("Create new device failed.");

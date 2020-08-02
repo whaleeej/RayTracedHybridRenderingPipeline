@@ -55,7 +55,6 @@ private:
     HINSTANCE m_hInstance;
 
     Microsoft::WRL::ComPtr<ID3D12Device> m_d3d12Device;
-	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_Adapter4;
 
     std::shared_ptr<CommandQueue> m_DirectCommandQueue;
     std::shared_ptr<CommandQueue> m_ComputeCommandQueue;
