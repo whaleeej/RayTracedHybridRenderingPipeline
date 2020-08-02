@@ -4,50 +4,32 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-WrappedD3D12Resource::WrappedD3D12Resource(
-	ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
-	WrappedD3D12Heap* pHeap,
-	WrappedD3D12ResourceType type,
-	D3D12_RESOURCE_STATES state,
-	const D3D12_CLEAR_VALUE *pClearValue,
-	UINT64 heapOffset)
-	:WrappedD3D12DeviceChild(pReal, pDevice),
-	m_pWrappedHeap(pHeap),
-	m_Type(type),
-	m_State(state),
-	m_pRealSwapChain(NULL),
-	m_heapOffset(heapOffset)
-{
-	if (pClearValue) {
-		m_ClearValue = *pClearValue;
+WrappedD3D12Resource::~WrappedD3D12Resource() {
+	if (m_ClearValue) {
+		delete m_ClearValue;
 	}
 }
 
-WrappedD3D12Resource::~WrappedD3D12Resource() {
-}
-
 COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
-	D3D12_RESOURCE_DESC resDesc = GetReal()->GetDesc();
 	COMPtr<ID3D12Resource> pvResource;
 	switch (m_Type)
 	{
 	//创建D3D12_RESOURCE_STATE_COPY_DEST状态的资源，方便在device的switch中拷贝
 	case CommittedWrappedD3D12Resource:
-		D3D12_HEAP_PROPERTIES heapProperties;
-		D3D12_HEAP_FLAGS heapFlags;
-		GetReal()->GetHeapProperties(&heapProperties, &heapFlags);
 		pNewDevice->CreateCommittedResource(
-			&heapProperties, heapFlags, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			&m_HeapProperties, m_HeapFlags, &m_Desc, 
+			D3D12_RESOURCE_STATE_COPY_DEST, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case PlacedWrappedD3D12Resource:
 		Assert(m_pWrappedHeap.Get()&&m_pWrappedHeap->GetReal().Get());
 		pNewDevice->CreatePlacedResource(
-			m_pWrappedHeap->GetReal().Get(), m_heapOffset, &resDesc, 
-			D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			m_pWrappedHeap->GetReal().Get(), m_heapOffset, &m_Desc, 
+			D3D12_RESOURCE_STATE_COPY_DEST, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case ReservedWrappedD3D12Resource:
 		pNewDevice->CreateReservedResource(
-			&resDesc, D3D12_RESOURCE_STATE_COPY_DEST, &m_ClearValue, IID_PPV_ARGS(&pvResource));
+			&m_Desc, 
+			D3D12_RESOURCE_STATE_COPY_DEST, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case BackBufferWrappedD3D12Resource:
 		//do nothing

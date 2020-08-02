@@ -17,14 +17,99 @@ public:
 		ReservedWrappedD3D12Resource,
 		BackBufferWrappedD3D12Resource
 	};
+	//WrappedD3D12ResourceType m_Type;
+	//D3D12_RESOURCE_DESC m_Desc;
+	//D3D12_RESOURCE_STATES m_State;
+	//D3D12_CLEAR_VALUE* m_ClearValue;
+
+
+	////committed
+	//D3D12_HEAP_PROPERTIES m_HeapProperties;
+	//D3D12_HEAP_FLAGS m_HeapFlags;
+
+	////placed
+	//COMPtr<WrappedD3D12Heap> m_pWrappedHeap;
+	//UINT64 m_heapOffset;
 public:
-	WrappedD3D12Resource(
+	WrappedD3D12Resource( //backbuffer
+		ID3D12Resource* pReal, WrappedD3D12Device* pDevice
+	) :WrappedD3D12DeviceChild(pReal, pDevice),
+		m_Type(BackBufferWrappedD3D12Resource),
+		m_Desc(),
+		m_State(D3D12_RESOURCE_STATE_COMMON),
+		m_ClearValue(NULL),
+		m_HeapProperties(),
+		m_HeapFlags(D3D12_HEAP_FLAG_NONE),
+		m_pWrappedHeap(NULL),
+		m_heapOffset(0)
+	{
+	}
+	WrappedD3D12Resource(//committed
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
-		WrappedD3D12Heap* pHeap = NULL,
-		WrappedD3D12ResourceType type = BackBufferWrappedD3D12Resource,
+		const D3D12_HEAP_PROPERTIES *pHeapProperties,
+		D3D12_HEAP_FLAGS heapFlags,
+		const D3D12_RESOURCE_DESC *pDesc,
+		D3D12_RESOURCE_STATES state,
+		const D3D12_CLEAR_VALUE *pClearValue
+	) :WrappedD3D12DeviceChild(pReal, pDevice),
+		m_Type(CommittedWrappedD3D12Resource),
+		m_Desc(*pDesc),
+		m_State(state),
+		m_ClearValue(NULL),
+		m_HeapProperties(*pHeapProperties),
+		m_HeapFlags(heapFlags),
+		m_pWrappedHeap(NULL),
+		m_heapOffset(0)
+	{
+		if (pClearValue) {
+			m_ClearValue = new D3D12_CLEAR_VALUE();
+			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
+		}
+	}
+	WrappedD3D12Resource(//placed
+		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
+		WrappedD3D12Heap* pHeap,
+		UINT64 heapOffset,
+		const D3D12_RESOURCE_DESC *pDesc,
 		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
-		const D3D12_CLEAR_VALUE *pClearValue=NULL,
-		UINT64 heapOffset = 0);
+		const D3D12_CLEAR_VALUE *pClearValue = NULL
+	) :WrappedD3D12DeviceChild(pReal, pDevice),
+		m_Type(PlacedWrappedD3D12Resource),
+		m_Desc(*pDesc),
+		m_State(state),
+		m_ClearValue(NULL),
+		m_HeapProperties(),
+		m_HeapFlags(D3D12_HEAP_FLAG_NONE),
+		m_pWrappedHeap(pHeap),
+		m_heapOffset(heapOffset)
+	{
+		if (pClearValue) {
+			m_ClearValue = new D3D12_CLEAR_VALUE();
+			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
+		}
+	}
+	WrappedD3D12Resource(//reserved
+		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
+		const D3D12_RESOURCE_DESC *pDesc,
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
+		const D3D12_CLEAR_VALUE *pClearValue = NULL
+	) :WrappedD3D12DeviceChild(pReal, pDevice),
+		m_Type(ReservedWrappedD3D12Resource),
+		m_Desc(*pDesc),
+		m_State(state),
+		m_ClearValue(NULL),
+		m_HeapProperties(),
+		m_HeapFlags(D3D12_HEAP_FLAG_NONE),
+		m_pWrappedHeap(0),
+		m_heapOffset(0)
+	{
+		if (pClearValue) {
+			m_ClearValue = new D3D12_CLEAR_VALUE();
+			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
+		}
+	}
+
+
 	~WrappedD3D12Resource();
 
 public: //override
@@ -69,13 +154,26 @@ public://framework
 	void SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3D12Resource* pNewResource);
 
 protected:
-	COMPtr<WrappedD3D12Heap> m_pWrappedHeap;
-	IDXGISwapChain1* m_pRealSwapChain;
 
 	WrappedD3D12ResourceType m_Type;
+	D3D12_RESOURCE_DESC m_Desc;
 	D3D12_RESOURCE_STATES m_State;
-	D3D12_CLEAR_VALUE m_ClearValue;
+	D3D12_CLEAR_VALUE* m_ClearValue;
+
+	
+	//committed
+	D3D12_HEAP_PROPERTIES m_HeapProperties;
+	D3D12_HEAP_FLAGS m_HeapFlags;
+
+	//placed
+	COMPtr<WrappedD3D12Heap> m_pWrappedHeap;
 	UINT64 m_heapOffset;
+
+	//reserved
+	//...
+
+	// backbuffer
+	IDXGISwapChain1* m_pRealSwapChain;
 };
 
 

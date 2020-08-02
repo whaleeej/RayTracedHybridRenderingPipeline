@@ -1,3 +1,4 @@
+#include "WrappedD3D12Heap.h"
 #include "WrappedD3D12DXGISwapChain.h"
 #include "WrappedD3D12Resource.h"
 #include "WrappedD3D12CommandQueue.h"
@@ -25,8 +26,7 @@ WrappedD3D12DXGISwapChain::WrappedD3D12DXGISwapChain(
 		COMPtr<WrappedD3D12Device> pvDevice = m_pWrappedCommandQueue->GetWrappedDevice();
 
 		WrappedD3D12Resource* pvWrappedRes = new WrappedD3D12Resource(
-			pvResource.Get(), pvDevice.Get(), NULL,
-			WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+			pvResource.Get(), pvDevice.Get());
 		m_SwapChainBuffers[i] = (pvWrappedRes);
 		m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain.Get());
 		pvWrappedRes->Release();
@@ -93,7 +93,7 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 			else {
 				COMPtr<WrappedD3D12Device> pvDevice=m_pWrappedCommandQueue->GetWrappedDevice();
 				Assert(pvDevice.Get());
-				auto pvWrappedRes = new WrappedD3D12Resource(pvResource.Get(), pvDevice.Get(), NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+				auto pvWrappedRes = new WrappedD3D12Resource(pvResource.Get(), pvDevice.Get());
 				m_SwapChainBuffers[i] = (pvWrappedRes);
 				m_SwapChainBuffers[i]->InitSwapChain(m_pRealSwapChain.Get());
 				pvWrappedRes->Release();
@@ -189,7 +189,7 @@ HRESULT  STDMETHODCALLTYPE WrappedD3D12DXGISwapChain::GetBuffer(UINT Buffer, REF
 			m_SwapChainBuffers.resize((size_t)Buffer + 1);
 			COMPtr<WrappedD3D12Device> pvDevice = m_pWrappedCommandQueue->GetWrappedDevice();
 			Assert(pvDevice.Get());
-			auto pvWrappedRes = new WrappedD3D12Resource(realSurface.Get(), pvDevice.Get(), NULL, WrappedD3D12Resource::BackBufferWrappedD3D12Resource);
+			auto pvWrappedRes = new WrappedD3D12Resource(realSurface.Get(), pvDevice.Get());
 			m_SwapChainBuffers[Buffer] = (pvWrappedRes);
 			m_SwapChainBuffers[Buffer]->InitSwapChain(m_pRealSwapChain.Get());
 			wrappedTex = m_SwapChainBuffers[Buffer].Get();

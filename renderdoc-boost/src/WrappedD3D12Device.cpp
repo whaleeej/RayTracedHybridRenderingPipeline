@@ -410,11 +410,13 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource.Get(), this, NULL,
-			WrappedD3D12Resource::CommittedWrappedD3D12Resource,
+			pvResource.Get(), this, 
+			pHeapProperties,
+			HeapFlags,
+			pDesc,
 			InitialResourceState,
-			pOptimizedClearValue,
-			0
+			pOptimizedClearValue
+
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
@@ -462,11 +464,12 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 	HRESULT ret = GetReal()->CreatePlacedResource(static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource.Get(), this, static_cast<WrappedD3D12Heap*>(pHeap),
-			WrappedD3D12Resource::PlacedWrappedD3D12Resource,
+			pvResource.Get(), this, 
+			static_cast<WrappedD3D12Heap*>(pHeap),
+			HeapOffset,
+			pDesc,
 			InitialState,
-			pOptimizedClearValue,
-			HeapOffset
+			pOptimizedClearValue
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
@@ -490,11 +493,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (!FAILED(ret)) {
 		WrappedD3D12Resource* wrapped = new WrappedD3D12Resource(
-			pvResource.Get(), this, NULL,
-			WrappedD3D12Resource::ReservedWrappedD3D12Resource,
+			pvResource.Get(), this,
+			pDesc,
 			InitialState,
-			pOptimizedClearValue,
-			0
+			pOptimizedClearValue
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
