@@ -125,6 +125,7 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::EndEvent(void) {
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandQueue::Signal(
 	ID3D12Fence *pFence,
 	UINT64 Value) {
+	static_cast<WrappedD3D12Fence *>(pFence)->UpdateApplicationFenceValue(Value);
 	return GetReal()->Signal(
 		static_cast<WrappedD3D12Fence *>(pFence)->GetReal().Get(), 
 		Value);

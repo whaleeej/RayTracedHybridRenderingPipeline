@@ -106,28 +106,33 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					++progress;
 				}
 
-				//enque commandlist
-				D3D12_RESOURCE_BARRIER srcResourceBarrier;
-				ZeroMemory(&srcResourceBarrier, sizeof(srcResourceBarrier));
-				srcResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				srcResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				srcResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->first);
-				srcResourceBarrier.Transition.StateBefore =static_cast<WrappedD3D12Resource*>(it->second)->queryState();//根据框架判断resouce有关的操作已经完成，resource实际的状态已经置为query到的state了
-				srcResourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-				srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				copyCommandList->ResourceBarrier(1,   &srcResourceBarrier);
-
+				if (!static_cast<WrappedD3D12Resource*>(it->second)->needCopy()) continue;
+				if (static_cast<WrappedD3D12Resource*>(it->second)->queryState() != D3D12_RESOURCE_STATE_COPY_SOURCE)
+				{
+					//enque commandlist
+					D3D12_RESOURCE_BARRIER srcResourceBarrier;
+					ZeroMemory(&srcResourceBarrier, sizeof(srcResourceBarrier));
+					srcResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+					srcResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+					srcResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->first);
+					srcResourceBarrier.Transition.StateBefore = static_cast<WrappedD3D12Resource*>(it->second)->queryState();//根据框架判断resouce有关的操作已经完成，resource实际的状态已经置为query到的state了
+					srcResourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+					srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+					copyCommandList->ResourceBarrier(1, &srcResourceBarrier);
+				}
 				copyCommandList->CopyResource(static_cast<WrappedD3D12Resource*>(it->second)->GetReal().Get(), static_cast<ID3D12Resource*>(it->first));
-
-				D3D12_RESOURCE_BARRIER destResourceBarrier;
-				ZeroMemory(&destResourceBarrier, sizeof(destResourceBarrier));
-				destResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				destResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject().Get());
-				destResourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-				destResourceBarrier.Transition.StateAfter = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
-				destResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				copyCommandList->ResourceBarrier(1, &destResourceBarrier);
+				if (D3D12_RESOURCE_STATE_COPY_DEST != static_cast<WrappedD3D12Resource*>(it->second)->queryState())
+				{
+					D3D12_RESOURCE_BARRIER destResourceBarrier;
+					ZeroMemory(&destResourceBarrier, sizeof(destResourceBarrier));
+					destResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+					destResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+					destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject().Get());
+					destResourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+					destResourceBarrier.Transition.StateAfter = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
+					destResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+					copyCommandList->ResourceBarrier(1, &destResourceBarrier);
+				}			
 			}
 			std::vector<ID3D12CommandList* > listsToExec(1);
 			listsToExec[0] = copyCommandList.Get();

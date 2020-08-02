@@ -32,6 +32,12 @@ public://function
 		}
 	}
 
+	void UpdateApplicationFenceValue(UINT64  Value) {
+		if (Value > m_AppFenceValue) {
+			m_AppFenceValue = Value;
+		}
+	}
+
 public://framewokr
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
