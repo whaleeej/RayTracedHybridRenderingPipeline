@@ -14,19 +14,12 @@ public:
 	struct PipelineStateTypeDesc {
 		PipelineStateType type;
 		union UPipelineStateDesc {
-			D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc;
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc;
+			D3D12_COMPUTE_PIPELINE_STATE_DESC compute;
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC graphics;
 		} uPipelineStateDesc;
-		PipelineStateTypeDesc(PipelineStateType _type, D3D12_COMPUTE_PIPELINE_STATE_DESC& _computeDesc) 
-		{
-			type = _type;
-			uPipelineStateDesc.computeDesc = _computeDesc;
-		}
-		PipelineStateTypeDesc(PipelineStateType _type, D3D12_GRAPHICS_PIPELINE_STATE_DESC& _graphicsDesc)
-		{
-			type = _type;
-			uPipelineStateDesc.graphicsDesc = _graphicsDesc;
-		}
+		PipelineStateTypeDesc(PipelineStateType _type, D3D12_COMPUTE_PIPELINE_STATE_DESC& _computeDesc);
+		PipelineStateTypeDesc(PipelineStateType _type, D3D12_GRAPHICS_PIPELINE_STATE_DESC& _graphicsDesc);
+		~PipelineStateTypeDesc();
 	};
 
 public:
@@ -48,12 +41,6 @@ public://framewokr
 protected:
 	PipelineStateTypeDesc m_typeDesc;
 	COMPtr<WrappedD3D12RootSignature> m_pWrappedRootSignature;
-	D3D12_SHADER_BYTECODE CS;
-	D3D12_SHADER_BYTECODE VS;
-	D3D12_SHADER_BYTECODE PS;
-	D3D12_SHADER_BYTECODE DS;
-	D3D12_SHADER_BYTECODE HS;
-	D3D12_SHADER_BYTECODE GS;
 };
 
 RDCBOOST_NAMESPACE_END

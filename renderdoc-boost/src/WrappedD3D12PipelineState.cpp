@@ -2,93 +2,113 @@
 #include "WrappedD3D12RootSignature.h"
 RDCBOOST_NAMESPACE_BEGIN
 
+void CopyByteCodeImpl(const void* &dest, const void* &src, const SIZE_T & length) {
+	if (src&&length>0) {
+		void* pbc = new byte[length];
+		dest = pbc;
+		memcpy(pbc, src, length);
+		return;
+	}
+	dest = NULL;
+}
+
+void ReleaseByteCodeImpl(const void* &dest, const SIZE_T& length) {
+	if (dest) {
+		delete[length]dest;
+	}
+}
+
+template<typename T>
+void CopyTImpl(const T*&dest, const T* & src, const UINT & length) {
+	if (src&&length > 0) {
+		T* pbc = new T[length];
+		dest = pbc;
+		memcpy(pbc, src, length * sizeof(T));
+		return;
+	}
+	dest = NULL;
+}
+
+template<typename T>
+void ReleaseTImpl(const T* &dest, const UINT& length) {
+	if (dest) {
+		delete[length]dest;
+	}
+}
+
+WrappedD3D12PipelineState::PipelineStateTypeDesc::PipelineStateTypeDesc(PipelineStateType _type, D3D12_COMPUTE_PIPELINE_STATE_DESC& _computeDesc)
+{
+	type = _type;
+	uPipelineStateDesc.compute = _computeDesc;
+	CopyByteCodeImpl(uPipelineStateDesc.compute.CS.pShaderBytecode, _computeDesc.CS.pShaderBytecode, _computeDesc.CS.BytecodeLength);
+	CopyByteCodeImpl(uPipelineStateDesc.compute.CachedPSO.pCachedBlob, _computeDesc.CachedPSO.pCachedBlob, _computeDesc.CachedPSO.CachedBlobSizeInBytes);
+}
+WrappedD3D12PipelineState::PipelineStateTypeDesc::PipelineStateTypeDesc(PipelineStateType _type, D3D12_GRAPHICS_PIPELINE_STATE_DESC& _graphicsDesc)
+{
+	type = _type;
+	uPipelineStateDesc.graphics = _graphicsDesc;
+
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.VS.pShaderBytecode, _graphicsDesc.VS.pShaderBytecode, _graphicsDesc.VS.BytecodeLength);
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.PS.pShaderBytecode, _graphicsDesc.PS.pShaderBytecode, _graphicsDesc.PS.BytecodeLength);
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.DS.pShaderBytecode, _graphicsDesc.DS.pShaderBytecode, _graphicsDesc.DS.BytecodeLength);
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.HS.pShaderBytecode, _graphicsDesc.HS.pShaderBytecode, _graphicsDesc.HS.BytecodeLength);
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.GS.pShaderBytecode, _graphicsDesc.GS.pShaderBytecode, _graphicsDesc.GS.BytecodeLength);
+	CopyTImpl(uPipelineStateDesc.graphics.StreamOutput.pSODeclaration, _graphicsDesc.StreamOutput.pSODeclaration, _graphicsDesc.StreamOutput.NumEntries);
+	CopyTImpl(uPipelineStateDesc.graphics.StreamOutput.pBufferStrides, _graphicsDesc.StreamOutput.pBufferStrides, _graphicsDesc.StreamOutput.NumStrides);
+	CopyTImpl(uPipelineStateDesc.graphics.InputLayout.pInputElementDescs, _graphicsDesc.InputLayout.pInputElementDescs, _graphicsDesc.InputLayout.NumElements);
+	CopyByteCodeImpl(uPipelineStateDesc.graphics.CachedPSO.pCachedBlob, _graphicsDesc.CachedPSO.pCachedBlob, _graphicsDesc.CachedPSO.CachedBlobSizeInBytes);
+}
+
+
+WrappedD3D12PipelineState::PipelineStateTypeDesc::~PipelineStateTypeDesc() {
+	if (type == PipelineStateType_Compute) {
+		ReleaseByteCodeImpl(uPipelineStateDesc.compute.CS.pShaderBytecode, uPipelineStateDesc.compute.CS.BytecodeLength);
+		ReleaseByteCodeImpl(uPipelineStateDesc.compute.CachedPSO.pCachedBlob, uPipelineStateDesc.compute.CachedPSO.CachedBlobSizeInBytes);
+	}
+	else {
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.VS.pShaderBytecode, uPipelineStateDesc.graphics.VS.BytecodeLength);
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.PS.pShaderBytecode, uPipelineStateDesc.graphics.PS.BytecodeLength);
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.DS.pShaderBytecode, uPipelineStateDesc.graphics.DS.BytecodeLength);
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.HS.pShaderBytecode, uPipelineStateDesc.graphics.HS.BytecodeLength);
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.GS.pShaderBytecode, uPipelineStateDesc.graphics.GS.BytecodeLength);
+		ReleaseTImpl(uPipelineStateDesc.graphics.StreamOutput.pSODeclaration, uPipelineStateDesc.graphics.StreamOutput.NumEntries);
+		ReleaseTImpl(uPipelineStateDesc.graphics.StreamOutput.pBufferStrides, uPipelineStateDesc.graphics.StreamOutput.NumStrides);
+		ReleaseTImpl(uPipelineStateDesc.graphics.InputLayout.pInputElementDescs, uPipelineStateDesc.graphics.InputLayout.NumElements);
+		ReleaseByteCodeImpl(uPipelineStateDesc.graphics.CachedPSO.pCachedBlob, uPipelineStateDesc.graphics.CachedPSO.CachedBlobSizeInBytes);
+	}
+}
+
+
 WrappedD3D12PipelineState::WrappedD3D12PipelineState(ID3D12PipelineState* pReal, WrappedD3D12Device* pDevice,
 	D3D12_COMPUTE_PIPELINE_STATE_DESC& compute_desc, WrappedD3D12RootSignature* pWrappedRootSignature)
 	:WrappedD3D12DeviceChild(pReal, pDevice),
 	m_typeDesc(PipelineStateType_Compute, compute_desc),
 	m_pWrappedRootSignature(pWrappedRootSignature)
 {
-	CS = compute_desc.CS;
-	if (CS.pShaderBytecode) {
-		void * pbc = new byte[CS.BytecodeLength];
-		CS.pShaderBytecode = pbc;
-		memcpy(pbc, compute_desc.CS.pShaderBytecode, CS.BytecodeLength);
-	}
+
+
 }
 
 WrappedD3D12PipelineState::WrappedD3D12PipelineState(ID3D12PipelineState* pReal, WrappedD3D12Device* pDevice,
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& graphics_desc, WrappedD3D12RootSignature* pWrappedRootSignature)
 	:WrappedD3D12DeviceChild(pReal, pDevice),
 	m_typeDesc(PipelineStateType_Graphics, graphics_desc),
-	m_pWrappedRootSignature(pWrappedRootSignature) 
+	m_pWrappedRootSignature(pWrappedRootSignature)
 {
-	VS = graphics_desc.VS;
-	if (VS.pShaderBytecode) {
-		void * pbc = new byte[VS.BytecodeLength];
-		VS.pShaderBytecode = pbc;
-		memcpy(pbc, graphics_desc.VS.pShaderBytecode, VS.BytecodeLength);
-	}
-	PS = graphics_desc.PS;
-	if (PS.pShaderBytecode) {
-		void * pbc = new byte[PS.BytecodeLength];
-		PS.pShaderBytecode = pbc;
-		memcpy(pbc, graphics_desc.PS.pShaderBytecode, PS.BytecodeLength);
-	}
-	DS = graphics_desc.DS;
-	if (DS.pShaderBytecode) {
-		void * pbc = new byte[DS.BytecodeLength];
-		DS.pShaderBytecode = pbc;
-		memcpy(pbc, graphics_desc.DS.pShaderBytecode, DS.BytecodeLength);
-	}
-	HS = graphics_desc.HS;
-	if (HS.pShaderBytecode) {
-		void * pbc = new byte[HS.BytecodeLength];
-		HS.pShaderBytecode = pbc;
-		memcpy(pbc, graphics_desc.HS.pShaderBytecode, HS.BytecodeLength);
-	}
-	GS = graphics_desc.GS;
-	if (GS.pShaderBytecode) {
-		void * pbc = new byte[GS.BytecodeLength];
-		GS.pShaderBytecode = pbc;
-		memcpy(pbc, graphics_desc.GS.pShaderBytecode, GS.BytecodeLength);
-	}
-
+	
 
 }
 
 WrappedD3D12PipelineState::~WrappedD3D12PipelineState() {
-	if (CS.pShaderBytecode) {
-		delete[CS.BytecodeLength](byte*)CS.pShaderBytecode;
-	}
-	if (VS.pShaderBytecode) {
-		delete[VS.BytecodeLength](byte*)VS.pShaderBytecode;
-	}
-	if (PS.pShaderBytecode) {
-		delete[PS.BytecodeLength](byte*)PS.pShaderBytecode;
-	}
-	if (DS.pShaderBytecode) {
-		delete[DS.BytecodeLength](byte*)DS.pShaderBytecode;
-	}
-	if (HS.pShaderBytecode) {
-		delete[HS.BytecodeLength](byte*)HS.pShaderBytecode;
-	}
-	if (GS.pShaderBytecode) {
-		delete[GS.BytecodeLength](byte*)GS.pShaderBytecode;
-	}
-
 
 }
+
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* pNewDevice) {
 	COMPtr<ID3D12PipelineState> pvPipelineState;
 	if (m_typeDesc.type ==PipelineStateType_Graphics) {
-		auto& desc = m_typeDesc.uPipelineStateDesc.graphicsDesc;
+		auto& desc = m_typeDesc.uPipelineStateDesc.graphics;
 		desc.pRootSignature = m_pWrappedRootSignature->GetReal().Get();
-		desc.VS = VS;
-		desc.PS = PS;
-		desc.DS = DS;
-		desc.HS = HS;
-		desc.GS = GS;
 		HRESULT ret = pNewDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pvPipelineState));
 		if (FAILED(ret)) {
 			LogError("create new D3D12RootSignature failed");
@@ -96,9 +116,8 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12PipelineState::CopyToDevice(ID3D12Device* 
 		}
 	}
 	else {
-		auto& desc = m_typeDesc.uPipelineStateDesc.computeDesc;
+		auto& desc = m_typeDesc.uPipelineStateDesc.compute;
 		desc.pRootSignature = m_pWrappedRootSignature->GetReal().Get();
-		desc.CS = CS;
 		HRESULT ret = pNewDevice->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pvPipelineState));
 		if (FAILED(ret)) {
 			LogError("create new D3D12RootSignature failed");
