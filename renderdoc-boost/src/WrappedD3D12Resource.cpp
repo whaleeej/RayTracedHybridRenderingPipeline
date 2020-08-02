@@ -26,6 +26,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewD
 			m_bNeedCopy?D3D12_RESOURCE_STATE_COPY_DEST:m_State, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
 	case PlacedWrappedD3D12Resource:
+		LogError("Placed D3D12Resource copy unsupportted now");
 		Assert(m_pWrappedHeap.Get()&&m_pWrappedHeap->GetReal().Get());
 		if (m_pWrappedHeap.Get()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_UPLOAD ||
 			m_pWrappedHeap.Get()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_READBACK) m_bNeedCopy = false;

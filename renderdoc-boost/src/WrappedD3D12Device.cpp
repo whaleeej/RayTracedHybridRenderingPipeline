@@ -70,34 +70,48 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 		if (!m_BackRefs.empty()) {
 			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
 			printf("--------------------------------------------------\n");
+			size_t counter = m_BackRefs.size();
+			ID3D12Device* pOldDevice = GetReal().Get();
+
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
-			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12Resource>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
-			//因为这个生命周期在switchToDevice1框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
+			std::vector<COMPtr<ID3D12Resource>> oldBackRefsSrc(counter); // old device
+			std::vector<COMPtr<ID3D12Resource>> oldBackRefsReadback(counter);// old device
+			std::vector<COMPtr<ID3D12Resource>> newBackRefsUpload(counter); // new device
+			std::vector<COMPtr<ID3D12Resource>> newBackRefsDest(counter); // new device
 			
 			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
 			/*.Type = */D3D12_COMMAND_LIST_TYPE_DIRECT,
 			/*.Priority =*/ D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
 			/*.Flags =*/ D3D12_COMMAND_QUEUE_FLAG_NONE,
 			/*.NodeMask =*/ 0 };
+
 			COMPtr<ID3D12CommandQueue>copyCommandQueue;
-			GetReal()->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
+			pOldDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
 			COMPtr<ID3D12CommandAllocator> copyCommandAllocator;
-			GetReal()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator));
+			pOldDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator));
 			COMPtr<ID3D12GraphicsCommandList> copyCommandList;
-			GetReal()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
+			pOldDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
 			uint64_t copyFenceValue = 0;
 			COMPtr<ID3D12Fence> copyFence;
-			GetReal()->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
+			pOldDevice->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
 
-			int progress = 0; int idx = 0;
+			COMPtr<ID3D12CommandQueue>copyCommandQueue1;
+			pNewDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue1));
+			COMPtr<ID3D12CommandAllocator> copyCommandAllocator1;
+			pNewDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator1));
+			COMPtr<ID3D12GraphicsCommandList> copyCommandList1;
+			pNewDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator1.Get(), nullptr, IID_PPV_ARGS(&copyCommandList1));
+			uint64_t copyFenceValue1 = 0;
+			COMPtr<ID3D12Fence> copyFence1;
+			pNewDevice->CreateFence(copyFenceValue1, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence1));
+
+
+			int progress = 0; int idx = 0; size_t counterReal = 0;
 			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
-				// 缓存wrapper到旧资源的ptr，使用comptr来保存生命
-				newBackRefsReflection[it->second] = static_cast<ID3D12Resource*>(it->first); 
-				
 				//key of the framework
 				it->second->SwitchToDeviceRdc(pNewDevice);
 				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
-				
+
 				// sequencing
 				++idx;
 				while (progress < (int)(idx * 50 / m_BackRefs.size()))
@@ -105,8 +119,29 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					printf(">");
 					++progress;
 				}
-
 				if (!static_cast<WrappedD3D12Resource*>(it->second)->needCopy()) continue;
+
+				// 缓存旧资源的ptr，使用comptr来保存生命
+				oldBackRefsSrc[counterReal] = (static_cast<ID3D12Resource*>(it->first));
+				// 生成readback resource
+				{
+					D3D12_HEAP_PROPERTIES properties = { D3D12_HEAP_TYPE_READBACK, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
+					pOldDevice->CreateCommittedResource(&properties, D3D12_HEAP_FLAG_NONE,
+						&oldBackRefsSrc[counterReal]->GetDesc(), D3D12_RESOURCE_STATE_COPY_DEST,
+						NULL, IID_PPV_ARGS(&oldBackRefsReadback[counterReal])
+					);
+				}
+				// 生成upload resource
+				{
+					D3D12_HEAP_PROPERTIES properties = { D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
+					pNewDevice->CreateCommittedResource(&properties, D3D12_HEAP_FLAG_NONE,
+						&oldBackRefsSrc[counterReal]->GetDesc(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+						NULL, IID_PPV_ARGS(&newBackRefsUpload[counterReal])
+					);
+				}
+				//缓存目标资源
+				newBackRefsDest[counterReal] = static_cast<ID3D12Resource*>(it->second->GetRealObject().Get());
+
 				if (static_cast<WrappedD3D12Resource*>(it->second)->queryState() != D3D12_RESOURCE_STATE_COPY_SOURCE)
 				{
 					//enque commandlist
@@ -114,40 +149,76 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					ZeroMemory(&srcResourceBarrier, sizeof(srcResourceBarrier));
 					srcResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 					srcResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-					srcResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->first);
-					srcResourceBarrier.Transition.StateBefore = static_cast<WrappedD3D12Resource*>(it->second)->queryState();//根据框架判断resouce有关的操作已经完成，resource实际的状态已经置为query到的state了
+					srcResourceBarrier.Transition.pResource = oldBackRefsSrc[counterReal].Get();
+					srcResourceBarrier.Transition.StateBefore = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
 					srcResourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
 					srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 					copyCommandList->ResourceBarrier(1, &srcResourceBarrier);
 				}
-				copyCommandList->CopyResource(static_cast<WrappedD3D12Resource*>(it->second)->GetReal().Get(), static_cast<ID3D12Resource*>(it->first));
+				copyCommandList->CopyResource(oldBackRefsReadback[counterReal].Get(), oldBackRefsSrc[counterReal].Get());
+				copyCommandList1->CopyResource(newBackRefsDest[counterReal].Get(), newBackRefsUpload[counterReal].Get());
 				if (D3D12_RESOURCE_STATE_COPY_DEST != static_cast<WrappedD3D12Resource*>(it->second)->queryState())
 				{
 					D3D12_RESOURCE_BARRIER destResourceBarrier;
 					ZeroMemory(&destResourceBarrier, sizeof(destResourceBarrier));
 					destResourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 					destResourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-					destResourceBarrier.Transition.pResource = static_cast<ID3D12Resource*>(it->second->GetRealObject().Get());
+					destResourceBarrier.Transition.pResource = newBackRefsDest[counterReal].Get();
 					destResourceBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 					destResourceBarrier.Transition.StateAfter = static_cast<WrappedD3D12Resource*>(it->second)->queryState();
 					destResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-					copyCommandList->ResourceBarrier(1, &destResourceBarrier);
+					copyCommandList1->ResourceBarrier(1, &destResourceBarrier);
 				}			
+				++counterReal;
 			}
-			std::vector<ID3D12CommandList* > listsToExec(1);
-			listsToExec[0] = copyCommandList.Get();
-			copyCommandQueue->ExecuteCommandLists(1, listsToExec.data());
-			copyCommandQueue->Signal(copyFence.Get(), ++copyFenceValue);
-			if ((copyFence->GetCompletedValue() < copyFenceValue)) //等待copy queue执行完毕
-			{
-				auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-				Assert(event && "Failed to create fence event handle.");
 
-				// Is this function thread safe?
-				copyFence->SetEventOnCompletion(copyFenceValue, event);
-				::WaitForSingleObject(event, DWORD_MAX);
+			{ // execute commandqueue
+				std::vector<ID3D12CommandList* > listsToExec(1);
+				listsToExec[0] = copyCommandList.Get();
+				copyCommandQueue->ExecuteCommandLists(1, listsToExec.data());
+				copyCommandQueue->Signal(copyFence.Get(), ++copyFenceValue);
+				if ((copyFence->GetCompletedValue() < copyFenceValue)) //等待copy queue执行完毕
+				{
+					auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+					Assert(event && "Failed to create fence event handle.");
 
-				::CloseHandle(event);
+					// Is this function thread safe?
+					copyFence->SetEventOnCompletion(copyFenceValue, event);
+					::WaitForSingleObject(event, DWORD_MAX);
+
+					::CloseHandle(event);
+				}
+			}
+			oldBackRefsSrc[counterReal]; // old device
+			oldBackRefsReadback[counterReal];// old device
+			newBackRefsUpload[counterReal]; // new device
+			newBackRefsDest[counterReal]; // new device
+			for (size_t i = 0; i < counterReal; i++) {
+				D3D12_RESOURCE_DESC& desc = oldBackRefsSrc[counterReal]->GetDesc();
+				SIZE_T size = 0;
+				D3D12_RANGE range{0, size};
+				byte* src = 0;
+				oldBackRefsReadback[i]->Map(0, &range, reinterpret_cast<void**>(&src));
+
+			}
+
+
+			{ // execute commandqueue1
+				std::vector<ID3D12CommandList* > listsToExec(1);
+				listsToExec[0] = copyCommandList1.Get();
+				copyCommandQueue1->ExecuteCommandLists(1, listsToExec.data());
+				copyCommandQueue1->Signal(copyFence1.Get(), ++copyFenceValue1);
+				if ((copyFence1->GetCompletedValue() < copyFenceValue1)) //等待copy queue执行完毕
+				{
+					auto event = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+					Assert(event && "Failed to create fence event handle.");
+
+					// Is this function thread safe?
+					copyFence1->SetEventOnCompletion(copyFenceValue1, event);
+					::WaitForSingleObject(event, DWORD_MAX);
+
+					::CloseHandle(event);
+				}
 			}
 
 
