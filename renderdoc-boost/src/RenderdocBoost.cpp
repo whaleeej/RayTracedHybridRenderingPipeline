@@ -268,7 +268,7 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 
 	COMPtr<ID3D12Device> pRealDevice = NULL;
 	
-	HRESULT ret = pfnCreateDevice(NULL, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
+	HRESULT ret = pfnCreateDevice(params.pAdapter, (params.pFeatureLevels)[0], IID_PPV_ARGS(&pRealDevice));
 
 	if (FAILED(ret)) {
 		LogError("Create new device failed.");

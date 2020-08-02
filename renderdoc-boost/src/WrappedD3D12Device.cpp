@@ -71,7 +71,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
-			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12DeviceChild>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
+			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12Resource>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期
 			//因为这个生命周期在switchToDevice1框架中被释放了，但是我要用它来进行拷贝到新资源内，所以要用ComPtr保存下来
 			
 			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
@@ -80,19 +80,19 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			/*.Flags =*/ D3D12_COMMAND_QUEUE_FLAG_NONE,
 			/*.NodeMask =*/ 0 };
 			COMPtr<ID3D12CommandQueue>copyCommandQueue;
-			pNewDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
+			GetReal()->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
 			COMPtr<ID3D12CommandAllocator> copyCommandAllocator;
-			pNewDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator));
+			GetReal()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&copyCommandAllocator));
 			COMPtr<ID3D12GraphicsCommandList> copyCommandList;
-			pNewDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
+			GetReal()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&copyCommandList));
 			uint64_t copyFenceValue = 0;
 			COMPtr<ID3D12Fence> copyFence;
-			pNewDevice->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
+			GetReal()->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
 
 			int progress = 0; int idx = 0;
 			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
 				// 缓存wrapper到旧资源的ptr，使用comptr来保存生命
-				newBackRefsReflection[it->second] = it->first; 
+				newBackRefsReflection[it->second] = static_cast<ID3D12Resource*>(it->first); 
 				
 				//key of the framework
 				it->second->SwitchToDeviceRdc(pNewDevice);
@@ -155,16 +155,17 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			m_BackRefs.swap(newBackRefs);
 		}
 	};
-	//0 切换RootSignature和依赖于Root Signature的Pipeline State
-	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
-	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
-	//1 切换保存资源的resource heap
-	backRefTransferFunc(m_BackRefs_Heap, "Heaps"); 
 	//2 要确保所有的fence进行Signal的Value都已经Complete了
 	for (auto it = m_BackRefs_Fence.begin(); it != m_BackRefs_Fence.end(); it++) {
 		auto pWrappedFence = static_cast<WrappedD3D12Fence*>(it->second);
 		pWrappedFence->WaitToCompleteApplicationFenceValue();
 	}
+	//0 切换RootSignature和依赖于Root Signature的Pipeline State
+	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
+	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
+	//1 切换保存资源的resource heap
+	backRefTransferFunc(m_BackRefs_Heap, "Heaps"); 
+	
 	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了
 	// 可以新建resource并且进行copy ->使用新的device的copy queue
 	backRefResourcesTransferFunc(m_BackRefs_Resource, "Resources");
