@@ -47,7 +47,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 
 	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
-			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr);
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs;
 			int progress=0; int idx=0;
@@ -68,7 +68,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	};
 	auto backRefResourcesTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
-			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr);
+			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
 			printf("--------------------------------------------------\n");
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
 			std::map<WrappedD3D12ObjectBase*, COMPtr<ID3D12DeviceChild>> newBackRefsReflection;//Wrapper->旧的资源, 用来保存旧资源的生命周期

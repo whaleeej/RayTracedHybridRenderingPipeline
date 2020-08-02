@@ -18,8 +18,8 @@ class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
 		//////////////////////////////
 		// implement IUnknown
 		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) { return E_NOINTERFACE; }
-		ULONG STDMETHODCALLTYPE AddRef();
-		ULONG STDMETHODCALLTYPE Release();
+		ULONG STDMETHODCALLTYPE AddRef() { return m_pDevice->AddRef(); }
+		ULONG STDMETHODCALLTYPE Release() { return m_pDevice->Release(); }
 
 		//////////////////////////////
 		// implement ID3D12InfoQueue
