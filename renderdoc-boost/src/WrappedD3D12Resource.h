@@ -148,6 +148,7 @@ public: //func
 	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
 	void changeToState(D3D12_RESOURCE_STATES state);
 	D3D12_RESOURCE_STATES queryState() { return m_State; }
+	bool needCopy() { return m_bNeedCopy; }
 
 public://framework
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
@@ -159,6 +160,7 @@ protected:
 	D3D12_RESOURCE_DESC m_Desc;
 	D3D12_RESOURCE_STATES m_State;
 	D3D12_CLEAR_VALUE* m_ClearValue;
+	bool m_bNeedCopy = true;
 
 	
 	//committed
