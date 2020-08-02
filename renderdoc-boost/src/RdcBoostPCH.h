@@ -30,6 +30,7 @@
 //copyToDevice中创建的对象，改成ComPtr直接走operator=                                                       ------>   ComPtr
 
 // update 8/1 TODO
+// -1 CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE initvalue和clearvalue不一致 在开启renderdoc后会产生，很奇怪，要么是和swapchain那里有关，先关了。其实是因为debug layer被wrapped关掉功能了。本来就有这个output
 // 0. descriptor heap中的resource可能已经被释放了
 // 1. 支持CreateView中的参数情况
 // 2. 支持其他API的参数情况
