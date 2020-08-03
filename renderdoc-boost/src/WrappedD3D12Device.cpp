@@ -281,13 +281,13 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了
 	// 可以新建resource并且进行copy ->使用新的device的copy queue
 	backRefResourcesTransferFunc(m_BackRefs_Resource, "Resources");
-	//4 因为资源更新了，所以指向资源的descriptor也要重建
-	backRefTransferFunc(m_BackRefs_DescriptorHeap, "DescriptorHeaps");
 	//5 新建command相关的object，重建但不恢复
 	backRefTransferFunc(m_BackRefs_CommandAllocator, "CommandAllocator");
 	backRefTransferFunc(m_BackRefs_CommandList, "CommandList,");
 	backRefTransferFunc(m_BackRefs_Fence, "Fence");
 	backRefTransferFunc(m_BackRefs_CommandQueue, "CommandQueue");
+	//4 因为资源更新了，所以指向资源的descriptor也要重建
+	backRefTransferFunc(m_BackRefs_DescriptorHeap, "DescriptorHeaps");
 
 	//5.pReal substitute
 	m_pReal = pNewDevice;

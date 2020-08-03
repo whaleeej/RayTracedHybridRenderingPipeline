@@ -43,6 +43,17 @@
 
 //update7/31 支持api传入参数为null的情况，主要支持了CreateView那部分
 
+//update8/01 在一个类中同时支持SwapChain1-4， 使用queryInterface的方法，这是一个可以通用的设计
+
+//update8/02 使用Dummy Info Queue来Hook掉Debug Layer的拦截，可以保证renderdoc中创建的renderdoc wrapped device不会进入死循环
+
+//update8/02 缓存pipeline state的时候要拷贝byte code，释放要正确地delete，例如CS，VS，PS，SO等
+
+//update8/03 完善资源拷贝的逻辑，1. 不拷贝的资源D3D12_HEAP_TYPE_UPLOAD/D3D12_HEAP_TYPE_READBACK/.. 
+//          2.因为renderdoc wrapped new res和raw res不能用同一个queue/list/allocator跑，要写回cpu，cpu拷贝，再upload-copy
+//          3. readback/upload heap只能是buffer，所以使用d3dx12中的UpdateSubresource那一套机制解决
+//          4. desc heap中新建view还是有点问题，先用catch exception来避免为释放的资源新建view
+
 // update  TODO
 // 0. descriptor heap中的resource可能已经被释放了 -》 catch(...)
 // 1. 支持CreateView中的参数情况

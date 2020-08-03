@@ -54,7 +54,8 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* p
 	}
 	// switch swapchain
 	Assert(pNewCommandQueue.Get());
-	m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue.Get());
+	if(m_pWrappedSwapChain.Get())
+		m_pWrappedSwapChain->SwitchToCommandQueue(pNewCommandQueue.Get());
 	return pNewCommandQueue;
 }
 
