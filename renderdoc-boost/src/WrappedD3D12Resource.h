@@ -145,6 +145,9 @@ public: //override
 		_Out_opt_  D3D12_HEAP_FLAGS *pHeapFlags);
 
 public: //func
+	class ResourceReleasedException :public std::exception {
+
+	};
 	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
 	void changeToState(D3D12_RESOURCE_STATES state);
 	D3D12_RESOURCE_STATES queryState() { return m_State; }
@@ -152,7 +155,7 @@ public: //func
 	D3D12_RESOURCE_DESC getCachedDesc() { return m_Desc; }
 	void tryToGet() {
 		if (m_Ref <= 0) {
-			throw std::exception();
+			throw ResourceReleasedException();
 		}
 	}
 

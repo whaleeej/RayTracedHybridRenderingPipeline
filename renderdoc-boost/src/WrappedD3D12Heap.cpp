@@ -40,7 +40,7 @@ struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从D
 		try {
 			pWrappedD3D12Res->tryToGet();
 		}
-		catch (std::exception& e) {
+		catch (...) {
 			return false;
 		}
 		return true;
@@ -52,6 +52,9 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = this->GetDesc();
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
 	Assert(pvNewDescriptorHeap.Get());
+	//if (descHeapDesc.Type&&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) {
+	//	return pvNewDescriptorHeap;
+	//}
 
 	for (size_t i = 0; i < m_slotDesc.size(); i++) {
 		auto targetHandle = pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
