@@ -150,6 +150,11 @@ public: //func
 	D3D12_RESOURCE_STATES queryState() { return m_State; }
 	bool needCopy() { return m_bNeedCopy; }
 	D3D12_RESOURCE_DESC getCachedDesc() { return m_Desc; }
+	void tryToGet() {
+		if (m_Ref <= 0) {
+			throw std::exception();
+		}
+	}
 
 public://framework
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);

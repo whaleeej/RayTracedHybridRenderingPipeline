@@ -38,9 +38,9 @@ struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从D
 		if (!pWrappedD3D12Res)
 			return false;
 		try {
-			pWrappedD3D12Res->GetReal();
+			pWrappedD3D12Res->tryToGet();
 		}
-		catch (...) {
+		catch (std::exception& e) {
 			return false;
 		}
 		return true;
@@ -53,11 +53,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
 	Assert(pvNewDescriptorHeap.Get());
 
-	//TODO: 这里要确认slotRes指向的Res是否已经被delete掉了，这里暂时使用Exception机制
 	for (size_t i = 0; i < m_slotDesc.size(); i++) {
-		
-		//if (m_slotDesc[i].viewDescType!= ViewDesc_SamplerV
-		//	&&!TryExistImpl().IsWrappedD3D12ResourceExisted(m_slotDesc[i].pWrappedD3D12Resource)) continue;
 		auto targetHandle = pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		targetHandle.ptr = targetHandle.ptr +(size_t)pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type)*i;
 
@@ -66,17 +62,24 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 		switch (m_slotDesc[i].viewDescType) {
 		case ViewDesc_CBV:
 			Assert(pWrappedRes);
+			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			m_slotDesc[i].concreteViewDesc.cbv.BufferLocation = pWrappedRes->GetReal()->GetGPUVirtualAddress();
 			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, targetHandle);
 			break;
 		case ViewDesc_SRV:
 			Assert(!(pWrappedRes==NULL && m_slotDesc[i].isViewDescNull));
+			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv : NULL,
 				targetHandle);
 			break;
 		case ViewDesc_UAV:
+			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
+			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				m_slotDesc[i].pWrappedD3D12CounterResource?m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
@@ -84,12 +87,18 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 				targetHandle);
 			break;
 		case ViewDesc_RTV:
+			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
+			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.rtv:NULL,
 				targetHandle);
 			break;
 		case ViewDesc_DSV:
+			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
+			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.dsv:NULL,
@@ -99,7 +108,6 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			pNewDevice->CreateSampler(&m_slotDesc[i].concreteViewDesc.sampler, targetHandle);
 			break;
 		case ViewDesc_Unknown:
-			LogError("Code will not be here");
 			break;
 		}
 	}
