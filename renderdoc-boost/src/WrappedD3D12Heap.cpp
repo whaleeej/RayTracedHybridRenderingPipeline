@@ -57,58 +57,49 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	//}
 
 	for (size_t i = 0; i < m_slotDesc.size(); i++) {
-		auto targetHandle = pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		targetHandle.ptr = targetHandle.ptr +(size_t)pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type)*i;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+		handle.Offset(i, pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type));
 
 		auto pWrappedRes = m_slotDesc[i].pWrappedD3D12Resource;
-
 		switch (m_slotDesc[i].viewDescType) {
 		case ViewDesc_CBV:
-			Assert(pWrappedRes);
-			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
-			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
-			m_slotDesc[i].concreteViewDesc.cbv.BufferLocation = pWrappedRes->GetReal()->GetGPUVirtualAddress();
-			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, targetHandle);
+			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, handle);
 			break;
 		case ViewDesc_SRV:
 			Assert(!(pWrappedRes==NULL && m_slotDesc[i].isViewDescNull));
 			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
-			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv : NULL,
-				targetHandle);
+				handle);
 			break;
 		case ViewDesc_UAV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
 			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
-			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				m_slotDesc[i].pWrappedD3D12CounterResource?m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.uav : NULL,
-				targetHandle);
+				handle);
 			break;
 		case ViewDesc_RTV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
 			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
-			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.rtv:NULL,
-				targetHandle);
+				handle);
 			break;
 		case ViewDesc_DSV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
 			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
-			if (pWrappedRes && pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && m_slotDesc[i].isViewDescNull) break;
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.dsv:NULL,
-				targetHandle);
+				handle);
 			break;
 		case ViewDesc_SamplerV:
-			pNewDevice->CreateSampler(&m_slotDesc[i].concreteViewDesc.sampler, targetHandle);
+			pNewDevice->CreateSampler(&m_slotDesc[i].concreteViewDesc.sampler, handle);
 			break;
 		case ViewDesc_Unknown:
 			break;

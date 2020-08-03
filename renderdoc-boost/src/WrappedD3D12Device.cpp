@@ -299,14 +299,12 @@ WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefDescriptorHeaps(D3D
 	for (auto it = m_BackRefs_DescriptorHeap.begin(); it != m_BackRefs_DescriptorHeap.end(); it++) {
 		if (it->second) {
 			WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
-			auto start = pWrappedHeap->GetCPUDescriptorHandleForHeapStart();
-			auto offset = pWrappedHeap->GetDesc().NumDescriptors;
-			auto interval = GetReal()->GetDescriptorHandleIncrementSize(pWrappedHeap->GetDesc().Type);
-			if (handle.ptr >= start.ptr && handle.ptr < start.ptr + offset * interval) {
+			if (pWrappedHeap->handleInDescriptorHeapRange(handle)) {
 				return pWrappedHeap;
 			}
 		}
 	}
+	Assert(false);
 	return NULL;
 }
 
@@ -686,25 +684,6 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 	}
 	WrappedD3D12DescriptorHeap::DescriptorHeapSlotDesc slotDesc;
 	slotDesc.viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_CBV;
-
-	//TODO: sneaky 通过遍历res的GPU VADDR来找WrappedRes
-	WrappedD3D12Resource* pWrappedD3D12Res = NULL;
-	for (auto it = m_BackRefs_Resource.begin(); it != m_BackRefs_Resource.end(); it++) {
-		if (it->second) {
-			auto pTmpRes = static_cast<WrappedD3D12Resource*>(it->second);
-			if (pTmpRes->GetGPUVirtualAddress() == pDesc->BufferLocation) {
-				pWrappedD3D12Res = pTmpRes;
-				break;
-			}
-		}
-	}
-	if (!pWrappedD3D12Res)
-	{
-		LogError("Error when create CBV descriptor");
-		return; 
-	}
-
-	slotDesc.pWrappedD3D12Resource = pWrappedD3D12Res;
 	slotDesc.concreteViewDesc.cbv = *pDesc;
 	pWrappedHeap->cacheDescriptorCreateParam(slotDesc, DestDescriptor);
 
@@ -905,7 +884,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CopyDescriptors(
 
 		auto pDestDescriptorHeap =destHeapsPtr[destRangeIndex.rangeNum];
 		auto destStart = destHeapsStartIndex[destRangeIndex.rangeNum];
-
+		Assert(pSrcDescriptorHeap->GetDesc().Type == pDestDescriptorHeap->GetDesc().Type);
 		auto& srcDescriptorCreateParamCache = pSrcDescriptorHeap->getDescriptorCreateParamCache(srcStart + srcRangeIndex.indexInRange);
 		pDestDescriptorHeap->cacheDescriptorCreateParamByIndex(srcDescriptorCreateParamCache, destStart+ destRangeIndex.indexInRange);
 	} while (srcRangeIndex.rangeNext() && destRangeIndex.rangeNext());

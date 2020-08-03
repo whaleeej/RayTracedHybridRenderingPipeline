@@ -33,7 +33,7 @@ public:
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
 		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
 		ViewDescType viewDescType = ViewDesc_Unknown;
-		bool isViewDescNull = false;
+		bool isViewDescNull = true;
 		union ConcreteViewDesc{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv;
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv;
@@ -75,7 +75,8 @@ public: // function
 	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc& slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
 		auto& desc = GetReal()->GetDesc();
 		auto diff = handle.ptr - GetReal()->GetCPUDescriptorHandleForHeapStart().ptr;
-		SIZE_T num = (SIZE_T)(diff / m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type));
+		Assert(diff >=0);
+		SIZE_T num = (SIZE_T)(diff / (SIZE_T)m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type));
 		Assert(num >= 0 && num < desc.NumDescriptors);
 		//m_slotDesc[num] = slotDesc;
 		cacheDescriptorCreateParamByIndex(slotDesc, num);
