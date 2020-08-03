@@ -117,6 +117,13 @@ COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12Comm
 	m_pRealSwapChain->GetDesc1(&swapChainDesc);
 	m_pRealSwapChain->GetHwnd(&hWnd);
 	Assert(hWnd);
+	
+	// clear swapchain refs
+	for (int i = 0; i < m_SwapChainBuffers.size(); i++) {
+		m_SwapChainBuffers[i]->ResetBySwapChain();
+	}
+	m_pRealSwapChain.Reset();
+
 	dxgiFactory4->CreateSwapChainForHwnd(
 		pRealCommandQueue,
 		hWnd,
@@ -133,17 +140,17 @@ COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12Comm
 
 	m_HighestVersion = 1;
 	COMPtr<IDXGISwapChain2> pSwapchain2;
-	ret = m_pRealSwapChain.As(&pSwapchain2);
+	ret = swapChain1.As(&pSwapchain2);
 	if (!FAILED(ret))
 		m_HighestVersion++;
 	else return swapChain1;
 	COMPtr<IDXGISwapChain3> pSwapchain3;
-	ret = m_pRealSwapChain.As(&pSwapchain3);
+	ret = swapChain1.As(&pSwapchain3);
 	if (!FAILED(ret))
 		m_HighestVersion++;
 	else return swapChain1;
 	COMPtr<IDXGISwapChain4> pSwapchain4;
-	ret = m_pRealSwapChain.As(&pSwapchain4);
+	ret = swapChain1.As(&pSwapchain4);
 	if (!FAILED(ret))
 		m_HighestVersion++;
 	return swapChain1;

@@ -159,7 +159,7 @@ public: //func
 public://framework
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 	void SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3D12Resource* pNewResource);
-
+	
 protected:
 
 	WrappedD3D12ResourceType m_Type;
@@ -182,6 +182,10 @@ protected:
 
 	// backbuffer
 	IDXGISwapChain1* m_pRealSwapChain;
+
+private:
+	friend class WrappedD3D12DXGISwapChain;
+	void ResetBySwapChain() { m_pReal.Reset(); }
 };
 
 
