@@ -72,19 +72,20 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			printf("--------------------------------------------------\n");
 			size_t counter = m_BackRefs.size();
 			ID3D12Device* pOldDevice = GetReal().Get();
-
+			// pool
 			std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> newBackRefs; //新的资源->Wrapper
 			std::vector<COMPtr<ID3D12Resource>> oldBackRefsSrc(counter); // old device
 			std::vector<COMPtr<ID3D12Resource>> oldBackRefsReadback(counter);// old device
 			std::vector<COMPtr<ID3D12Resource>> newBackRefsUpload(counter); // new device
 			std::vector<COMPtr<ID3D12Resource>> newBackRefsDest(counter); // new device
+			std::vector<UINT64> requiredRefsSize(counter);
 			
 			D3D12_COMMAND_QUEUE_DESC commandQueueDesc={
 			/*.Type = */D3D12_COMMAND_LIST_TYPE_DIRECT,
 			/*.Priority =*/ D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
 			/*.Flags =*/ D3D12_COMMAND_QUEUE_FLAG_NONE,
 			/*.NodeMask =*/ 0 };
-
+			// command series old
 			COMPtr<ID3D12CommandQueue>copyCommandQueue;
 			pOldDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue));
 			COMPtr<ID3D12CommandAllocator> copyCommandAllocator;
@@ -94,7 +95,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			uint64_t copyFenceValue = 0;
 			COMPtr<ID3D12Fence> copyFence;
 			pOldDevice->CreateFence(copyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence));
-
+			// command series new
 			COMPtr<ID3D12CommandQueue>copyCommandQueue1;
 			pNewDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&copyCommandQueue1));
 			COMPtr<ID3D12CommandAllocator> copyCommandAllocator1;
@@ -104,10 +105,10 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			uint64_t copyFenceValue1 = 0;
 			COMPtr<ID3D12Fence> copyFence1;
 			pNewDevice->CreateFence(copyFenceValue1, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&copyFence1));
-
-
+			// setup and framework
 			int progress = 0; int idx = 0; size_t counterReal = 0;
 			for (auto it = m_BackRefs.begin(); it != m_BackRefs.end(); it++) {
+				COMPtr<ID3D12Resource> tmpOldResource = (static_cast<ID3D12Resource*>(it->first));
 				//key of the framework
 				it->second->SwitchToDeviceRdc(pNewDevice);
 				newBackRefs[static_cast<ID3D12DeviceChild*>(it->second->GetRealObject().Get())] = it->second;
@@ -119,23 +120,38 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					printf(">");
 					++progress;
 				}
+				printf("\n");
+
 				if (!static_cast<WrappedD3D12Resource*>(it->second)->needCopy()) continue;
+				D3D12_RESOURCE_DESC desc = tmpOldResource->GetDesc();
 
 				// 缓存旧资源的ptr，使用comptr来保存生命
-				oldBackRefsSrc[counterReal] = (static_cast<ID3D12Resource*>(it->first));
-				// 生成readback resource
+				oldBackRefsSrc[counterReal] = tmpOldResource;
+				// 查询footprint
+				UINT64 NumSubresources = desc.MipLevels;
+				UINT64 RequiredSize = 0;
+				UINT64 MemToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * NumSubresources;
+				Assert(MemToAlloc <= SIZE_MAX);
+				void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(MemToAlloc));
+				Assert(pMem);
+				D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts = reinterpret_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
+				UINT64* pRowSizesInBytes = reinterpret_cast<UINT64*>(pLayouts + NumSubresources);
+				UINT* pNumRows = reinterpret_cast<UINT*>(pRowSizesInBytes + NumSubresources);
+				pOldDevice->GetCopyableFootprints(&desc, 0, NumSubresources, 0, pLayouts, pNumRows, pRowSizesInBytes, &RequiredSize);
+				requiredRefsSize[counterReal] = RequiredSize;
+				// 生成readback resource buffer
 				{
 					D3D12_HEAP_PROPERTIES properties = { D3D12_HEAP_TYPE_READBACK, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
 					pOldDevice->CreateCommittedResource(&properties, D3D12_HEAP_FLAG_NONE,
-						&oldBackRefsSrc[counterReal]->GetDesc(), D3D12_RESOURCE_STATE_COPY_DEST,
+						&CD3DX12_RESOURCE_DESC::Buffer(RequiredSize), D3D12_RESOURCE_STATE_COPY_DEST,
 						NULL, IID_PPV_ARGS(&oldBackRefsReadback[counterReal])
 					);
 				}
-				// 生成upload resource
+				// 生成upload resource buffer
 				{
 					D3D12_HEAP_PROPERTIES properties = { D3D12_HEAP_TYPE_UPLOAD, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1 };
 					pNewDevice->CreateCommittedResource(&properties, D3D12_HEAP_FLAG_NONE,
-						&oldBackRefsSrc[counterReal]->GetDesc(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+						&CD3DX12_RESOURCE_DESC::Buffer(RequiredSize), D3D12_RESOURCE_STATE_GENERIC_READ,
 						NULL, IID_PPV_ARGS(&newBackRefsUpload[counterReal])
 					);
 				}
@@ -155,8 +171,34 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					srcResourceBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 					copyCommandList->ResourceBarrier(1, &srcResourceBarrier);
 				}
-				copyCommandList->CopyResource(oldBackRefsReadback[counterReal].Get(), oldBackRefsSrc[counterReal].Get());
-				copyCommandList1->CopyResource(newBackRefsDest[counterReal].Get(), newBackRefsUpload[counterReal].Get());
+				//copyCommandList->CopyResource(oldBackRefsReadback[counterReal].Get(), oldBackRefsSrc[counterReal].Get());
+				//copyCommandList1->CopyResource(newBackRefsDest[counterReal].Get(), newBackRefsUpload[counterReal].Get());
+				// copy from old ref to readback
+				if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER) {
+					copyCommandList->CopyBufferRegion(
+						oldBackRefsReadback[counterReal].Get(), 0, oldBackRefsSrc[counterReal].Get(), pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+				}
+				else {
+					for (UINT i = 0; i < NumSubresources; ++i)
+					{
+						CD3DX12_TEXTURE_COPY_LOCATION Dst(oldBackRefsReadback[counterReal].Get(), pLayouts[i]);
+						CD3DX12_TEXTURE_COPY_LOCATION Src(oldBackRefsSrc[counterReal].Get(), i+0);
+						copyCommandList->CopyTextureRegion(&Dst, 0, 0, 0, &Src, nullptr);
+					}
+				}
+				// copy from upload to new ref
+				if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER) {
+					copyCommandList1->CopyBufferRegion(
+						newBackRefsDest[counterReal].Get(), 0, newBackRefsUpload[counterReal].Get(), pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+				}
+				else {
+					for (UINT i = 0; i < NumSubresources; ++i)
+					{
+						CD3DX12_TEXTURE_COPY_LOCATION Dst(newBackRefsDest[counterReal].Get(), i + 0);
+						CD3DX12_TEXTURE_COPY_LOCATION Src(newBackRefsUpload[counterReal].Get(), pLayouts[i]);
+						copyCommandList1->CopyTextureRegion(&Dst, 0, 0, 0, &Src, nullptr);
+					}
+				}
 				if (D3D12_RESOURCE_STATE_COPY_DEST != static_cast<WrappedD3D12Resource*>(it->second)->queryState())
 				{
 					D3D12_RESOURCE_BARRIER destResourceBarrier;
@@ -170,11 +212,13 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					copyCommandList1->ResourceBarrier(1, &destResourceBarrier);
 				}			
 				++counterReal;
+				HeapFree(GetProcessHeap(), 0, pMem);
 			}
 
 			{ // execute commandqueue
 				std::vector<ID3D12CommandList* > listsToExec(1);
 				listsToExec[0] = copyCommandList.Get();
+				copyCommandList->Close();
 				copyCommandQueue->ExecuteCommandLists(1, listsToExec.data());
 				copyCommandQueue->Signal(copyFence.Get(), ++copyFenceValue);
 				if ((copyFence->GetCompletedValue() < copyFenceValue)) //等待copy queue执行完毕
@@ -189,23 +233,22 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					::CloseHandle(event);
 				}
 			}
-			oldBackRefsSrc[counterReal]; // old device
-			oldBackRefsReadback[counterReal];// old device
-			newBackRefsUpload[counterReal]; // new device
-			newBackRefsDest[counterReal]; // new device
+			// CPU copy
 			for (size_t i = 0; i < counterReal; i++) {
-				D3D12_RESOURCE_DESC& desc = oldBackRefsSrc[counterReal]->GetDesc();
-				SIZE_T size = 0;
-				D3D12_RANGE range{0, size};
-				byte* src = 0;
-				oldBackRefsReadback[i]->Map(0, &range, reinterpret_cast<void**>(&src));
-
+				D3D12_RESOURCE_DESC& desc = oldBackRefsSrc[i]->GetDesc();
+				UINT64 requiredSize = requiredRefsSize[i];
+				BYTE* pSrcData=0; BYTE* pDestData=0;
+				HRESULT hr = oldBackRefsReadback[i]->Map(0, NULL, reinterpret_cast<void**>(&pSrcData));
+				HRESULT hr1 = newBackRefsUpload[i]->Map(0, NULL, reinterpret_cast<void**>(&pDestData));
+				Assert(!FAILED(hr) && !FAILED(hr1)&&pSrcData&&pDestData);
+				memcpy(pDestData, pSrcData, requiredSize);
+				oldBackRefsReadback[i]->Unmap(0, NULL);
+				newBackRefsUpload[i]->Unmap(0, NULL);
 			}
-
-
 			{ // execute commandqueue1
 				std::vector<ID3D12CommandList* > listsToExec(1);
 				listsToExec[0] = copyCommandList1.Get();
+				copyCommandList1->Close();
 				copyCommandQueue1->ExecuteCommandLists(1, listsToExec.data());
 				copyCommandQueue1->Signal(copyFence1.Get(), ++copyFenceValue1);
 				if ((copyFence1->GetCompletedValue() < copyFenceValue1)) //等待copy queue执行完毕
@@ -220,9 +263,6 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 					::CloseHandle(event);
 				}
 			}
-
-
-			printf("\n");
 			m_BackRefs.swap(newBackRefs);
 		}
 	};
@@ -231,6 +271,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 		auto pWrappedFence = static_cast<WrappedD3D12Fence*>(it->second);
 		pWrappedFence->WaitToCompleteApplicationFenceValue();
 	}
+
 	//0 切换RootSignature和依赖于Root Signature的Pipeline State
 	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
 	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
@@ -251,6 +292,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//5.pReal substitute
 	m_pReal = pNewDevice;
 }
+
 
 WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
 	//TODO 加速结构
