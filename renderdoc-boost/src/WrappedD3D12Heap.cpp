@@ -49,7 +49,7 @@ struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从D
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDevice) {
 	COMPtr<ID3D12DescriptorHeap> pvNewDescriptorHeap = 0;
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = pvNewDescriptorHeap->GetDesc();
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = this->GetDesc();
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
 	Assert(pvNewDescriptorHeap.Get());
 
