@@ -298,7 +298,8 @@ WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefCPUDescriptorHeaps(
 	for (auto it = m_BackRefs_DescriptorHeap.begin(); it != m_BackRefs_DescriptorHeap.end(); it++) {
 		if (it->second) {
 			WrappedD3D12DescriptorHeap* pWrappedHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
-			if ((pWrappedHeap->GetDesc().Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)!=0&&pWrappedHeap->handleInDescriptorHeapRange(handle)) {
+			auto desc = pWrappedHeap->GetDesc();
+			if (!(pWrappedHeap->GetDesc().Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)&&pWrappedHeap->handleInDescriptorHeapRange(handle)) {
 				return pWrappedHeap;
 			}
 		}
@@ -879,10 +880,11 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CopyDescriptors(
 	do {
 		auto pSrcDescriptorHeap = srcHeapsPtr[srcRangeIndex.rangeNum];
 		auto pDestDescriptorHeap =destHeapsPtr[destRangeIndex.rangeNum];
-		Assert(pSrcDescriptorHeap->GetDesc().Type == pDestDescriptorHeap->GetDesc().Type);
+		Assert(!(pDestDescriptorHeap && !pSrcDescriptorHeap));
 		if (!pSrcDescriptorHeap || !pDestDescriptorHeap) {
 			continue;
 		}
+		Assert(pSrcDescriptorHeap->GetDesc().Type == pDestDescriptorHeap->GetDesc().Type);
 		auto srcStart = srcHeapsStartIndex[srcRangeIndex.rangeNum];
 		auto destStart = destHeapsStartIndex[destRangeIndex.rangeNum];
 		auto& srcDescriptorCreateParamCache = pSrcDescriptorHeap->getDescriptorCreateParamCache(srcStart + srcRangeIndex.indexInRange);
@@ -905,6 +907,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CopyDescriptorsSimple(
 	_In_  D3D12_DESCRIPTOR_HEAP_TYPE DescriptorHeapsType) {
 	auto srcDescriptorHeap = findInBackRefCPUDescriptorHeaps(SrcDescriptorRangeStart);
 	auto destDescriptorHeap = findInBackRefCPUDescriptorHeaps(DestDescriptorRangeStart);
+	Assert(!(destDescriptorHeap && !srcDescriptorHeap));
 	if (srcDescriptorHeap&&destDescriptorHeap) {
 		Assert(DescriptorHeapsType == srcDescriptorHeap->GetDesc().Type
 			&&DescriptorHeapsType == destDescriptorHeap->GetDesc().Type);
