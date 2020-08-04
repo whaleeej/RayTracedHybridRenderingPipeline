@@ -78,7 +78,6 @@ public: // function
 		Assert(diff >=0);
 		SIZE_T num = (SIZE_T)(diff / (SIZE_T)m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type));
 		Assert(num >= 0 && num < desc.NumDescriptors);
-		//m_slotDesc[num] = slotDesc;
 		cacheDescriptorCreateParamByIndex(slotDesc, num);
 	}
 
@@ -87,7 +86,6 @@ public: //framework:
 
 protected:
 	std::vector<DescriptorHeapSlotDesc> m_slotDesc;
-	byte* m_pHookedDescriptorHeap;
 };
 
 RDCBOOST_NAMESPACE_END

@@ -23,21 +23,14 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12Heap::CopyToDevice(ID3D12Device* pNewDevic
 }
 
 WrappedD3D12DescriptorHeap::WrappedD3D12DescriptorHeap(ID3D12DescriptorHeap* pReal, WrappedD3D12Device* pWrappedDevice)
-	:WrappedD3D12DeviceChild(pReal, pWrappedDevice),
-	m_pHookedDescriptorHeap(0)
+	:WrappedD3D12DeviceChild(pReal, pWrappedDevice)
 {
 	auto& desc = GetReal()->GetDesc();
 	m_slotDesc.resize(desc.NumDescriptors);
-	if (!desc.Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) {
-		m_pHookedDescriptorHeap = new byte[desc.NumDescriptors * GetWrappedDevice()->GetDescriptorHandleIncrementSize(desc.Type)];
-	}
 }
 
 WrappedD3D12DescriptorHeap::~WrappedD3D12DescriptorHeap() {
 	auto& desc = GetReal()->GetDesc();
-	if (m_pHookedDescriptorHeap) {
-		delete []m_pHookedDescriptorHeap;
-	}
 }
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDevice) {

@@ -51,6 +51,18 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//copy private data of device
 	m_PrivateData.CopyPrivateData(pNewDevice);
 
+	//for (auto it = m_BackRefs_DescriptorHeap.begin(); it != m_BackRefs_DescriptorHeap.end(); it++) {
+	//	auto descriptorHeap = static_cast<WrappedD3D12DescriptorHeap*>(it->second);
+	//	auto desc = descriptorHeap->GetDesc();
+	//	auto flag = desc.Flags;
+	//	auto start = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	//	auto interval = GetDescriptorHandleIncrementSize(desc.Type);
+	//	auto size = desc.NumDescriptors;
+	//	auto end = start.ptr + interval * size;
+	//	printf("");
+	//}
+
+
 	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
 			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
