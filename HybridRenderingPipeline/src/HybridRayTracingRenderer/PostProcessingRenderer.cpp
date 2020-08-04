@@ -62,7 +62,7 @@ void PostProcessingRenderer::LoadPipeline()
 	rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters);
 
 	m_PostLightingRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
+	NAME_D3D12_OBJECT(m_PostLightingRootSignature.m_RootSignature);
 	ComPtr<ID3DBlob> vs;
 	ComPtr<ID3DBlob> ps;
 	ThrowIfFailed(D3DReadFileToBlob(L"build_vs2019/data/shaders/HybridRenderingPipeline/PostProcessing_VS.cso", &vs));
@@ -99,6 +99,7 @@ void PostProcessingRenderer::LoadPipeline()
 	des.NodeMask = 0;
 	des.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_PostLightingPipelineState)));
+	NAME_D3D12_OBJECT(m_PostLightingPipelineState);
 }
 
 void PostProcessingRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)

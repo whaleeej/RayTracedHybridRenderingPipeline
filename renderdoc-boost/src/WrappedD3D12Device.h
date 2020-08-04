@@ -320,7 +320,6 @@ public: //func
 	bool isRenderDocDevice() { return m_bRenderDocDevice; }
 	void SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
 	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
-	WrappedD3D12DescriptorHeap* findInBackRefCPUDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 	bool isResourceExist(WrappedD3D12Resource* pWrappedResource);
 
 public: // framework

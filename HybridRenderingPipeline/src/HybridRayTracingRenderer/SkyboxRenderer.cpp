@@ -68,7 +68,7 @@ void SkyboxRenderer::LoadPipeline()
 	rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &linearClampSampler, rootSignatureFlags);
 
 	m_SkyboxSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
-
+	NAME_D3D12_OBJECT(m_SkyboxSignature.m_RootSignature);
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC des; // comparti for device1 interface
 	ZeroMemory(&des, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	des.pRootSignature = m_SkyboxSignature.GetRootSignature().Get();
@@ -97,6 +97,7 @@ void SkyboxRenderer::LoadPipeline()
 	des.NodeMask = 0;
 	des.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_SkyboxPipelineState)));
+	NAME_D3D12_OBJECT(m_SkyboxPipelineState);
 }
 
 void SkyboxRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)

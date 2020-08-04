@@ -3,8 +3,6 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-
-
 WrappedD3D12Heap::WrappedD3D12Heap(ID3D12Heap* pReal, WrappedD3D12Device* pWrappedDevice)
 	: WrappedD3D12DeviceChild(pReal, pWrappedDevice)
 {
@@ -26,7 +24,13 @@ WrappedD3D12DescriptorHeap::WrappedD3D12DescriptorHeap(ID3D12DescriptorHeap* pRe
 	:WrappedD3D12DeviceChild(pReal, pWrappedDevice)
 {
 	auto& desc = GetReal()->GetDesc();
-	m_slotDesc.resize(desc.NumDescriptors);
+	m_Slots.resize(desc.NumDescriptors);
+	m_cpuStart = GetReal()->GetCPUDescriptorHandleForHeapStart();
+	m_gpuStart = GetReal()->GetGPUDescriptorHandleForHeapStart();
+	for (UINT i = 0; i < m_Slots.size(); i++) {
+		m_Slots[i].idx = i;
+		m_Slots[i].m_DescriptorHeap = this;
+	}
 }
 
 WrappedD3D12DescriptorHeap::~WrappedD3D12DescriptorHeap() {
@@ -38,54 +42,57 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = this->GetDesc();
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
 	Assert(pvNewDescriptorHeap.Get());
-	if ((descHeapDesc.Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)!=0) {
-		return pvNewDescriptorHeap;
-	}
+	m_cpuStart = pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	m_gpuStart = pvNewDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
-	for (size_t i = 0; i < m_slotDesc.size(); i++) {
+	//if ((descHeapDesc.Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)!=0) {
+	//	return pvNewDescriptorHeap;
+	//}
+
+	for (UINT i = 0; i < m_Slots.size(); i++) {
 		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 		handle.Offset(i, pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type));
 
-		auto pWrappedRes = m_slotDesc[i].pWrappedD3D12Resource;
-		switch (m_slotDesc[i].viewDescType) {
+		auto pWrappedRes = m_Slots[i].pWrappedD3D12Resource;
+		switch (m_Slots[i].viewDescType) {
 		case ViewDesc_CBV:
-			pNewDevice->CreateConstantBufferView(&m_slotDesc[i].concreteViewDesc.cbv, handle);
+			pNewDevice->CreateConstantBufferView(&m_Slots[i].concreteViewDesc.cbv, handle);
 			break;
 		case ViewDesc_SRV:
-			Assert(!(pWrappedRes==NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
+			Assert(!(pWrappedRes==NULL && m_Slots[i].isViewDescNull));
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv : NULL,
+				!m_Slots[i].isViewDescNull? &m_Slots[i].concreteViewDesc.srv : NULL,
 				handle);
 			break;
 		case ViewDesc_UAV:
-			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
+			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				m_slotDesc[i].pWrappedD3D12CounterResource?m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
-				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.uav : NULL,
+				m_Slots[i].pWrappedD3D12CounterResource?m_Slots[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.uav : NULL,
 				handle);
 			break;
 		case ViewDesc_RTV:
-			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
+			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.rtv:NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.rtv:NULL,
 				handle);
 			break;
 		case ViewDesc_DSV:
-			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
+			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.dsv:NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.dsv:NULL,
 				handle);
 			break;
 		case ViewDesc_SamplerV:
-			pNewDevice->CreateSampler(&m_slotDesc[i].concreteViewDesc.sampler, handle);
+			pNewDevice->CreateSampler(&m_Slots[i].concreteViewDesc.sampler, handle);
 			break;
 		case ViewDesc_Unknown:
 			break;
@@ -110,11 +117,13 @@ D3D12_DESCRIPTOR_HEAP_DESC STDMETHODCALLTYPE WrappedD3D12DescriptorHeap::GetDesc
 
 D3D12_CPU_DESCRIPTOR_HANDLE STDMETHODCALLTYPE WrappedD3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart(void)
 {
-	return GetReal()->GetCPUDescriptorHandleForHeapStart();
+	//return GetReal()->GetCPUDescriptorHandleForHeapStart();//hooked with slots
+	return { (SIZE_T)static_cast<void*>(m_Slots.data()) };
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE STDMETHODCALLTYPE WrappedD3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart(void) {
-	return GetReal()->GetGPUDescriptorHandleForHeapStart();
+	//return GetReal()->GetGPUDescriptorHandleForHeapStart();//hooked with slots
+	return { (SIZE_T)static_cast<void*>(m_Slots.data()) };
 }
 
 

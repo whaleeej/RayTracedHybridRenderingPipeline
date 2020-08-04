@@ -329,7 +329,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootDescriptor
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) {
 	return GetReal()->SetComputeRootDescriptorTable(
 		RootParameterIndex,
-		BaseDescriptor);
+		ANALYZE_WRAPPED_GPU_HANDLE(BaseDescriptor));
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootDescriptorTable(
@@ -337,7 +337,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootDescripto
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) {
 	return GetReal()->SetGraphicsRootDescriptorTable(
 		RootParameterIndex,
-		BaseDescriptor);
+		ANALYZE_WRAPPED_GPU_HANDLE(BaseDescriptor));
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRoot32BitConstant(
@@ -463,11 +463,25 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetRenderTargets(
 	_In_opt_  const D3D12_CPU_DESCRIPTOR_HANDLE *pRenderTargetDescriptors,
 	_In_  BOOL RTsSingleHandleToDescriptorRange,
 	_In_opt_  const D3D12_CPU_DESCRIPTOR_HANDLE *pDepthStencilDescriptor) {
+	UINT numHandles = RTsSingleHandleToDescriptorRange ? RDCMIN(1U, NumRenderTargetDescriptors)
+		: NumRenderTargetDescriptors;
+
+	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtHandles(numHandles);
+	const D3D12_CPU_DESCRIPTOR_HANDLE* dspHandle = pDepthStencilDescriptor;
+	D3D12_CPU_DESCRIPTOR_HANDLE dsRealHandle;
+	if (dspHandle) {
+		dsRealHandle = ANALYZE_WRAPPED_CPU_HANDLE(*dspHandle);
+		dspHandle = &dsRealHandle;
+	}
+	for (size_t i = 0; i < numHandles; i++) {
+		rtHandles[i].ptr = ANALYZE_WRAPPED_CPU_HANDLE(pRenderTargetDescriptors[i]).ptr;
+	}
+
 	return GetReal()->OMSetRenderTargets(
 		NumRenderTargetDescriptors,
-		pRenderTargetDescriptors,
+		rtHandles.data(),
 		RTsSingleHandleToDescriptorRange,
-		pDepthStencilDescriptor);
+		dspHandle);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearDepthStencilView(
@@ -478,7 +492,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearDepthStencilView(
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
 	return GetReal()->ClearDepthStencilView(
-		DepthStencilView,
+		ANALYZE_WRAPPED_CPU_HANDLE(DepthStencilView),
 		ClearFlags,
 		Depth,
 		Stencil,
@@ -492,7 +506,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearRenderTargetView(
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
 	return GetReal()->ClearRenderTargetView(
-		RenderTargetView,
+		ANALYZE_WRAPPED_CPU_HANDLE(RenderTargetView),
 		ColorRGBA,
 		NumRects,
 		pRects);
@@ -506,8 +520,8 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessView
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
 	return GetReal()->ClearUnorderedAccessViewUint(
-		ViewGPUHandleInCurrentHeap,
-		ViewCPUHandle,
+		ANALYZE_WRAPPED_GPU_HANDLE(ViewGPUHandleInCurrentHeap),
+		ANALYZE_WRAPPED_CPU_HANDLE(ViewCPUHandle),
 		static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(),
 		Values,
 		NumRects,
@@ -522,8 +536,8 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessView
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
 	return GetReal()->ClearUnorderedAccessViewFloat(
-		ViewGPUHandleInCurrentHeap,
-		ViewCPUHandle,
+		ANALYZE_WRAPPED_GPU_HANDLE(ViewGPUHandleInCurrentHeap),
+		ANALYZE_WRAPPED_CPU_HANDLE(ViewCPUHandle),
 		static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(),
 		Values,
 		NumRects,

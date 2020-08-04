@@ -81,6 +81,7 @@ void GBufferRenderer::LoadPipeline()
 	rootSignatureDescription.Init_1_1(arraysize(rootParameters), rootParameters, 1, &anisotropicSampler, rootSignatureFlags);
 
 	m_DeferredRootSignature.SetRootSignatureDesc(rootSignatureDescription.Desc_1_1, featureData.HighestVersion);
+	NAME_D3D12_OBJECT(m_DeferredRootSignature.m_RootSignature);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC des; // comparti for device1 interface
 	ZeroMemory(&des, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
@@ -109,6 +110,7 @@ void GBufferRenderer::LoadPipeline()
 	des.NodeMask = 0;
 	des.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&des, IID_PPV_ARGS(&m_DeferredPipelineState)));
+	NAME_D3D12_OBJECT(m_DeferredPipelineState);
 }
 
 void GBufferRenderer::Update(UpdateEventArgs& e, std::shared_ptr<Scene> scene)

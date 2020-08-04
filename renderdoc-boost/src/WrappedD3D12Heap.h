@@ -29,10 +29,10 @@ public:
 		ViewDesc_SamplerV,
 		ViewDesc_Unknown
 	};
-	struct DescriptorHeapSlotDesc{ // TODO 把WrappedD3D12Resource的生命拥有起来，改成ComPtr
+	struct DescriptorHeapSlot{ // TODO 把WrappedD3D12Resource的生命拥有起来，改成ComPtr
+		ViewDescType viewDescType = ViewDesc_Unknown;
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
 		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
-		ViewDescType viewDescType = ViewDesc_Unknown;
 		bool isViewDescNull = true;
 		union ConcreteViewDesc{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv;
@@ -42,6 +42,35 @@ public:
 			D3D12_DEPTH_STENCIL_VIEW_DESC dsv;
 			D3D12_SAMPLER_DESC sampler;
 		}concreteViewDesc;
+
+		UINT  idx;
+		WrappedD3D12DescriptorHeap* m_DescriptorHeap;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE getRealCPUHandle() {
+			return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+				m_DescriptorHeap->m_cpuStart,
+				m_DescriptorHeap->m_pRealDevice->GetDescriptorHandleIncrementSize(m_DescriptorHeap->GetDesc().Type),
+				idx
+			);
+		};
+
+		D3D12_GPU_DESCRIPTOR_HANDLE getRealGPUHandle() {
+			return CD3DX12_GPU_DESCRIPTOR_HANDLE(
+				m_DescriptorHeap->m_gpuStart,
+				m_DescriptorHeap->m_pRealDevice->GetDescriptorHandleIncrementSize(m_DescriptorHeap->GetDesc().Type),
+				idx
+			);
+
+		};
+
+		DescriptorHeapSlot& operator=(const DescriptorHeapSlot& cls) {
+			viewDescType = cls.viewDescType;
+			pWrappedD3D12Resource = cls.pWrappedD3D12Resource;
+			pWrappedD3D12CounterResource = cls.pWrappedD3D12CounterResource;
+			isViewDescNull = cls.isViewDescNull;
+			concreteViewDesc = cls.concreteViewDesc;
+			return *this;
+		}
 	};
 
 public:
@@ -56,36 +85,15 @@ public: //override
 	virtual D3D12_GPU_DESCRIPTOR_HANDLE STDMETHODCALLTYPE GetGPUDescriptorHandleForHeapStart(void);
 
 public: // function
-	bool handleInDescriptorHeapRange(D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-		auto& desc = GetReal()->GetDesc();
-		UINT perSize = m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type);
-		return handle.ptr >= GetReal()->GetCPUDescriptorHandleForHeapStart().ptr && handle.ptr < (GetReal()->GetCPUDescriptorHandleForHeapStart().ptr + desc.NumDescriptors *perSize);
-	}
-
-	DescriptorHeapSlotDesc& getDescriptorCreateParamCache(size_t i) {
-		Assert(i >= 0 && i < m_slotDesc.size());
-		return m_slotDesc[i];
-	}
-
-	void cacheDescriptorCreateParamByIndex(DescriptorHeapSlotDesc& slotDesc, size_t index) {
-		Assert(index >= 0 && index < m_slotDesc.size());
-		m_slotDesc[index] = slotDesc;
-	}
-
-	void cacheDescriptorCreateParam(DescriptorHeapSlotDesc& slotDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle) {
-		auto& desc = GetReal()->GetDesc();
-		auto diff = handle.ptr - GetReal()->GetCPUDescriptorHandleForHeapStart().ptr;
-		Assert(diff >=0);
-		SIZE_T num = (SIZE_T)(diff / (SIZE_T)m_pWrappedDevice->GetDescriptorHandleIncrementSize(desc.Type));
-		Assert(num >= 0 && num < desc.NumDescriptors);
-		cacheDescriptorCreateParamByIndex(slotDesc, num);
-	}
 
 public: //framework:
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
-	std::vector<DescriptorHeapSlotDesc> m_slotDesc;
+	friend DescriptorHeapSlot;
+	std::vector<DescriptorHeapSlot> m_Slots;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_cpuStart;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_gpuStart;
 };
 
 RDCBOOST_NAMESPACE_END
