@@ -33,6 +33,7 @@ public:
 		ViewDescType viewDescType = ViewDesc_Unknown;
 		WrappedD3D12Resource* pWrappedD3D12Resource = NULL;
 		WrappedD3D12Resource* pWrappedD3D12CounterResource = NULL;
+		ID3D12Object* pRealD3D12Object = NULL;
 		bool isViewDescNull = true;
 		union ConcreteViewDesc{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv;
@@ -72,6 +73,7 @@ public:
 			pWrappedD3D12CounterResource = cls.pWrappedD3D12CounterResource;
 			isViewDescNull = cls.isViewDescNull;
 			concreteViewDesc = cls.concreteViewDesc;
+			pRealD3D12Object = cls.pRealD3D12Object;
 			res_desc = cls.res_desc;
 			return *this;
 		}
