@@ -61,6 +61,11 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 		case ViewDesc_SRV:
 			Assert(!(pWrappedRes==NULL && m_Slots[i].isViewDescNull));
 			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
+			if (m_Slots[i].isViewDescNull&&pWrappedRes->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER) {
+				printf("");
+				Assert(false);
+				break;
+			}
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_Slots[i].isViewDescNull? &m_Slots[i].concreteViewDesc.srv : NULL,

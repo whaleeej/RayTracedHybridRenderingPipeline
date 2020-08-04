@@ -58,6 +58,7 @@ void WrappedD3D12Resource::SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3
 		return;
 	Assert(pNewResource != NULL);
 	//TODO: copy content in the swapchain buffers
+	m_Desc = pNewResource->GetDesc();
 	m_PrivateData.CopyPrivateData(pNewResource);
 	m_pReal = pNewResource;
 	m_pRealSwapChain = pNewSwapChain;

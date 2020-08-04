@@ -179,7 +179,7 @@ protected:
 	//...
 
 	// backbuffer
-	IDXGISwapChain1* m_pRealSwapChain;
+	IDXGISwapChain1* m_pRealSwapChain = 0;
 
 private:
 	friend class WrappedD3D12DXGISwapChain;

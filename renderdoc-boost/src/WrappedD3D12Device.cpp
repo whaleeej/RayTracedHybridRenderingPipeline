@@ -27,9 +27,10 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	if (m_BackRefs_Heap.erase(pReal) != 0) return;
 	auto resPivot = m_BackRefs_Resource.find(pReal);
 	if (resPivot != m_BackRefs_Resource.end()) {
-		m_BackRefs_Resource_Reflection.erase(resPivot->second);
-		m_BackRefs_Resource.erase(pReal);
-		return;
+		auto e1 = m_BackRefs_Resource_Reflection.erase(resPivot->second);
+		auto e2 = m_BackRefs_Resource.erase(pReal);
+		if (e1 > 0 || e2 > 0)
+			return;
 	}
 		
 	if (m_BackRefs_DescriptorHeap.erase(pReal) != 0) return;
@@ -343,6 +344,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandQueue(
 	if (ppCommandQueue == NULL)
 		return GetReal()->CreateCommandQueue(pDesc, riid, NULL);
 
+	if (*ppCommandQueue) {
+		static_cast<WrappedD3D12CommandQueue*>(*ppCommandQueue)->Release();
+	}
+
 	COMPtr<ID3D12CommandQueue> pCommandQueue = NULL;
 	HRESULT ret = GetReal()->CreateCommandQueue(pDesc, IID_PPV_ARGS(&pCommandQueue));
 	if (!FAILED(ret)) {
@@ -363,6 +368,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandAllocator(
 	if (ppCommandAllocator == NULL)
 		return GetReal()->CreateCommandAllocator(type, riid, NULL);
 
+	if (*ppCommandAllocator) {
+		static_cast<WrappedD3D12CommandAllocator*>(*ppCommandAllocator)->Release();
+	}
+
 	COMPtr < ID3D12CommandAllocator> pCommandAllocator = NULL;
 	HRESULT ret = GetReal()->CreateCommandAllocator(type, IID_PPV_ARGS(&pCommandAllocator));
 	if (!FAILED(ret)) {
@@ -382,6 +391,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateGraphicsPipelineState(
 	_COM_Outptr_  void **ppPipelineState){
 	if (ppPipelineState == NULL)
 		return GetReal()->CreateGraphicsPipelineState(pDesc, riid, NULL);
+
+	if (*ppPipelineState) {
+		static_cast<WrappedD3D12PipelineState*>(*ppPipelineState)->Release();
+	}
 
 	COMPtr < ID3D12PipelineState> pPipelineState = NULL;
 	auto pWrappedRootSignature = static_cast<WrappedD3D12RootSignature*>(pDesc->pRootSignature);//这里因为Desc里指向的RootSignature是Wrapped的，所以他要做替换
@@ -407,6 +420,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateComputePipelineState(
 	_COM_Outptr_  void **ppPipelineState){
 	if (ppPipelineState == NULL)
 		return GetReal()->CreateComputePipelineState(pDesc, riid, NULL);
+
+	if (*ppPipelineState) {
+		static_cast<WrappedD3D12PipelineState*>(*ppPipelineState)->Release();
+	}
 
 	COMPtr < ID3D12PipelineState> pPipelineState = NULL;
 	auto pWrappedRootSignature = static_cast<WrappedD3D12RootSignature*>(pDesc->pRootSignature);//这里因为Desc里指向的RootSignature是Wrapped的，所以他要做替换
@@ -438,6 +455,10 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandList(
 
 	if (ppCommandList == NULL)
 		return GetReal()->CreateCommandList(nodeMask, type, pCommandAllocator, pInitialState, riid, NULL);
+
+	if (*ppCommandList) {
+		static_cast<WrappedD3D12CommandList*>(*ppCommandList)->Release();
+	}
 
 	if (riid == __uuidof(ID3D12CommandList)) {
 		COMPtr < ID3D12CommandList> pCommandList = NULL;
@@ -486,7 +507,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateDescriptorHeap(
 	_COM_Outptr_  void **ppvHeap){
 	if (ppvHeap == NULL)
 		return GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, riid, NULL);
-
+	if (*ppvHeap) {
+		static_cast<WrappedD3D12DescriptorHeap*>(*ppvHeap)->Release();
+	}
 	COMPtr<ID3D12DescriptorHeap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateDescriptorHeap(pDescriptorHeapDesc, IID_PPV_ARGS(&pvHeap));
 	if (!FAILED(ret)) {
@@ -508,7 +531,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateRootSignature(
 	_COM_Outptr_  void **ppvRootSignature) {
 	if (ppvRootSignature == NULL)
 		return GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, riid, NULL);
-
+	if (*ppvRootSignature) {
+		static_cast<WrappedD3D12RootSignature*>(*ppvRootSignature)->Release();
+	}
 	COMPtr<ID3D12RootSignature> pvRootSignature = NULL;
 	HRESULT ret = GetReal()->CreateRootSignature(nodeMask, pBlobWithRootSignature, blobLengthInBytes, IID_PPV_ARGS(&pvRootSignature));
 	if (!FAILED(ret)) {
@@ -535,6 +560,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 	_COM_Outptr_opt_  void **ppvResource) {
 	if (ppvResource == NULL)
 		return GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, riidResource, NULL);
+	if (*ppvResource) {
+		static_cast<WrappedD3D12Resource*>(*ppvResource)->Release();
+	}
 
 	COMPtr<ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateCommittedResource(pHeapProperties, HeapFlags, pDesc, InitialResourceState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
@@ -564,6 +592,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateHeap(
 	_COM_Outptr_opt_  void **ppvHeap) {
 	if (ppvHeap == NULL)
 		return GetReal()->CreateHeap(pDesc, riid, NULL);
+	if (*ppvHeap) {
+		static_cast<WrappedD3D12Heap*>(*ppvHeap)->Release();
+	}
 
 	COMPtr<ID3D12Heap> pvHeap = NULL;
 	HRESULT ret = GetReal()->CreateHeap(pDesc, IID_PPV_ARGS(&pvHeap));
@@ -590,6 +621,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 		return GetReal()->CreatePlacedResource(
 			static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), 
 			HeapOffset, pDesc, InitialState, pOptimizedClearValue, riid, NULL);
+	if (*ppvResource) {
+		static_cast<WrappedD3D12Resource*>(*ppvResource)->Release();
+	}
 
 	COMPtr<ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreatePlacedResource(static_cast<WrappedD3D12Heap *>(pHeap)->GetReal().Get(), HeapOffset, pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
@@ -620,7 +654,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 	_COM_Outptr_opt_  void **ppvResource) {
 	if (ppvResource == NULL)
 		return GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, riid, NULL);
-
+	if (*ppvResource) {
+		static_cast<WrappedD3D12Resource*>(*ppvResource)->Release();
+	}
 	COMPtr< ID3D12Resource> pvResource = NULL;
 	HRESULT ret = GetReal()->CreateReservedResource(pDesc, InitialState, pOptimizedClearValue, IID_PPV_ARGS(&pvResource));
 	if (!FAILED(ret)) {
@@ -655,7 +691,9 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateFence(
 	_COM_Outptr_  void **ppFence) {
 	if (ppFence == NULL)
 		return GetReal()->CreateFence(InitialValue, Flags, riid, NULL);
-
+	if (*ppFence) {
+		static_cast<WrappedD3D12Fence*>(*ppFence)->Release();
+	}
 	COMPtr< ID3D12Fence> pFence = NULL;
 	HRESULT ret = GetReal()->CreateFence(InitialValue, Flags, IID_PPV_ARGS(&pFence));
 	if (!FAILED(ret)) {
@@ -707,6 +745,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	ANALYZE_WRAPPED_SLOT(pSlot, DestDescriptor);
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SRV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
+	pSlot->res_desc = static_cast<WrappedD3D12Resource*>(pResource)->m_Desc;
 	if (pDesc) {
 		pSlot->concreteViewDesc.srv = *pDesc;
 		pSlot->isViewDescNull = false;
