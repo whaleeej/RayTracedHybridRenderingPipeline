@@ -745,7 +745,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	ANALYZE_WRAPPED_SLOT(pSlot, DestDescriptor);
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SRV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
-	pSlot->res_desc = static_cast<WrappedD3D12Resource*>(pResource)->m_Desc;
+	pSlot->res_desc = static_cast<WrappedD3D12Resource*>(pResource)->GetDesc();
 	if (pDesc) {
 		pSlot->concreteViewDesc.srv = *pDesc;
 		pSlot->isViewDescNull = false;

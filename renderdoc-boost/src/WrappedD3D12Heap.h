@@ -72,6 +72,7 @@ public:
 			pWrappedD3D12CounterResource = cls.pWrappedD3D12CounterResource;
 			isViewDescNull = cls.isViewDescNull;
 			concreteViewDesc = cls.concreteViewDesc;
+			res_desc = cls.res_desc;
 			return *this;
 		}
 	};
