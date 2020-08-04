@@ -25,7 +25,13 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	if (m_BackRefs_RootSignature.erase(pReal) !=0) return;
 	if (m_BackRefs_PipelineState.erase(pReal) != 0) return;
 	if (m_BackRefs_Heap.erase(pReal) != 0) return;
-	if (m_BackRefs_Resource.erase(pReal) != 0) return;
+	auto resPivot = m_BackRefs_Resource.find(pReal);
+	if (resPivot != m_BackRefs_Resource.end()) {
+		m_BackRefs_Resource_Reflection.erase(resPivot->second);
+		m_BackRefs_Resource.erase(pReal);
+		return;
+	}
+		
 	if (m_BackRefs_DescriptorHeap.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandAllocator.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandList.erase(pReal) != 0) return;
@@ -307,6 +313,17 @@ WrappedD3D12DescriptorHeap* WrappedD3D12Device::findInBackRefCPUDescriptorHeaps(
 	return NULL;
 }
 
+bool WrappedD3D12Device::isResourceExist(WrappedD3D12Resource* pWrappedResource) {
+	if (m_BackRefs_Resource_Reflection.find(pWrappedResource) != m_BackRefs_Resource_Reflection.end())
+		return true;
+	for (auto it = m_BackRefs_CommandQueue.begin(); it != m_BackRefs_CommandQueue.end(); it++) {
+		if (static_cast<WrappedD3D12CommandQueue*>(it->second)->isResourceExist(pWrappedResource)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
@@ -536,6 +553,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
+		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;
@@ -589,6 +607,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
+		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;
@@ -616,6 +635,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
+		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;

@@ -1,12 +1,13 @@
 #pragma once
 #include <map>
+#include <set>
 #include "WrappedD3D12Object.h"
 #include "DeviceCreateParams.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
 class WrappedD3D12DescriptorHeap;
-
+class WrappedD3D12Resource;
 
 
 class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
@@ -320,6 +321,7 @@ public: //func
 	void SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
 	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
 	WrappedD3D12DescriptorHeap* findInBackRefCPUDescriptorHeaps(D3D12_CPU_DESCRIPTOR_HANDLE handle);
+	bool isResourceExist(WrappedD3D12Resource* pWrappedResource);
 
 public: // framework
 	virtual void SwitchToDeviceRdc(ID3D12Device* pNewDevice);
@@ -331,6 +333,7 @@ private:
 
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heap;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resource;
+	std::set<WrappedD3D12ObjectBase*>										m_BackRefs_Resource_Reflection;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeap;
 
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandAllocator;

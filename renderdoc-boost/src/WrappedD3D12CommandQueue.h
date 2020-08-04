@@ -5,6 +5,7 @@
 RDCBOOST_NAMESPACE_BEGIN
 
 class WrappedD3D12DXGISwapChain;
+class WrappedD3D12Resource;
 
 class WrappedD3D12CommandQueue : public WrappedD3D12DeviceChild<ID3D12CommandQueue>
 {
@@ -65,6 +66,9 @@ public://override
 		_Out_  UINT64 *pCpuTimestamp) ;
 
 	virtual D3D12_COMMAND_QUEUE_DESC STDMETHODCALLTYPE GetDesc(void) ;
+
+public: //function
+	bool isResourceExist(WrappedD3D12Resource* pWrappedResource);
 
 public: //framework
 	HRESULT createSwapChain(

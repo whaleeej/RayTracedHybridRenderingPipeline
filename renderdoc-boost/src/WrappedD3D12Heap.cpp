@@ -23,29 +23,22 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12Heap::CopyToDevice(ID3D12Device* pNewDevic
 }
 
 WrappedD3D12DescriptorHeap::WrappedD3D12DescriptorHeap(ID3D12DescriptorHeap* pReal, WrappedD3D12Device* pWrappedDevice)
-	:WrappedD3D12DeviceChild(pReal, pWrappedDevice)
+	:WrappedD3D12DeviceChild(pReal, pWrappedDevice),
+	m_pHookedDescriptorHeap(0)
 {
 	auto& desc = GetReal()->GetDesc();
 	m_slotDesc.resize(desc.NumDescriptors);
+	if (!desc.Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) {
+		m_pHookedDescriptorHeap = new byte[desc.NumDescriptors * GetWrappedDevice()->GetDescriptorHandleIncrementSize(desc.Type)];
+	}
 }
 
 WrappedD3D12DescriptorHeap::~WrappedD3D12DescriptorHeap() {
-
-}
-
-struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从DescriptorHeap里去掉
-	bool IsWrappedD3D12ResourceExisted(WrappedD3D12Resource* pWrappedD3D12Res) {
-		if (!pWrappedD3D12Res)
-			return false;
-		try {
-			pWrappedD3D12Res->tryToGet();
-		}
-		catch (...) {
-			return false;
-		}
-		return true;
+	auto& desc = GetReal()->GetDesc();
+	if (m_pHookedDescriptorHeap) {
+		delete []m_pHookedDescriptorHeap;
 	}
-};
+}
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device* pNewDevice) {
 	COMPtr<ID3D12DescriptorHeap> pvNewDescriptorHeap = 0;
@@ -67,7 +60,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_SRV:
 			Assert(!(pWrappedRes==NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull? &m_slotDesc[i].concreteViewDesc.srv : NULL,
@@ -75,7 +68,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_UAV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				m_slotDesc[i].pWrappedD3D12CounterResource?m_slotDesc[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
@@ -84,7 +77,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_RTV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.rtv:NULL,
@@ -92,7 +85,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_DSV:
 			Assert(!(pWrappedRes == NULL && m_slotDesc[i].isViewDescNull));
-			if (pWrappedRes && !TryExistImpl().IsWrappedD3D12ResourceExisted(pWrappedRes)) break;// sneaky technique try if resource exists
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;// sneaky technique try if resource exists
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_slotDesc[i].isViewDescNull ? &m_slotDesc[i].concreteViewDesc.dsv:NULL,

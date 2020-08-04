@@ -54,6 +54,10 @@
 //          3. readback/upload heap只能是buffer，所以使用d3dx12中的UpdateSubresource那一套机制解决
 //          4. desc heap中新建view还是有点问题，先用catch exception来避免为释放的资源新建view
 
+//update8/04 descriptor heap中的内容如果是cpu visible的话是有明确的cpu handle的，如果是gpu visible的话是没有的
+// 因此只需要缓存cpu descriptor heap中的params，重建也只要恢复cpu descriptor中的内容就好了
+// 因为交出去的是handle，这里的handle需要在wrappedDescriptorHeap中hook一块新的内存地址出来，然后拿回来的时候再解析成真实的d3d api开的descriptorheap的内存地址
+
 // update  TODO
 // 0. descriptor heap中的resource可能已经被释放了 -》 catch(...)
 // 1. 支持CreateView中的参数情况

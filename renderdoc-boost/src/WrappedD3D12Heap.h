@@ -87,6 +87,7 @@ public: //framework:
 
 protected:
 	std::vector<DescriptorHeapSlotDesc> m_slotDesc;
+	byte* m_pHookedDescriptorHeap;
 };
 
 RDCBOOST_NAMESPACE_END

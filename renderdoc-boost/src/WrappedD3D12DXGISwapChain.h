@@ -214,6 +214,13 @@ public: //func
 		m_pRealSwapChain.As(&_ret);
 		return _ret;
 	};
+	bool isResourceExist(WrappedD3D12Resource* pWrappedResource) {
+		for (size_t i = 0; i < m_SwapChainBuffers.size(); i++) {
+			if (m_SwapChainBuffers[i].Get() == pWrappedResource)
+				return true;
+		}
+		return false;
+	}
 
 public: // framework
 	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);

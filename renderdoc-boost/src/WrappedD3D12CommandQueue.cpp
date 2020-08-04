@@ -59,6 +59,12 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* p
 	return pNewCommandQueue;
 }
 
+bool WrappedD3D12CommandQueue::isResourceExist(WrappedD3D12Resource* pWrappedResource) {
+	if (m_pWrappedSwapChain.Get()) {
+		return m_pWrappedSwapChain->isResourceExist(pWrappedResource);
+	}
+	return false;
+}
 
 /************************************************************************/
 /*                         override                                                                     */

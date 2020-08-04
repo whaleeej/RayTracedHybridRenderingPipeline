@@ -14,7 +14,7 @@ void CopyByteCodeImpl(const void* &dest, const void* &src, const SIZE_T & length
 
 void ReleaseByteCodeImpl(const void* &dest, const SIZE_T& length) {
 	if (dest) {
-		delete[length]dest;
+		delete[]dest;
 	}
 }
 
@@ -32,7 +32,7 @@ void CopyTImpl(const T*&dest, const T* & src, const UINT & length) {
 template<typename T>
 void ReleaseTImpl(const T* &dest, const UINT& length) {
 	if (dest) {
-		delete[length]dest;
+		delete[]dest;
 	}
 }
 
