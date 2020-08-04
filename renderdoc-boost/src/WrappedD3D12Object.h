@@ -109,7 +109,7 @@ public: // func
 	COMPtr<NestedType> GetReal() { return COMPtr<NestedType>(static_cast<NestedType*>(m_pReal.Get())); } //这里先临时控制成返回ComPtr， 后续如果性能有问题就改裸指针
 	std::wstring getName() { return m_ObjectName; }
 protected:
-	LONG m_Ref;
+	ULONG m_Ref;
 	std::wstring m_ObjectName;
 	PrivateDataMap m_PrivateData;
 };

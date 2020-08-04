@@ -157,6 +157,7 @@ public: //func
 		if (m_Ref <= 0) {
 			throw ResourceReleasedException();
 		}
+		this->GetReal();
 	}
 
 public://framework

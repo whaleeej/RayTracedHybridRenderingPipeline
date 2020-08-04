@@ -33,7 +33,7 @@ WrappedD3D12DescriptorHeap::~WrappedD3D12DescriptorHeap() {
 
 }
 
-struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从DescriptorHeap里去掉，但是太耗费性能了
+struct TryExistImpl { //这里是一个非常sneaky的实现，最好是res在释放的时候主动从DescriptorHeap里去掉
 	bool IsWrappedD3D12ResourceExisted(WrappedD3D12Resource* pWrappedD3D12Res) {
 		if (!pWrappedD3D12Res)
 			return false;
@@ -52,9 +52,9 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = this->GetDesc();
 	pNewDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&pvNewDescriptorHeap));
 	Assert(pvNewDescriptorHeap.Get());
-	//if (descHeapDesc.Type&&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) {
-	//	return pvNewDescriptorHeap;
-	//}
+	if ((descHeapDesc.Flags&D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)!=0) {
+		return pvNewDescriptorHeap;
+	}
 
 	for (size_t i = 0; i < m_slotDesc.size(); i++) {
 		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
