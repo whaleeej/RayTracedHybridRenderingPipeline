@@ -1,7 +1,9 @@
 #pragma once 
 #include <vector>
+#include <map>
 #include <dxgi1_6.h>
 #include "RdcBoostPCH.h"
+#include "WrappedD3D12Object.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12Resource;
@@ -195,7 +197,16 @@ public: //override swapchain4
 
 public: //func
 	bool checkVersionSupport(int _ver) { return _ver <= m_HighestVersion; };
-	COMPtr<IDXGISwapChain> GetReal() { COMPtr<IDXGISwapChain> _ret; _ret = static_cast<IDXGISwapChain*>(m_pRealSwapChain.Get()); };
+	bool isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource);
+	void cacheResourceReflectionToOldReal();
+	void clearResourceReflectionToOldReal();
+
+public: // framework
+	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+	COMPtr<IDXGISwapChain1> CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+	COMPtr<IDXGISwapChain> GetReal() { 
+		COMPtr<IDXGISwapChain> _ret; _ret = static_cast<IDXGISwapChain*>(m_pRealSwapChain.Get()); 
+	};
 	COMPtr<IDXGISwapChain1> GetReal1() {
 		return m_pRealSwapChain;
 	};
@@ -214,24 +225,13 @@ public: //func
 		m_pRealSwapChain.As(&_ret);
 		return _ret;
 	};
-	bool isResourceExist(WrappedD3D12Resource* pWrappedResource) {
-		for (size_t i = 0; i < m_SwapChainBuffers.size(); i++) {
-			if (m_SwapChainBuffers[i].Get() == pWrappedResource)
-				return true;
-		}
-		return false;
-	}
-
-public: // framework
-	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
-	COMPtr<IDXGISwapChain1> CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
 
 protected:
 	COMPtr<IDXGISwapChain1> m_pRealSwapChain;// the wrapped real swapchain
 
 	COMPtr<WrappedD3D12CommandQueue> const m_pWrappedCommandQueue;
 	std::vector< COMPtr<WrappedD3D12Resource>> m_SwapChainBuffers;
-
+	std::map<WrappedD3D12ObjectBase*, ID3D12Resource*>		m_BackRefs_Resource_Reflection; //cache old real device when switching
 
 	SResizeBufferParameter m_ResizeParam;
 	unsigned int m_Ref;

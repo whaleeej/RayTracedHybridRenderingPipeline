@@ -156,6 +156,23 @@ COMPtr<IDXGISwapChain1> WrappedD3D12DXGISwapChain::CopyToCommandQueue(ID3D12Comm
 	return swapChain1;
 }
 
+bool WrappedD3D12DXGISwapChain::isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource) {
+	auto find1 = m_BackRefs_Resource_Reflection.find(pWrappedResource);
+	if (find1 != m_BackRefs_Resource_Reflection.end() && find1->second == pRealResource)
+		return true;
+	return false;
+}
+
+void WrappedD3D12DXGISwapChain::cacheResourceReflectionToOldReal() {
+	for (auto it = m_SwapChainBuffers.begin(); it != m_SwapChainBuffers.end(); it++) {
+		m_BackRefs_Resource_Reflection.emplace(it->Get(),
+			static_cast<ID3D12Resource*>((*it)->GetReal().Get()));
+	}
+};
+
+void WrappedD3D12DXGISwapChain::clearResourceReflectionToOldReal() {
+	m_BackRefs_Resource_Reflection.clear();
+}
 
 /************************************************************************/
 /*                         override                                                                     */

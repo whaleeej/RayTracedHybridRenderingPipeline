@@ -25,14 +25,7 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	if (m_BackRefs_RootSignature.erase(pReal) !=0) return;
 	if (m_BackRefs_PipelineState.erase(pReal) != 0) return;
 	if (m_BackRefs_Heap.erase(pReal) != 0) return;
-	auto resPivot = m_BackRefs_Resource.find(pReal);
-	if (resPivot != m_BackRefs_Resource.end()) {
-		auto e1 = m_BackRefs_Resource_Reflection.erase(resPivot->second);
-		auto e2 = m_BackRefs_Resource.erase(pReal);
-		if (e1 > 0 || e2 > 0)
-			return;
-	}
-		
+	if (m_BackRefs_Resource.erase(pReal) != 0) return;
 	if (m_BackRefs_DescriptorHeap.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandAllocator.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandList.erase(pReal) != 0) return;
@@ -291,6 +284,9 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 		pWrappedFence->WaitToCompleteApplicationFenceValue();
 	}
 
+	//0 cache resources切换前的状态
+	cacheResourceReflectionToOldReal();
+
 	//0 切换RootSignature和依赖于Root Signature的Pipeline State
 	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
 	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
@@ -308,19 +304,39 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//4 因为资源更新了，所以指向资源的descriptor也要重建
 	backRefTransferFunc(m_BackRefs_DescriptorHeap, "DescriptorHeaps");
 
+	//5 清空cache
+	clearResourceReflectionToOldReal();
+
 	//5.pReal substitute
 	m_pReal = pNewDevice;
 }
 
-bool WrappedD3D12Device::isResourceExist(WrappedD3D12Resource* pWrappedResource) {
-	if (m_BackRefs_Resource_Reflection.find(pWrappedResource) != m_BackRefs_Resource_Reflection.end())
+bool WrappedD3D12Device::isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource ) {
+	auto find1 = m_BackRefs_Resource_Reflection.find(pWrappedResource);
+	if ( find1!= m_BackRefs_Resource_Reflection.end() && find1->second ==pRealResource)
 		return true;
 	for (auto it = m_BackRefs_CommandQueue.begin(); it != m_BackRefs_CommandQueue.end(); it++) {
-		if (static_cast<WrappedD3D12CommandQueue*>(it->second)->isResourceExist(pWrappedResource)) {
+		if (static_cast<WrappedD3D12CommandQueue*>(it->second)->isResourceExist(pWrappedResource, pRealResource)) {
 			return true;
 		}
 	}
 	return false;
+}
+
+void WrappedD3D12Device::cacheResourceReflectionToOldReal() {
+	for (auto it = m_BackRefs_Resource.begin(); it != m_BackRefs_Resource.end(); it++) {
+		m_BackRefs_Resource_Reflection.emplace(it->second, static_cast<ID3D12Resource*>(it->first));
+	}
+	for (auto it = m_BackRefs_CommandQueue.begin(); it != m_BackRefs_CommandQueue.end(); it++) {
+		static_cast<WrappedD3D12CommandQueue*>(it->second)->cacheResourceReflectionToOldReal();
+	}
+};
+
+void WrappedD3D12Device::clearResourceReflectionToOldReal() {
+	m_BackRefs_Resource_Reflection.clear();
+	for (auto it = m_BackRefs_CommandQueue.begin(); it != m_BackRefs_CommandQueue.end(); it++) {
+		static_cast<WrappedD3D12CommandQueue*>(it->second)->clearResourceReflectionToOldReal();
+	}
 }
 
 /************************************************************************/
@@ -578,7 +594,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommittedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
-		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;
@@ -638,7 +653,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreatePlacedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
-		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;
@@ -668,7 +682,6 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateReservedResource(
 		);
 		*ppvResource = static_cast<ID3D12Resource*>(wrapped);
 		m_BackRefs_Resource[pvResource.Get()] = wrapped;
-		m_BackRefs_Resource_Reflection.emplace(wrapped);
 	}
 	else {
 		*ppvResource = NULL;
@@ -746,7 +759,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_SRV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
 	if (pSlot->pWrappedD3D12Resource)
-		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetRealObject().Get();
+		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetReal().Get();
 	pSlot->res_desc = static_cast<WrappedD3D12Resource*>(pResource)->GetDesc();
 	if (pDesc) {
 		pSlot->concreteViewDesc.srv = *pDesc;
@@ -770,7 +783,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateUnorderedAccessView(
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_UAV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
 	if (pSlot->pWrappedD3D12Resource)
-		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetRealObject().Get();
+		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetReal().Get();
 	pSlot->pWrappedD3D12CounterResource = static_cast<WrappedD3D12Resource*>(pCounterResource);
 	if (pDesc) {
 		pSlot->concreteViewDesc.uav = *pDesc;
@@ -794,7 +807,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateRenderTargetView(
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_RTV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
 	if (pSlot->pWrappedD3D12Resource)
-		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetRealObject().Get();
+		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetReal().Get();
 	if (pDesc) {
 		pSlot->isViewDescNull = false;
 		pSlot->concreteViewDesc.rtv = *pDesc;
@@ -816,7 +829,7 @@ void STDMETHODCALLTYPE WrappedD3D12Device::CreateDepthStencilView(
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_DSV;
 	pSlot->pWrappedD3D12Resource = static_cast<WrappedD3D12Resource*>(pResource);
 	if (pSlot->pWrappedD3D12Resource)
-		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetRealObject().Get();
+		pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetReal().Get();
 	if (pDesc) {
 		pSlot->isViewDescNull = false;
 		pSlot->concreteViewDesc.dsv = *pDesc;

@@ -59,11 +59,20 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12CommandQueue::CopyToDevice(ID3D12Device* p
 	return pNewCommandQueue;
 }
 
-bool WrappedD3D12CommandQueue::isResourceExist(WrappedD3D12Resource* pWrappedResource) {
+bool WrappedD3D12CommandQueue::isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource) {
 	if (m_pWrappedSwapChain.Get()) {
-		return m_pWrappedSwapChain->isResourceExist(pWrappedResource);
+		return m_pWrappedSwapChain->isResourceExist(pWrappedResource, pRealResource);
 	}
 	return false;
+}
+
+void WrappedD3D12CommandQueue::cacheResourceReflectionToOldReal() {
+	if (m_pWrappedSwapChain.Get())
+		m_pWrappedSwapChain->cacheResourceReflectionToOldReal();
+};
+void WrappedD3D12CommandQueue::clearResourceReflectionToOldReal() {
+	if (m_pWrappedSwapChain.Get())
+		m_pWrappedSwapChain->clearResourceReflectionToOldReal();
 }
 
 /************************************************************************/

@@ -50,8 +50,10 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 	//}
 
 	for (UINT i = 0; i < m_Slots.size(); i++) {
-		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-		handle.Offset(i, pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type));
+		CD3DX12_CPU_DESCRIPTOR_HANDLE handle(
+			pvNewDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 
+			i, 
+			pNewDevice->GetDescriptorHandleIncrementSize(descHeapDesc.Type));
 
 		auto pWrappedRes = m_Slots[i].pWrappedD3D12Resource;
 		switch (m_Slots[i].viewDescType) {
@@ -60,8 +62,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_SRV:
 			Assert(!(pWrappedRes==NULL && m_Slots[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
-			if (pWrappedRes && pWrappedRes->GetRealObject().Get() != m_Slots[i].pRealD3D12Object) break;
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_Slots[i].isViewDescNull? &m_Slots[i].concreteViewDesc.srv : NULL,
@@ -69,8 +70,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_UAV:
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
-			if (pWrappedRes && pWrappedRes->GetRealObject().Get() != m_Slots[i].pRealD3D12Object) break;
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				m_Slots[i].pWrappedD3D12CounterResource?m_Slots[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
@@ -79,8 +79,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_RTV:
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
-			if (pWrappedRes && pWrappedRes->GetRealObject().Get() != m_Slots[i].pRealD3D12Object) break;
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.rtv:NULL,
@@ -88,8 +87,7 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 			break;
 		case ViewDesc_DSV:
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
-			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes)) break;
-			if (pWrappedRes && pWrappedRes->GetRealObject().Get() != m_Slots[i].pRealD3D12Object) break;
+			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
 				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.dsv:NULL,

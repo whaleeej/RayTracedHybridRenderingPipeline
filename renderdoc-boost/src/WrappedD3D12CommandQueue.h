@@ -68,7 +68,9 @@ public://override
 	virtual D3D12_COMMAND_QUEUE_DESC STDMETHODCALLTYPE GetDesc(void) ;
 
 public: //function
-	bool isResourceExist(WrappedD3D12Resource* pWrappedResource);
+	bool isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource);
+	void cacheResourceReflectionToOldReal() ;
+	void clearResourceReflectionToOldReal();
 
 public: //framework
 	HRESULT createSwapChain(
