@@ -129,7 +129,7 @@ auto realVAddr =  pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VAD
 //解决办法是自己管理一层虚拟映射，资源新建的时候主动去从VADDR Mgr申请offset+size的空间，资源释放的时候交还
 //参考3dgp的free page缓存的实现方法，用一个map存储offset相关的空闲空间，一个multimap存储size相关的空闲空间，并且主动管理申请和释放
 //同时用一个set来存储分配出去的offset+size，使用operator<中的技巧来完成VADDR从这个set中的定位，找到所在的offset+size区间
-//额外开销是从外部拿到GPU_VIRTUAL_ADDR需要走一趟红黑树(set)找区间，每一帧/n帧结束后恢复丢弃的空间
+//额外开销是从外部拿到GPU_VIRTUAL_ADDR需要走一趟红黑树(set)找区间，每一帧/n帧结束后恢复丢弃的空间  ----------------------------------参考WrappedD3D12GPUVAddrMgr的实现
 
 //update8/06
 // 将Pending Resource Barrier生效的时机往后挪到了commanlist提交入commandqueue的时刻
