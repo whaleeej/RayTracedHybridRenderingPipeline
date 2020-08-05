@@ -124,9 +124,19 @@ auto realVAddr =  pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VAD
 //所以如果这段内存新建一个wrapped资源就会导致资源指向错误，也就是会错的view desc创建了新资源的view，desc对不上就会让d3d device remove掉
 //而且资源在重建的时候会导致wrapper内的real变掉。解决方法是每个slot中都记下real，然后在资源重建前，device和swap chain中记下具有生命周期的wrapped->old raw res的指针。在descHeap中的view重建的时候检查是否存在。即整套修改掉了isResourceExist的机制
 
+//update8/05
+//GPU_VIRTUAL_ADDR交出去给引擎用了之后，switch框架走完新建资源后会导致ADDR失效，因为资源新建了GPU_VIRTUAL_ADDR会失效
+//解决办法是自己管理一层虚拟映射，资源新建的时候主动去从VADDR Mgr申请offset+size的空间，资源释放的时候交还
+//参考3dgp的free page缓存的实现方法，用一个map存储offset相关的空闲空间，一个multimap存储size相关的空闲空间，并且主动管理申请和释放
+//同时用一个set来存储分配出去的offset+size，使用operator<中的技巧来完成VADDR从这个set中的定位，找到所在的offset+size区间
+//额外开销是从外部拿到GPU_VIRTUAL_ADDR需要走一趟红黑树(set)找区间，每一帧/n帧结束后恢复丢弃的空间
+
+//update8/06
+// 将Pending Resource Barrier生效的时机往后挪到了commanlist提交入commandqueue的时刻
+//虽然这样也不一定是对的，但是比在commandlist中提交barrier就改变state合理
+
 // update  TODO
-// 0. descriptor heap中的resource可能已经被释放了 -》 catch(...)
-// 1. 支持CreateView中的参数情况
+// 1. 支持CommandList和GraphicsCommandList的合并
 // 2. 支持其他API的参数情况
 // 3. ID3D12Device1-6
 // 4. ID3D12GraphicsCommandList1-5
