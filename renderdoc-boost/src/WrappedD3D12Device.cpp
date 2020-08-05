@@ -32,7 +32,6 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	if (m_BackRefs_Fence.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandQueue.erase(pReal) != 0) return;
 
-	//TODO unknown wrapped devicechild released error
 	LogError("Unknown device child released.");
 	Assert(false);
 	return;
