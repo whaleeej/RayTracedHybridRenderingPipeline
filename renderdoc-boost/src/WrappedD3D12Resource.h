@@ -107,10 +107,10 @@ public:
 		m_Offset = 0;
 		if (desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
 			return;
-		desc.Alignment = 128896; //64KB = 1024*64Bytes
+		//64KB = 1024*64Bytes 128896
 		UINT64 size = desc.Width;
-		auto alignedSize = AlignUp(size, desc.Alignment);
-		m_Offset = WrappedD3D12GPUVAddrMgr::Get().Allocate(size, this);
+		auto alignedSize = AlignUp(size, 1024 * 1024);
+		m_Offset = WrappedD3D12GPUVAddrMgr::Get().Allocate(alignedSize, this);
 	}
 
 public: //override

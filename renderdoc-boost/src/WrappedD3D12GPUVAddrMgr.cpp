@@ -19,7 +19,7 @@ bool WrappedD3D12GPUVAddrMgr::Allocation::operator<(const Allocation& allocation
 	// when a compared with b, return aOffset+aSize < bOffset
 	// when b compared with a, return bOffset < aOffset
 	if (this->size != 0) {//this is a, a compared with b
-		return this->offset + this->size < allocation.offset;
+		return this->offset + this->size  -1< allocation.offset;
 	}
 	else {//this is b, b compared with a 
 		return this->offset < allocation.offset;
@@ -83,8 +83,8 @@ void WrappedD3D12GPUVAddrMgr::Free(OffsetType offset) {
 	auto it = m_AllocationsInFlight.find(Allocation(offset));
 	if (it == m_AllocationsInFlight.end())
 		return;
-	m_AllocationsInFlight.erase(it);
 	m_AllocationsStaled.emplace(*it);
+	m_AllocationsInFlight.erase(it);
 }
 
 void WrappedD3D12GPUVAddrMgr::Cleanup() {
