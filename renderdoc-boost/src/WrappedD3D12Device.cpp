@@ -742,12 +742,17 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(
 	_In_opt_  const D3D12_CONSTANT_BUFFER_VIEW_DESC *pDesc,
 	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor) {
-	Assert(pDesc);//TODO ½âÎöGPU VADDR
+	Assert(pDesc);
+	auto desc = *pDesc;
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(desc.BufferLocation);
+	desc.BufferLocation = realVAddr;
 	ANALYZE_WRAPPED_SLOT(pSlot, DestDescriptor);
+	pSlot->pWrappedD3D12Resource = pWrappedResource_Ano;
+	pSlot->pRealD3D12Object = pSlot->pWrappedD3D12Resource->GetReal().Get();
 	pSlot->viewDescType = WrappedD3D12DescriptorHeap::ViewDesc_CBV;
 	pSlot->concreteViewDesc.cbv = *pDesc;
 	pSlot->isViewDescNull = false;
-	GetReal()->CreateConstantBufferView(pDesc, ANALYZE_WRAPPED_CPU_HANDLE(DestDescriptor));
+	GetReal()->CreateConstantBufferView(&desc, ANALYZE_WRAPPED_CPU_HANDLE(DestDescriptor));
 }
 
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateShaderResourceView(

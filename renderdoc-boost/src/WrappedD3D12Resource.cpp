@@ -8,6 +8,8 @@ WrappedD3D12Resource::~WrappedD3D12Resource() {
 	if (m_ClearValue) {
 		delete m_ClearValue;
 	}
+	if (m_Desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+		WrappedD3D12GPUVAddrMgr::Get().Free(m_Offset);
 }
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
@@ -89,7 +91,9 @@ D3D12_RESOURCE_DESC STDMETHODCALLTYPE WrappedD3D12Resource::GetDesc(void) {
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS STDMETHODCALLTYPE WrappedD3D12Resource::GetGPUVirtualAddress(void) {
-	return GetReal()->GetGPUVirtualAddress();
+	//return GetReal()->GetGPUVirtualAddress();
+	//return reinterpret_cast<D3D12_GPU_VIRTUAL_ADDRESS>(this);
+	return m_Offset;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Resource::WriteToSubresource(

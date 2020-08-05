@@ -57,45 +57,60 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12DescriptorHeap::CopyToDevice(ID3D12Device*
 
 		auto pWrappedRes = m_Slots[i].pWrappedD3D12Resource;
 		switch (m_Slots[i].viewDescType) {
-		case ViewDesc_CBV:
-			pNewDevice->CreateConstantBufferView(&m_Slots[i].concreteViewDesc.cbv, handle);
+		case ViewDesc_CBV: {
+			if (!pWrappedRes || !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
+			auto cbv = m_Slots[i].concreteViewDesc.cbv;
+			DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(cbv.BufferLocation);
+			cbv.BufferLocation = realVAddr;
+			pNewDevice->CreateConstantBufferView(&cbv, handle);
 			break;
+		}
 		case ViewDesc_SRV:
-			Assert(!(pWrappedRes==NULL && m_Slots[i].isViewDescNull));
+		{
+			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
 			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateShaderResourceView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_Slots[i].isViewDescNull? &m_Slots[i].concreteViewDesc.srv : NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.srv : NULL,
 				handle);
 			break;
+		}
 		case ViewDesc_UAV:
+		{
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
 			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateUnorderedAccessView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				m_Slots[i].pWrappedD3D12CounterResource?m_Slots[i].pWrappedD3D12CounterResource->GetReal().Get():NULL,
+				m_Slots[i].pWrappedD3D12CounterResource ? m_Slots[i].pWrappedD3D12CounterResource->GetReal().Get() : NULL,
 				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.uav : NULL,
 				handle);
 			break;
+		}
 		case ViewDesc_RTV:
+		{
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
 			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateRenderTargetView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.rtv:NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.rtv : NULL,
 				handle);
 			break;
+		}
 		case ViewDesc_DSV:
+		{
 			Assert(!(pWrappedRes == NULL && m_Slots[i].isViewDescNull));
 			if (pWrappedRes && !GetWrappedDevice()->isResourceExist(pWrappedRes, m_Slots[i].pRealD3D12Object)) break;
 			pNewDevice->CreateDepthStencilView(
 				pWrappedRes ? pWrappedRes->GetReal().Get() : NULL,
-				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.dsv:NULL,
+				!m_Slots[i].isViewDescNull ? &m_Slots[i].concreteViewDesc.dsv : NULL,
 				handle);
 			break;
+		}
 		case ViewDesc_SamplerV:
+		{
 			pNewDevice->CreateSampler(&m_Slots[i].concreteViewDesc.sampler, handle);
 			break;
+		}
 		case ViewDesc_Unknown:
 			break;
 		}

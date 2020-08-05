@@ -1,5 +1,6 @@
 #pragma once
 #include "WrappedD3D12DeviceChild.h"
+#include "WrappedD3D12GPUVAddrMgr.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 

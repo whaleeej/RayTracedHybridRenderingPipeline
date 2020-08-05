@@ -1,6 +1,7 @@
 #pragma once
 #include <dxgi1_6.h>
 #include "WrappedD3D12DeviceChild.h"
+#include "WrappedD3D12GPUVAddrMgr.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
@@ -23,7 +24,7 @@ public:
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice
 	) :WrappedD3D12DeviceChild(pReal, pDevice),
 		m_Type(BackBufferWrappedD3D12Resource),
-		m_Desc(),
+		m_Desc(pReal->GetDesc()),
 		m_State(D3D12_RESOURCE_STATE_COMMON),
 		m_ClearValue(NULL),
 		m_HeapProperties(),
@@ -31,6 +32,7 @@ public:
 		m_pWrappedHeap(NULL),
 		m_heapOffset(0)
 	{
+		InitVAddr(pReal->GetDesc()); // backbuffer is definiitely a texture
 	}
 	WrappedD3D12Resource(//committed
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
@@ -53,6 +55,7 @@ public:
 			m_ClearValue = new D3D12_CLEAR_VALUE();
 			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
 		}
+		InitVAddr(m_Desc);
 	}
 	WrappedD3D12Resource(//placed
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
@@ -75,6 +78,7 @@ public:
 			m_ClearValue = new D3D12_CLEAR_VALUE();
 			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
 		}
+		InitVAddr(m_Desc);
 	}
 	WrappedD3D12Resource(//reserved
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice,
@@ -95,8 +99,19 @@ public:
 			m_ClearValue = new D3D12_CLEAR_VALUE();
 			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
 		}
+		InitVAddr(m_Desc);
 	}
 	~WrappedD3D12Resource();
+
+	void InitVAddr(D3D12_RESOURCE_DESC & desc) {
+		m_Offset = 0;
+		if (desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
+			return;
+		desc.Alignment = 128896; //64KB = 1024*64Bytes
+		UINT64 size = desc.Width;
+		auto alignedSize = AlignUp(size, desc.Alignment);
+		m_Offset = WrappedD3D12GPUVAddrMgr::Get().Allocate(size, this);
+	}
 
 public: //override
 	virtual HRESULT STDMETHODCALLTYPE Map(
@@ -141,6 +156,8 @@ public: //func
 
 	D3D12_RESOURCE_DESC getCachedDesc() { return m_Desc; }
 
+	UINT64 GetOffset() { return m_Offset; }
+
 public://framework
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
@@ -152,6 +169,7 @@ protected:
 	D3D12_RESOURCE_DESC m_Desc;
 	D3D12_RESOURCE_STATES m_State;
 	D3D12_CLEAR_VALUE* m_ClearValue;
+	UINT64 m_Offset;
 	bool m_bNeedCopy = true;
 
 	//committed

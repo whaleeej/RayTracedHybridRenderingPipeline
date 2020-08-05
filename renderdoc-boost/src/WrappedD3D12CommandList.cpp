@@ -387,75 +387,107 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRoot32BitCons
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootConstantBufferView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetComputeRootConstantBufferView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootConstantBufferView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetGraphicsRootConstantBufferView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootShaderResourceView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetComputeRootShaderResourceView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootShaderResourceView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetGraphicsRootShaderResourceView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootUnorderedAccessView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetComputeRootUnorderedAccessView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootUnorderedAccessView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
 	return GetReal()->SetGraphicsRootUnorderedAccessView(
 		RootParameterIndex,
-		BufferLocation);
+		realVAddr);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetIndexBuffer(
 	_In_opt_  const D3D12_INDEX_BUFFER_VIEW *pView) {
+	Assert(pView);
+	auto view = *pView;
+	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(view.BufferLocation);
+	view.BufferLocation = realVAddr;
 	return GetReal()->IASetIndexBuffer(
-		pView);
+		&view);
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetVertexBuffers(
 	_In_  UINT StartSlot,
 	_In_  UINT NumViews,
 	_In_reads_opt_(NumViews)  const D3D12_VERTEX_BUFFER_VIEW *pViews) {
+	Assert(pViews);
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> views(NumViews);
+	for (UINT i=0; i<NumViews; i++)
+	{
+		views[i] = pViews[i];
+		DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(views[i].BufferLocation);
+		views[i].BufferLocation = realVAddr;
+	}
 	return GetReal()->IASetVertexBuffers(
 		StartSlot,
 		NumViews,
-		pViews);
+		views.data());
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SOSetTargets(
 	_In_  UINT StartSlot,
 	_In_  UINT NumViews,
 	_In_reads_opt_(NumViews)  const D3D12_STREAM_OUTPUT_BUFFER_VIEW *pViews) {
+	Assert(pViews);
+	std::vector<D3D12_STREAM_OUTPUT_BUFFER_VIEW> views(NumViews);
+	for (UINT i = 0; i < NumViews; i++)
+	{
+		views[i] = pViews[i];
+		{
+			DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(views[i].BufferLocation);
+			views[i].BufferLocation = realVAddr;
+		}
+		{
+			DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(views[i].BufferFilledSizeLocation);
+			views[i].BufferFilledSizeLocation = realVAddr;
+		}
+	}
 	return GetReal()->SOSetTargets(
 		StartSlot,
 		NumViews,
-		pViews);
+		views.data());
 }
 
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetRenderTargets(

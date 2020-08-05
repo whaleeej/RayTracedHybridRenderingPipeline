@@ -3,6 +3,7 @@
 #include <set>
 #include "WrappedD3D12Object.h"
 #include "DeviceCreateParams.h"
+#include "WrappedD3D12GPUVAddrMgr.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
