@@ -10,6 +10,7 @@ public:
 
 public://override
 	virtual HRESULT STDMETHODCALLTYPE Reset(void);
+
 public://function
 
 public://framewokr

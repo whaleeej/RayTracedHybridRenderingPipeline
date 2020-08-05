@@ -17,19 +17,7 @@ public:
 		ReservedWrappedD3D12Resource,
 		BackBufferWrappedD3D12Resource
 	};
-	//WrappedD3D12ResourceType m_Type;
-	//D3D12_RESOURCE_DESC m_Desc;
-	//D3D12_RESOURCE_STATES m_State;
-	//D3D12_CLEAR_VALUE* m_ClearValue;
 
-
-	////committed
-	//D3D12_HEAP_PROPERTIES m_HeapProperties;
-	//D3D12_HEAP_FLAGS m_HeapFlags;
-
-	////placed
-	//COMPtr<WrappedD3D12Heap> m_pWrappedHeap;
-	//UINT64 m_heapOffset;
 public:
 	WrappedD3D12Resource( //backbuffer
 		ID3D12Resource* pReal, WrappedD3D12Device* pDevice
@@ -108,8 +96,6 @@ public:
 			memcpy(m_ClearValue, pClearValue, sizeof(D3D12_CLEAR_VALUE));
 		}
 	}
-
-
 	~WrappedD3D12Resource();
 
 public: //override
@@ -145,28 +131,29 @@ public: //override
 		_Out_opt_  D3D12_HEAP_FLAGS *pHeapFlags);
 
 public: //func
-	class ResourceReleasedException :public std::exception {
-
-	};
 	void InitSwapChain(IDXGISwapChain1* pRealSwapChain);
+
 	void changeToState(D3D12_RESOURCE_STATES state);
+
 	D3D12_RESOURCE_STATES queryState() { return m_State; }
+
 	bool needCopy() { return m_bNeedCopy; }
+
 	D3D12_RESOURCE_DESC getCachedDesc() { return m_Desc; }
 
 public://framework
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
+
 	void SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3D12Resource* pNewResource);
 	
 protected:
-
+	//common
 	WrappedD3D12ResourceType m_Type;
 	D3D12_RESOURCE_DESC m_Desc;
 	D3D12_RESOURCE_STATES m_State;
 	D3D12_CLEAR_VALUE* m_ClearValue;
 	bool m_bNeedCopy = true;
 
-	
 	//committed
 	D3D12_HEAP_PROPERTIES m_HeapProperties;
 	D3D12_HEAP_FLAGS m_HeapFlags;
@@ -176,7 +163,6 @@ protected:
 	UINT64 m_heapOffset;
 
 	//reserved
-	//...
 
 	// backbuffer
 	IDXGISwapChain1* m_pRealSwapChain = 0;

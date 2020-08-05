@@ -9,7 +9,6 @@ RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12DescriptorHeap;
 class WrappedD3D12Resource;
 
-
 class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
 	struct DummyID3D12InfoQueue : public ID3D12InfoQueue
 	{
@@ -318,31 +317,35 @@ public: // override ID3D12Device
 
 public: //func
 	bool isRenderDocDevice() { return m_bRenderDocDevice; }
+
 	void SetAsRenderDocDevice(bool b) { m_bRenderDocDevice = b; }
+
 	const SDeviceCreateParams& GetDeviceCreateParams() const { return m_DeviceCreateParams; }
+
 	bool isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource);
+
 	void cacheResourceReflectionToOldReal();
+
 	void clearResourceReflectionToOldReal();
 
 
 public: // framework
 	virtual void SwitchToDeviceRdc(ID3D12Device* pNewDevice);
+
 	void OnDeviceChildReleased(ID3D12DeviceChild* pReal);
 
 private:
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_RootSignature;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_PipelineState;
-
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heap;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resource;
-	std::map<WrappedD3D12ObjectBase*, ID3D12Resource*>		m_BackRefs_Resource_Reflection; //cache old real device when switching
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeap;
-
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandAllocator;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandList;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Fence;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandQueue;
 
+	std::map<WrappedD3D12ObjectBase*, ID3D12Resource*>		m_BackRefs_Resource_Reflection; //cache old real device when switching
 	DummyID3D12InfoQueue m_DummyInfoQueue;
 	SDeviceCreateParams m_DeviceCreateParams;
 	bool m_bRenderDocDevice;

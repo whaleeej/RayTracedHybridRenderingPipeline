@@ -69,7 +69,9 @@ public://override
 
 public: //function
 	bool isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource);
-	void cacheResourceReflectionToOldReal() ;
+
+	void cacheResourceReflectionToOldReal();
+
 	void clearResourceReflectionToOldReal();
 
 public: //framework
@@ -77,6 +79,7 @@ public: //framework
 		IDXGIFactory2* pDXGIFactory, HWND hWnd, 
 		const DXGI_SWAP_CHAIN_DESC1 *pDesc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *pFullscreenDesc, 
 		IDXGIOutput *pRestrictToOutput, IDXGISwapChain1 **ppSwapChain);
+
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:

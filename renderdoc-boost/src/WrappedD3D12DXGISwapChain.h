@@ -197,29 +197,38 @@ public: //override swapchain4
 
 public: //func
 	bool checkVersionSupport(int _ver) { return _ver <= m_HighestVersion; };
+
 	bool isResourceExist(WrappedD3D12Resource* pWrappedResource, ID3D12Resource* pRealResource);
+
 	void cacheResourceReflectionToOldReal();
+
 	void clearResourceReflectionToOldReal();
 
 public: // framework
 	void SwitchToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+
 	COMPtr<IDXGISwapChain1> CopyToCommandQueue(ID3D12CommandQueue* pRealCommandQueue);
+
 	COMPtr<IDXGISwapChain> GetReal() { 
 		COMPtr<IDXGISwapChain> _ret; _ret = static_cast<IDXGISwapChain*>(m_pRealSwapChain.Get()); 
 	};
+
 	COMPtr<IDXGISwapChain1> GetReal1() {
 		return m_pRealSwapChain;
 	};
+
 	COMPtr<IDXGISwapChain2> GetReal2() {
 		COMPtr<IDXGISwapChain2> _ret;
 		m_pRealSwapChain.As(&_ret);
 		return _ret;
 	};
+
 	COMPtr<IDXGISwapChain3> GetReal3() {
 		COMPtr<IDXGISwapChain3> _ret;
 		m_pRealSwapChain.As(&_ret);
 		return _ret;
 	};
+
 	COMPtr<IDXGISwapChain4> GetReal4() {
 		COMPtr<IDXGISwapChain4> _ret;
 		m_pRealSwapChain.As(&_ret);
@@ -235,7 +244,6 @@ protected:
 
 	SResizeBufferParameter m_ResizeParam;
 	unsigned int m_Ref;
-
 	int m_HighestVersion;
 };
 

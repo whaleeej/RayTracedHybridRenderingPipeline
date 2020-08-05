@@ -39,8 +39,8 @@ public://framewokr
 	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
-	PipelineStateTypeDesc m_typeDesc;
 	COMPtr<WrappedD3D12RootSignature> m_pWrappedRootSignature;
+	PipelineStateTypeDesc m_typeDesc;
 };
 
 RDCBOOST_NAMESPACE_END
