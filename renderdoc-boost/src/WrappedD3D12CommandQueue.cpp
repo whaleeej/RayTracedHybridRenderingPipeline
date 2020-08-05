@@ -115,7 +115,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandQueue::ExecuteCommandLists(
 	std::vector<ID3D12CommandList*> listArray(NumCommandLists);
 	for (UINT i=0; i<NumCommandLists; i++)
 	{
-		listArray[i] = static_cast<WrappedD3D12CommandList *>(ppCommandLists[i])->GetReal().Get();
+		listArray[i] = static_cast<WrappedD3D12GraphicsCommansList*>(ppCommandLists[i])->GetReal().Get();
+		static_cast<WrappedD3D12GraphicsCommansList*>(ppCommandLists[i])->FlushPendingResourceStates();
 	}
 	GetReal()->ExecuteCommandLists(NumCommandLists, listArray.data());
 }

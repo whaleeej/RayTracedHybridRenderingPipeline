@@ -4,6 +4,8 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
+class WrappedD3D12Resource;
+
 class WrappedD3D12CommandAllocator : public WrappedD3D12DeviceChild<ID3D12CommandAllocator> {
 public:
 	WrappedD3D12CommandAllocator(ID3D12CommandAllocator* pReal, WrappedD3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE type);
@@ -298,12 +300,16 @@ public://override
 		_In_opt_  ID3D12Resource *pCountBuffer,
 		_In_  UINT64 CountBufferOffset);
 
+public://func
+	void FlushPendingResourceStates();
+
 public://framework
 	virtual COMPtr <ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
 protected:
 	COMPtr<WrappedD3D12CommandAllocator> m_pWrappedCommandAllocator;
 	UINT m_NodeMask;
+	std::map<WrappedD3D12Resource*, D3D12_RESOURCE_STATES> m_PendingResourceStates;
 };
 
 RDCBOOST_NAMESPACE_END

@@ -81,6 +81,12 @@ COMPtr<ID3D12DeviceChild> WrappedD3D12GraphicsCommansList::CopyToDevice(ID3D12De
 	return pvNewCommandList;
 }
 
+void WrappedD3D12GraphicsCommansList::FlushPendingResourceStates() {
+	for (auto it = m_PendingResourceStates.begin(); it != m_PendingResourceStates.end(); it++) {
+		it->first->changeToState(it->second);//这里认为持有的资源都有生命周期 // 否则d3d也会出错的
+	}
+}
+
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
@@ -103,6 +109,7 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Close(void) {
 HRESULT STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Reset(
 	_In_  ID3D12CommandAllocator *pAllocator,
 	_In_opt_  ID3D12PipelineState *pInitialState) {
+	m_PendingResourceStates.clear();
 	return GetReal()->Reset(static_cast<WrappedD3D12CommandAllocator *>(pAllocator)->GetReal().Get(), 
 		pInitialState?static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get():NULL);
 }
@@ -270,7 +277,8 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 		D3D12_RESOURCE_BARRIER& _Barriers = barriers[i];
 		switch (_Barriers.Type) {
 		case D3D12_RESOURCE_BARRIER_TYPE_TRANSITION:
-			static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
+			//static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
+			m_PendingResourceStates.emplace(static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource), _Barriers.Transition.StateAfter);
 			_Barriers.Transition.pResource =
 				_Barriers.Transition.pResource ? static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get() : NULL;
 			break;
