@@ -176,6 +176,26 @@ void CommandQueue::Wait( const CommandQueue& other )
     m_d3d12CommandQueue->Wait( other.m_d3d12Fence.Get(), other.m_FenceValue );
 }
 
+void CommandQueue::ReMapAllCommandLists() {
+	std::lock_guard<std::mutex> lock(m_ProcessInFlightCommandListsThreadMutex);
+	ThreadSafeQueue<std::shared_ptr<CommandList>> IntermediateQueue;
+	assert(m_InFlightCommandLists.Empty());
+	while (!m_AvailableCommandLists.Empty()) {
+		std::shared_ptr<CommandList> entry;
+		if (m_AvailableCommandLists.TryPop(entry)) {
+			(entry)->ReMap();
+			IntermediateQueue.Push(entry);
+		}
+	}
+	while (IntermediateQueue.Empty()) {
+		std::shared_ptr<CommandList> entry;
+		if (IntermediateQueue.TryPop(entry)) {
+			m_AvailableCommandLists.Push(entry);
+		}
+	}
+
+}
+
 Microsoft::WRL::ComPtr<ID3D12CommandQueue> CommandQueue::GetD3D12CommandQueue() const
 {
     return m_d3d12CommandQueue;

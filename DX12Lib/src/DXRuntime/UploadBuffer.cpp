@@ -60,6 +60,13 @@ void UploadBuffer::Reset()
     }
 }
 
+void UploadBuffer::ReMap()
+{
+	for (auto it = m_PagePool.begin(); it != m_PagePool.end(); it++) {
+		(*it)->ReMap();
+	}
+}
+
 UploadBuffer::Page::Page(size_t sizeInBytes)
     : m_PageSize(sizeInBytes)
     , m_Offset(0)
@@ -119,4 +126,15 @@ UploadBuffer::Allocation UploadBuffer::Page::Allocate(size_t sizeInBytes, size_t
 void UploadBuffer::Page::Reset()
 {
     m_Offset = 0;
+}
+
+void UploadBuffer::Page::ReMap()
+{
+	//clear
+	//m_d3d12Resource->Unmap(0, nullptr);
+	m_CPUPtr = nullptr;
+	m_GPUPtr = D3D12_GPU_VIRTUAL_ADDRESS(0);
+
+	m_GPUPtr = m_d3d12Resource->GetGPUVirtualAddress();
+	m_d3d12Resource->Map(0, nullptr, &m_CPUPtr);
 }

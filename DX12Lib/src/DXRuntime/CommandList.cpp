@@ -1133,6 +1133,11 @@ void CommandList::Reset()
     m_ComputeCommandList = nullptr;
 }
 
+void CommandList::ReMap()
+{
+	m_UploadBuffer->ReMap();
+}
+
 void CommandList::TrackObject(Microsoft::WRL::ComPtr<ID3D12Object> object)
 {
     m_TrackedObjects.push_back(object);

@@ -441,6 +441,13 @@ UINT Application::GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE ty
     return m_d3d12Device->GetDescriptorHandleIncrementSize(type);
 }
 
+void Application::ReMapAllCommandLists()
+{
+	m_DirectCommandQueue->ReMapAllCommandLists();
+	m_ComputeCommandQueue->ReMapAllCommandLists();
+	m_CopyCommandQueue->ReMapAllCommandLists();
+}
+
 static void RemoveWindow(HWND hWnd)
 {
     WindowMap::iterator windowIter = gs_Windows.find(hWnd);

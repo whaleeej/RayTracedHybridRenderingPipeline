@@ -36,6 +36,7 @@ public:
     UINT																	GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
     static uint64_t														GetFrameCount()  {   return ms_FrameCount; }
 	bool																		IsRenderDocEnabled(){ return m_EnableRenderdoc; }
+	void																		ReMapAllCommandLists();
 protected:
 
     Application(HINSTANCE hInst);

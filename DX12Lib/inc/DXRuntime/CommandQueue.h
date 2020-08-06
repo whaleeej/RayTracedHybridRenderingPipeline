@@ -64,6 +64,8 @@ public:
     // Wait for another command queue to finish.
     void Wait( const CommandQueue& other );
 
+	void ReMapAllCommandLists();
+
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetD3D12CommandQueue() const;
 
 private:

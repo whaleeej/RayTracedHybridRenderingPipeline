@@ -33,7 +33,7 @@ HRESULT  CreateSwapChainForHwnd(
 
 void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc);
 	
-void D3D12CallAtEndOfFrame(ID3D12Device* pDevice);
+bool D3D12CallAtEndOfFrame(ID3D12Device* pDevice);
 
 // common wrap for renderdoc
 RENDERDOC_API_1_0_1* GetRenderdocAPI();

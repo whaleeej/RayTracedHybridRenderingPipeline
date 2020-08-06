@@ -250,11 +250,11 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc) {
 	}
 }
 
-void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
+bool D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 
 	WrappedD3D12Device* pWrappedDevice = static_cast<WrappedD3D12Device*>(pDevice);
 	if (!pWrappedDevice || (pWrappedDevice->isRenderDocDevice() == d3d12InRenderdocFlg))
-		return;
+		return false;
 
 	tD3D12CreateDevice pfnCreateDevice = 
 		d3d12InRenderdocFlg ? pfnRenderdocD3D12CreateDevice : pfnD3D12CreateDevice;
@@ -263,7 +263,7 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 	if (params.FeatureLevels < 1)
 	{
 		LogError("Can't switch to device without any feature level");
-		return;
+		return  false;
 	}
 
 	COMPtr<ID3D12Device> pRealDevice = NULL;
@@ -272,11 +272,12 @@ void D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 
 	if (FAILED(ret)) {
 		LogError("Create new device failed.");
-		return;
+		return false;
 	}
 
 	pWrappedDevice->SetAsRenderDocDevice(d3d12InRenderdocFlg);
 	pWrappedDevice->SwitchToDeviceRdc(pRealDevice.Get());
+	return true;
 }
 //*************************************d3d12*************************************//
 

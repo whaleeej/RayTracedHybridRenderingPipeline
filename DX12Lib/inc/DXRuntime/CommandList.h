@@ -360,6 +360,8 @@ public:
      */
     void Reset();
 
+	void ReMap();
+
     /**
      * Release tracked objects. Useful if the swap chain needs to be resized.
      */
