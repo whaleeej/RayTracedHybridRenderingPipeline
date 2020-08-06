@@ -60,7 +60,7 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 	if (pRealCommandQueue == m_pWrappedCommandQueue->GetReal().Get()) {
 		return;
 	}
-
+	auto oldIndex = GetCurrentBackBufferIndex();
 	COMPtr<IDXGISwapChain1> pNewSwapChain = CopyToCommandQueue(pRealCommandQueue);
 
 	{ //TODO handle resize/fullscreen
@@ -99,6 +99,11 @@ void WrappedD3D12DXGISwapChain::SwitchToCommandQueue(ID3D12CommandQueue* pRealCo
 				pvWrappedRes->Release();
 			}
 		}
+	}
+	auto currentIndex = GetCurrentBackBufferIndex();
+	while (currentIndex != oldIndex) {
+		Present(0, 0);
+		currentIndex = GetCurrentBackBufferIndex();
 	}
 }
 
