@@ -39,7 +39,7 @@ tD3D12CreateDevice pfnRenderdocD3D12CreateDevice;
 tD3D12CreateDevice pfnD3D12CreateDevice;
 
 static HMODULE sRdcModule;
-static RENDERDOC_API_1_0_1* sRdcAPI = NULL;
+static RENDERDOC_API_1_4_1* sRdcAPI = NULL;
 
 static bool InitRenderDoc()
 {
@@ -281,7 +281,7 @@ bool D3D12CallAtEndOfFrame(ID3D12Device* pDevice){
 }
 //*************************************d3d12*************************************//
 
-RENDERDOC_API_1_0_1* GetRenderdocAPI()
+RENDERDOC_API_1_4_1* GetRenderdocAPI()
 {
 	return sRdcAPI;
 }

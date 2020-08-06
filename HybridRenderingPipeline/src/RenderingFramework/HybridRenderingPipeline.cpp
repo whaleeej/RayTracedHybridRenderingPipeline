@@ -130,38 +130,38 @@ void HybridRenderingPipeline::OnRender(RenderEventArgs& e)
 
 void HybridRenderingPipeline::OnKeyPressed(KeyEventArgs& e)
 {
-    super::OnKeyPressed(e);
+	super::OnKeyPressed(e);
 
-    m_Scene->OnKeyPressed(e);
+	m_Scene->OnKeyPressed(e);
 
 	for (auto& pRenderer : m_Renderers) {
 		pRenderer->PressKey(e);
 	}
 
-    switch (e.Key)
-    {
-    case KeyCode::Escape:
-        Application::Get().Quit(0);
-        break;
-    case KeyCode::Enter:
-        if (e.Alt)
-        {
+	switch (e.Key)
+	{
+	case KeyCode::Escape:
+		Application::Get().Quit(0);
+		break;
+	case KeyCode::Enter:
+		if (e.Alt)
+		{
 			if (g_AllowFullscreenToggle)
 			{
 				m_pWindow->ToggleFullscreen();
 				g_AllowFullscreenToggle = false;
 			}
-        break;
-        }
-    case KeyCode::V:
-        m_pWindow->ToggleVSync();
-        break;
+			break;
+		}
+	case KeyCode::V:
+		m_pWindow->ToggleVSync();
+		break;
 
 	case KeyCode::C:
 		if (Application::Get().IsRenderDocEnabled()) {
 			rdcboost::D3D12EnableRenderDoc(Application::Get().GetDevice().Get(), 1);
 			void* m_pRdcAPI = rdcboost::GetRenderdocAPI();
-			RENDERDOC_API_1_0_1* pAPI = static_cast<RENDERDOC_API_1_0_1*>(m_pRdcAPI);
+			RENDERDOC_API_1_4_1* pAPI = static_cast<RENDERDOC_API_1_4_1*>(m_pRdcAPI);
 			if (pAPI != NULL)
 			{
 				std::string pathTemplate = pAPI->GetLogFilePathTemplate();

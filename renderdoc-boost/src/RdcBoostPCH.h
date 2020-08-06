@@ -135,6 +135,9 @@ auto realVAddr =  pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VAD
 // 将Pending Resource Barrier生效的时机往后挪到了commanlist提交入commandqueue的时刻
 //虽然这样也不一定是对的，但是比在commandlist中提交barrier就改变state合理
 
+//update8/06
+// 
+
 // update  TODO
 // 1. 支持CommandList和GraphicsCommandList的合并
 // 2. 支持其他API的参数情况
