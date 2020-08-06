@@ -38,11 +38,6 @@ void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 }
 
 void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
-	//create new device(done)
-	Assert(pNewDevice != NULL);
-
-	//copy private data of device
-	m_PrivateData.CopyPrivateData(pNewDevice);
 
 	auto backRefTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
@@ -65,6 +60,8 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			m_BackRefs.swap(newBackRefs);
 		}
 	};
+
+#ifdef ENABLE_RDC_RESOURCE_RECREATE
 	auto backRefResourcesTransferFunc = [=](std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*>& m_BackRefs, std::string objectTypeStr)->void {
 		if (!m_BackRefs.empty()) {
 			printf("Transferring %s to new device without modifying the content of WrappedDeviceChild\n", objectTypeStr.c_str());
@@ -127,7 +124,7 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 				// 缓存旧资源的ptr，使用comptr来保存生命
 				oldBackRefsSrc[counterReal] = tmpOldResource;
 				// 查询footprint
-				UINT64 NumSubresources = desc.MipLevels;
+				UINT64 NumSubresources = D3D12CalcSubresource(desc.MipLevels-1, desc.DepthOrArraySize-1, 0, desc.MipLevels, desc.DepthOrArraySize)+1;
 				UINT64 RequiredSize = 0;
 				UINT64 MemToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * NumSubresources;
 				Assert(MemToAlloc <= SIZE_MAX);
@@ -265,7 +262,16 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 			m_BackRefs.swap(newBackRefs);
 		}
 	};
-	//2 要确保所有的fence进行Signal的Value都已经Complete了
+#endif
+
+	//create new device(done)
+	Assert(pNewDevice != NULL);
+
+	//copy private data of device
+	m_PrivateData.CopyPrivateData(pNewDevice);
+
+	
+	//-1 要确保所有的fence进行Signal的Value都已经Complete了
 	for (auto it = m_BackRefs_Fence.begin(); it != m_BackRefs_Fence.end(); it++) {
 		auto pWrappedFence = static_cast<WrappedD3D12Fence*>(it->second);
 		pWrappedFence->WaitToCompleteApplicationFenceValue();
@@ -274,27 +280,26 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 	//0 cache resources切换前的状态
 	cacheResourceReflectionToOldReal();
 
-	//0 切换RootSignature和依赖于Root Signature的Pipeline State
+	//1 切换RootSignature和依赖于Root Signature的Pipeline State
 	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
 	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
-	//1 切换保存资源的resource heap
+	//2 切换保存资源的resource heap
 	backRefTransferFunc(m_BackRefs_Heap, "Heaps"); 
 	
-	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了
-	// 可以新建resource并且进行copy ->使用新的device的copy queue
-	backRefResourcesTransferFunc(m_BackRefs_Resource, "Resources");
-	//5 新建command相关的object，重建但不恢复
+	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了, 可以新建resource并且进行copy ->使用新的device的copy queue
+	backRefTransferFunc(m_BackRefs_Resource, "Resources");
+	//4 新建command相关的object，重建但不恢复
 	backRefTransferFunc(m_BackRefs_CommandAllocator, "CommandAllocator");
 	backRefTransferFunc(m_BackRefs_CommandList, "CommandList,");
 	backRefTransferFunc(m_BackRefs_Fence, "Fence");
 	backRefTransferFunc(m_BackRefs_CommandQueue, "CommandQueue");
-	//4 因为资源更新了，所以指向资源的descriptor也要重建
+	//5 因为资源更新了，所以指向资源的descriptor也要重建
 	backRefTransferFunc(m_BackRefs_DescriptorHeap, "DescriptorHeaps");
 
-	//5 清空cache
+	//6 清空cache
 	clearResourceReflectionToOldReal();
 
-	//5.pReal substitute
+	//7 pReal substitute
 	m_pReal = pNewDevice;
 }
 
