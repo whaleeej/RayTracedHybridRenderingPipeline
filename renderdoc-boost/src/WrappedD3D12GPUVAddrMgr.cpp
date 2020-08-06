@@ -73,7 +73,7 @@ WrappedD3D12GPUVAddrMgr::OffsetType WrappedD3D12GPUVAddrMgr::Allocate(SizeType s
 		AddNewBlock(newOffset, newSize);
 
 	m_NumFreeSpace -= size;
-	m_AllocationsInFlight.emplace(Allocation( offset, size, pResource));
+	m_AllocationsInFlight.insert(Allocation( offset, size, pResource));
 
 	return offset;
 }
@@ -83,7 +83,7 @@ void WrappedD3D12GPUVAddrMgr::Free(OffsetType offset) {
 	auto it = m_AllocationsInFlight.find(Allocation(offset));
 	if (it == m_AllocationsInFlight.end())
 		return;
-	m_AllocationsStaled.emplace(*it);
+	m_AllocationsStaled.push(*it);
 	m_AllocationsInFlight.erase(it);
 }
 

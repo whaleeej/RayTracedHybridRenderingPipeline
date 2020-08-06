@@ -271,14 +271,14 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetPipelineState(
 void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 	_In_  UINT NumBarriers,
 	_In_reads_(NumBarriers)  const D3D12_RESOURCE_BARRIER *pBarriers) {
-	std::vector<D3D12_RESOURCE_BARRIER > barriers(NumBarriers+1);//TODO: why need +1??
-	memcpy(barriers.data(), pBarriers, NumBarriers * sizeof(D3D12_RESOURCE_BARRIER));
+	std::vector<D3D12_RESOURCE_BARRIER > barriers(NumBarriers);
 	for (size_t i = 0; i < NumBarriers; i++) {
+		barriers[i] = *(pBarriers + i);
 		D3D12_RESOURCE_BARRIER& _Barriers = barriers[i];
 		switch (_Barriers.Type) {
 		case D3D12_RESOURCE_BARRIER_TYPE_TRANSITION:
 			//static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
-			m_PendingResourceStates.emplace(static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource), _Barriers.Transition.StateAfter);
+			m_PendingResourceStates[static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)] = _Barriers.Transition.StateAfter;
 			_Barriers.Transition.pResource =
 				_Barriers.Transition.pResource ? static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get() : NULL;
 			break;
