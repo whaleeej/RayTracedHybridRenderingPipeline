@@ -1,5 +1,6 @@
 #pragma once
 #include <renderdoc/renderdoc_app.h>
+#include <set>
 #include <dxgi1_6.h>
 #include <d3d11.h>
 #include <d3d12.h>

@@ -1,5 +1,4 @@
 #pragma once
-#include <string>
 #include "RdcBoostPCH.h"
 #include "PrivateDataMap.h"
 
@@ -20,17 +19,17 @@ protected:
 	COMPtr<ID3D12Object> m_pReal;
 };
 
-template<typename NestedType>
-class WrappedD3D12Object : public WrappedD3D12ObjectBase, public NestedType {
+template<typename NestedTypeBase, typename NestedTypeHighest>
+class WrappedD3D12Object : public WrappedD3D12ObjectBase, public NestedTypeHighest {
 public:
-	WrappedD3D12Object(NestedType* pReal) : WrappedD3D12ObjectBase(pReal), m_Ref(1) {};
+	WrappedD3D12Object(NestedTypeBase* pReal) : WrappedD3D12ObjectBase(pReal), m_Ref(1) {};
 
 public: // override for IUnknown
 	virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject)
 	{
-		if (riid == __uuidof(NestedType))
+		if (riid == __uuidof(NestedTypeBase))
 		{
-			*ppvObject = static_cast<NestedType*>(this);
+			*ppvObject = static_cast<NestedTypeBase*>(this);
 			AddRef();
 			return S_OK;
 		}
@@ -47,7 +46,7 @@ public: // override for IUnknown
 			return S_OK;
 		}
 		LogError("InValid Query for this Interface");
-		return m_pReal->QueryInterface(riid, ppvObject);
+		return E_NOINTERFACE;
 	}
 
 	virtual ULONG STDMETHODCALLTYPE AddRef(void)
@@ -106,8 +105,8 @@ public: // override for ID3D12Object
 	}
 
 public: // func
-	COMPtr<NestedType> GetReal() { 
-		return COMPtr<NestedType>(static_cast<NestedType*>(m_pReal.Get())); 
+	COMPtr<NestedTypeBase> GetReal() {
+		return COMPtr<NestedTypeBase>(static_cast<NestedTypeBase*>(m_pReal.Get()));
 	}
 
 	std::wstring getName() { 

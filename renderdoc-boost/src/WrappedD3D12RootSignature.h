@@ -3,7 +3,7 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-class WrappedD3D12RootSignature : public WrappedD3D12DeviceChild<ID3D12RootSignature> {
+class WrappedD3D12RootSignature : public WrappedD3D12DeviceChild<ID3D12RootSignature, ID3D12RootSignature> {
 public:
 	WrappedD3D12RootSignature(ID3D12RootSignature* pReal, WrappedD3D12Device* pDevice,
 		UINT nodeMask,

@@ -1,4 +1,3 @@
-#include "vector"
 #include "WrappedD3D12CommandList.h"
 #include "WrappedD3D12PipelineState.h"
 #include "WrappedD3D12Resource.h"

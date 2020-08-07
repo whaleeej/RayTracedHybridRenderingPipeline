@@ -1,5 +1,4 @@
 #pragma once
-#include <dxgi1_6.h>
 #include "WrappedD3D12DeviceChild.h"
 
 RDCBOOST_NAMESPACE_BEGIN
@@ -7,7 +6,7 @@ RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12DXGISwapChain;
 class WrappedD3D12Resource;
 
-class WrappedD3D12CommandQueue : public WrappedD3D12DeviceChild<ID3D12CommandQueue>
+class WrappedD3D12CommandQueue : public WrappedD3D12DeviceChild<ID3D12CommandQueue, ID3D12CommandQueue>
 {
 public:
 	WrappedD3D12CommandQueue(ID3D12CommandQueue* pRealD3D12CommandQueue, WrappedD3D12Device* pDevice);

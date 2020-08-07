@@ -1,10 +1,9 @@
 #pragma once
-#include <vector>
 #include "WrappedD3D12DeviceChild.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
-class WrappedD3D12Heap : public WrappedD3D12DeviceChild<ID3D12Heap> {
+class WrappedD3D12Heap : public WrappedD3D12DeviceChild<ID3D12Heap, ID3D12Heap> {
 public:
 	WrappedD3D12Heap(ID3D12Heap* pReal, WrappedD3D12Device* pWrappedDevice);
 	~WrappedD3D12Heap();
@@ -18,7 +17,7 @@ public: //framework:
 
 class WrappedD3D12Resource;
 
-class WrappedD3D12DescriptorHeap : public WrappedD3D12DeviceChild<ID3D12DescriptorHeap> {
+class WrappedD3D12DescriptorHeap : public WrappedD3D12DeviceChild<ID3D12DescriptorHeap, ID3D12DescriptorHeap> {
 public:
 	enum ViewDescType {
 		ViewDesc_SRV=0,

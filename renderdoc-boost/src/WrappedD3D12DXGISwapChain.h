@@ -1,7 +1,4 @@
 #pragma once 
-#include <vector>
-#include <map>
-#include <dxgi1_6.h>
 #include "RdcBoostPCH.h"
 #include "WrappedD3D12Object.h"
 

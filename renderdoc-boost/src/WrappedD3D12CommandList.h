@@ -6,7 +6,7 @@ RDCBOOST_NAMESPACE_BEGIN
 
 class WrappedD3D12Resource;
 
-class WrappedD3D12CommandAllocator : public WrappedD3D12DeviceChild<ID3D12CommandAllocator> {
+class WrappedD3D12CommandAllocator : public WrappedD3D12DeviceChild<ID3D12CommandAllocator, ID3D12CommandAllocator> {
 public:
 	WrappedD3D12CommandAllocator(ID3D12CommandAllocator* pReal, WrappedD3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE type);
 	~WrappedD3D12CommandAllocator();
@@ -23,7 +23,7 @@ protected:
 	D3D12_COMMAND_LIST_TYPE m_type;
 };
 
-class WrappedD3D12CommandList : public WrappedD3D12DeviceChild<ID3D12CommandList> {
+class WrappedD3D12CommandList : public WrappedD3D12DeviceChild<ID3D12CommandList, ID3D12CommandList> {
 public:
 	WrappedD3D12CommandList(
 		ID3D12CommandList* pReal, WrappedD3D12Device* pDevice, 
@@ -42,7 +42,7 @@ protected:
 	UINT m_NodeMask;
 };
 
-class WrappedD3D12GraphicsCommansList : public WrappedD3D12DeviceChild <ID3D12GraphicsCommandList>{
+class WrappedD3D12GraphicsCommansList : public WrappedD3D12DeviceChild <ID3D12GraphicsCommandList, ID3D12GraphicsCommandList>{
 public:
 	WrappedD3D12GraphicsCommansList(
 		ID3D12GraphicsCommandList* pReal, WrappedD3D12Device* pDevice,

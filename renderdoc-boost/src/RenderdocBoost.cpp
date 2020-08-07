@@ -1,4 +1,3 @@
-#include <set>
 #include "RenderdocBoost.h"
 #include "DeviceCreateParams.h"
 //d3d11 wrapper

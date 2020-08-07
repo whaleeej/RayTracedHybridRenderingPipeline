@@ -3,7 +3,7 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
-class WrappedD3D12Fence : public WrappedD3D12DeviceChild<ID3D12Fence> {
+class WrappedD3D12Fence : public WrappedD3D12DeviceChild<ID3D12Fence, ID3D12Fence> {
 public:
 	WrappedD3D12Fence(ID3D12Fence* pReal, WrappedD3D12Device* pDevice, UINT64 InitialValue, D3D12_FENCE_FLAGS Flags);
 	~WrappedD3D12Fence();

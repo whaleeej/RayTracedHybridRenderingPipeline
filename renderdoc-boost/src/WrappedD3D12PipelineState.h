@@ -4,7 +4,7 @@
 RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12RootSignature;
 
-class WrappedD3D12PipelineState : public WrappedD3D12DeviceChild<ID3D12PipelineState> {
+class WrappedD3D12PipelineState : public WrappedD3D12DeviceChild<ID3D12PipelineState, ID3D12PipelineState> {
 public:
 	enum PipelineStateType {
 		PipelineStateType_Graphics,

@@ -1,5 +1,4 @@
 #pragma once
-#include <dxgi1_6.h>
 #include "WrappedD3D12DeviceChild.h"
 #include "WrappedD3D12GPUVAddrMgr.h"
 
@@ -9,7 +8,7 @@ class WrappedD3D12Device;
 class WrappedD3D12DXGISwapChain;
 class WrappedD3D12Heap;
 
-class WrappedD3D12Resource : public WrappedD3D12DeviceChild<ID3D12Resource>
+class WrappedD3D12Resource : public WrappedD3D12DeviceChild<ID3D12Resource, ID3D12Resource>
 {
 public:
 	enum WrappedD3D12ResourceType {

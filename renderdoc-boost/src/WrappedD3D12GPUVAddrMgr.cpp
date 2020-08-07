@@ -1,8 +1,7 @@
-#include "RdcBoostPCH.h"
+#include "Log.h"
 #include "WrappedD3D12GPUVAddrMgr.h"
 #include "WrappedD3D12Resource.h"
 #include "WrappedD3D12Heap.h"
-#include "Log.h"
 RDCBOOST_NAMESPACE_BEGIN
 
 static WrappedD3D12GPUVAddrMgr* pGpuVAddrMgr;

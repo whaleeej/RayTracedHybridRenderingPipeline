@@ -1,13 +1,12 @@
 #pragma once
-#include <string>
 #include "WrappedD3D12Device.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
-template<typename NestedType>
-class WrappedD3D12DeviceChild : public WrappedD3D12Object<NestedType> {
+template<typename NestedTypeBase, typename NestedTypeHighest>
+class WrappedD3D12DeviceChild : public WrappedD3D12Object<NestedTypeBase, NestedTypeHighest> {
 public:
-	WrappedD3D12DeviceChild(NestedType* pReal, WrappedD3D12Device* pDevice)
+	WrappedD3D12DeviceChild(NestedTypeBase* pReal, WrappedD3D12Device* pDevice)
 		:WrappedD3D12Object(pReal), m_pWrappedDevice(pDevice)
 	{
 		m_pRealDevice = m_pWrappedDevice->GetReal().Get();

@@ -1,6 +1,4 @@
 #pragma once
-#include <map>
-#include <set>
 #include "WrappedD3D12Object.h"
 #include "DeviceCreateParams.h"
 #include "WrappedD3D12GPUVAddrMgr.h"
@@ -10,7 +8,7 @@ RDCBOOST_NAMESPACE_BEGIN
 class WrappedD3D12DescriptorHeap;
 class WrappedD3D12Resource;
 
-class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device> {
+class WrappedD3D12Device:public WrappedD3D12Object<ID3D12Device, ID3D12Device> {
 	struct DummyID3D12InfoQueue : public ID3D12InfoQueue
 	{
 		WrappedD3D12Device *m_pDevice;

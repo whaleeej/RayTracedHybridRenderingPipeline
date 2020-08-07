@@ -2,6 +2,13 @@
 #include <d3d11.h>
 #include <d3d12.h>
 #include <d3dx12.h>
+#include <dxgi1_6.h>
+
+#include <vector>
+#include <map>
+#include <set>
+#include <string>
+
 
 #define RDCBOOST_NAMESPACE_BEGIN namespace rdcboost\
 {
@@ -134,7 +141,11 @@ pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VADDR - pWrappedResou
 //虽然这样也不一定是对的，但是比在commandlist中提交barrier就改变state合理
 
 //update8/06
-// 
+// - 如果upload buffer和readback buffer类型的资源重建之后， map 出来的cpu addr会变化
+// solution 1. 修改引擎重map （not recommended
+// solution 2. 修改renderdoc代码，开wrap created committed resource的方法，不拷贝资源 （√
+// - swapchain重建之后需要实现present到原来的正确的backbuffer上
+// - 接入renderdoc1.9, 需要自己用create_Internal来开创建的方法
 
 // update  TODO
 // 1. 支持CommandList和GraphicsCommandList的合并
