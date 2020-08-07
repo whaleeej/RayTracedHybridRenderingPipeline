@@ -6,6 +6,8 @@
 #include "WrappedD3D12CommandQueue.h"
 #include "WrappedD3D12RootSignature.h"
 #include "WrappedD3D12PipelineState.h"
+#include "WrappedD3D12CommandSignature.h"
+#include "WrappedD3D12QueryHeap.h"
 
 RDCBOOST_NAMESPACE_BEGIN
 
@@ -23,8 +25,10 @@ WrappedD3D12Device::~WrappedD3D12Device() {
 
 void WrappedD3D12Device::OnDeviceChildReleased(ID3D12DeviceChild* pReal) {
 	if (m_BackRefs_RootSignature.erase(pReal) !=0) return;
+	if (m_BackRefs_CommandSignature.erase(pReal) != 0) return;
 	if (m_BackRefs_PipelineState.erase(pReal) != 0) return;
 	if (m_BackRefs_Heap.erase(pReal) != 0) return;
+	if (m_BackRefs_QueryHeap.erase(pReal) != 0) return;
 	if (m_BackRefs_Resource.erase(pReal) != 0) return;
 	if (m_BackRefs_DescriptorHeap.erase(pReal) != 0) return;
 	if (m_BackRefs_CommandAllocator.erase(pReal) != 0) return;
@@ -282,10 +286,11 @@ void WrappedD3D12Device::SwitchToDeviceRdc(ID3D12Device* pNewDevice) {
 
 	//1 切换RootSignature和依赖于Root Signature的Pipeline State
 	backRefTransferFunc(m_BackRefs_RootSignature, "RootSignatures");
+	backRefTransferFunc(m_BackRefs_CommandSignature, "CommandSignature");
 	backRefTransferFunc(m_BackRefs_PipelineState, "PipelineStates");
 	//2 切换保存资源的resource heap
 	backRefTransferFunc(m_BackRefs_Heap, "Heaps"); 
-	
+	backRefTransferFunc(m_BackRefs_QueryHeap, "QueryHeaps");
 	//3 那么认为所有帧组织的commandlist都提交给commandQueue并且执行完毕了, 可以新建resource并且进行copy ->使用新的device的copy queue
 	backRefTransferFunc(m_BackRefs_Resource, "Resources");
 	//4 新建command相关的object，重建但不恢复
@@ -716,8 +721,22 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateQueryHeap(
 	_In_  const D3D12_QUERY_HEAP_DESC *pDesc,
 	REFIID riid,
 	_COM_Outptr_opt_  void **ppvHeap) {
-	LogError("Query Heap Not supported yet");
-	return 0;
+	if (ppvHeap == NULL)
+		return GetReal()->CreateQueryHeap(pDesc, riid, NULL);
+	if (*ppvHeap) {
+		static_cast<WrappedD3D12QueryHeap*>(*ppvHeap)->Release();
+	}
+	COMPtr<ID3D12QueryHeap> pQueryHeap = NULL;
+	HRESULT ret = GetReal()->CreateQueryHeap(pDesc, IID_PPV_ARGS(&pQueryHeap));
+	if (!FAILED(ret)) {
+		WrappedD3D12QueryHeap* wrapped = new WrappedD3D12QueryHeap(pQueryHeap.Get(), this, pDesc);
+		*ppvHeap = static_cast<ID3D12QueryHeap*>(wrapped);
+		m_BackRefs_QueryHeap[pQueryHeap.Get()] = wrapped;
+	}
+	else {
+		*ppvHeap = NULL;
+	}
+	return ret;
 }
 
 HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
@@ -725,10 +744,29 @@ HRESULT STDMETHODCALLTYPE WrappedD3D12Device::CreateCommandSignature(
 	_In_opt_  ID3D12RootSignature *pRootSignature,
 	REFIID riid,
 	_COM_Outptr_opt_  void **ppvCommandSignature) {
-	LogError("Command Signature Not supported yet");
-	return 0;
+	if (ppvCommandSignature == NULL)
+		return GetReal()->CreateCommandSignature(pDesc, 
+			static_cast<WrappedD3D12RootSignature*>(pRootSignature)->GetReal().Get(), 
+			riid, NULL);
+	if (*ppvCommandSignature) {
+		static_cast<WrappedD3D12CommandSignature*>(*ppvCommandSignature)->Release();
+	}
+	COMPtr< ID3D12CommandSignature> pCommandSignature = NULL;
+	HRESULT ret = GetReal()->CreateCommandSignature(pDesc, 
+		static_cast<WrappedD3D12RootSignature*>(pRootSignature)->GetReal().Get(),
+		IID_PPV_ARGS(&pCommandSignature));
+	if (!FAILED(ret)) {
+		WrappedD3D12CommandSignature* wrapped = new WrappedD3D12CommandSignature(
+			pCommandSignature.Get(), this, pDesc, 
+			static_cast<WrappedD3D12RootSignature*>(pRootSignature));
+		*ppvCommandSignature = static_cast<ID3D12CommandSignature*>(wrapped);
+		m_BackRefs_CommandSignature[pCommandSignature.Get()] = wrapped;
+	}
+	else {
+		*ppvCommandSignature = NULL;
+	}
+	return ret;
 }
-
 
 //////////////////////////////////////////////////////////////////////////Create Descriptor
 void STDMETHODCALLTYPE WrappedD3D12Device::CreateConstantBufferView(

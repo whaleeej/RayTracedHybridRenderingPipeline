@@ -3,6 +3,8 @@
 #include "WrappedD3D12Resource.h"
 #include "WrappedD3D12Heap.h"
 #include "WrappedD3D12RootSignature.h"
+#include "WrappedD3D12CommandSignature.h"
+#include "WrappedD3D12QueryHeap.h"
 RDCBOOST_NAMESPACE_BEGIN
 
 WrappedD3D12CommandAllocator::WrappedD3D12CommandAllocator(ID3D12CommandAllocator* pReal, WrappedD3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE type)
@@ -600,10 +602,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandList::BeginQuery(
 	_In_  ID3D12QueryHeap *pQueryHeap,
 	_In_  D3D12_QUERY_TYPE Type,
 	_In_  UINT Index) {
-	//TODO: suppotr query heap
-	LogError("QUERY HEAP not supported");
 	return GetReal0()->BeginQuery(
-		pQueryHeap,
+		static_cast<WrappedD3D12QueryHeap*>(pQueryHeap)->GetReal().Get(),
 		Type,
 		Index);
 }
@@ -612,10 +612,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandList::EndQuery(
 	_In_  ID3D12QueryHeap *pQueryHeap,
 	_In_  D3D12_QUERY_TYPE Type,
 	_In_  UINT Index) {
-	//TODO: suppotr query heap
-	LogError("QUERY HEAP not supported");
 	return GetReal0()->EndQuery(
-		pQueryHeap,
+		static_cast<WrappedD3D12QueryHeap*>(pQueryHeap)->GetReal().Get(),
 		Type,
 		Index);
 }
@@ -627,10 +625,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandList::ResolveQueryData(
 	_In_  UINT NumQueries,
 	_In_  ID3D12Resource *pDestinationBuffer,
 	_In_  UINT64 AlignedDestinationBufferOffset) {
-	//TODO: suppotr query heap
-	LogError("QUERY HEAP not supported");
 	return GetReal0()->ResolveQueryData(
-		pQueryHeap,
+		static_cast<WrappedD3D12QueryHeap*>(pQueryHeap)->GetReal().Get(),
 		Type,
 		StartIndex,
 		NumQueries,
@@ -679,10 +675,8 @@ void STDMETHODCALLTYPE WrappedD3D12CommandList::ExecuteIndirect(
 	_In_  UINT64 ArgumentBufferOffset,
 	_In_opt_  ID3D12Resource *pCountBuffer,
 	_In_  UINT64 CountBufferOffset) {
-	//TODO COMMANDSignature
-	LogError("CommandSignature unsupported");
 	return GetReal0()->ExecuteIndirect(
-		pCommandSignature,
+		static_cast<WrappedD3D12CommandSignature*>(pCommandSignature)->GetReal().Get(),
 		MaxCommandCount,
 		static_cast<WrappedD3D12Resource *>(pArgumentBuffer)->GetReal().Get(),
 		ArgumentBufferOffset,

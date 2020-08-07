@@ -335,8 +335,10 @@ public: // framework
 
 private:
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_RootSignature;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandSignature;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_PipelineState;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Heap;
+	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_QueryHeap;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_Resource;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_DescriptorHeap;
 	std::map<ID3D12DeviceChild*, WrappedD3D12ObjectBase*> m_BackRefs_CommandAllocator;
