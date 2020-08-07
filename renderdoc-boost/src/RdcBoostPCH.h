@@ -60,13 +60,11 @@ static_cast<WrappedD3D12DescriptorHeap::DescriptorHeapSlot*>((void*)((wrapped).p
 #define ANALYZE_WRAPPED_SLOT(pName, wrapped) auto pName = \
 static_cast<WrappedD3D12DescriptorHeap::DescriptorHeapSlot*>((void*)((wrapped).ptr))
 
-#define DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(VADDR) \
+#define DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(VADDR)\
 auto pWrappedResource_Ano = WrappedD3D12GPUVAddrMgr::Get().GetWrappedResourceByAddr(VADDR);\
-auto mineaddr = VADDR;\
-auto offsetstart = pWrappedResource_Ano->GetOffset();\
-auto realstart = pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress();\
-Assert(pWrappedResource_Ano);\
-auto realVAddr =  pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VADDR - pWrappedResource_Ano->GetOffset())
+D3D12_GPU_VIRTUAL_ADDRESS realVAddr=pWrappedResource_Ano?\
+pWrappedResource_Ano->GetReal()->GetGPUVirtualAddress() + (VADDR - pWrappedResource_Ano->GetOffset()):VADDR\
+
 
 // update fist类的结构
 // cons des

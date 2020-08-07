@@ -27,6 +27,9 @@ bool WrappedD3D12GPUVAddrMgr::Allocation::operator<(const Allocation& allocation
 }
 
 WrappedD3D12Resource* WrappedD3D12GPUVAddrMgr::GetWrappedResourceByAddr(OffsetType Addr) {
+#ifndef ENABLE_RDC_RESOURCE_RECREATE
+	return 0;
+#endif
 	auto it = m_AllocationsInFlight.find(Allocation(Addr));
 	if (it != m_AllocationsInFlight.end()) {
 		return it->resource;
@@ -53,6 +56,9 @@ WrappedD3D12GPUVAddrMgr& WrappedD3D12GPUVAddrMgr::Get() {
 }
 
 WrappedD3D12GPUVAddrMgr::OffsetType WrappedD3D12GPUVAddrMgr::Allocate(SizeType size, WrappedD3D12Resource* pResource) {
+#ifndef ENABLE_RDC_RESOURCE_RECREATE
+	return pResource->GetReal()->GetGPUVirtualAddress();
+#endif
 	std::lock_guard<std::mutex> lock(m_AllocationMutex);
 
 	Assert(size <= m_NumFreeSpace);
@@ -79,6 +85,9 @@ WrappedD3D12GPUVAddrMgr::OffsetType WrappedD3D12GPUVAddrMgr::Allocate(SizeType s
 }
 
 void WrappedD3D12GPUVAddrMgr::Free(OffsetType offset) {
+#ifndef ENABLE_RDC_RESOURCE_RECREATE
+	return;
+#endif
 	std::lock_guard<std::mutex> lock(m_AllocationMutex);
 	auto it = m_AllocationsInFlight.find(Allocation(offset));
 	if (it == m_AllocationsInFlight.end())
@@ -88,6 +97,9 @@ void WrappedD3D12GPUVAddrMgr::Free(OffsetType offset) {
 }
 
 void WrappedD3D12GPUVAddrMgr::Cleanup() {
+#ifndef ENABLE_RDC_RESOURCE_RECREATE
+	return;
+#endif
 	std::lock_guard<std::mutex> lock(m_AllocationMutex);
 
 	while (!m_AllocationsStaled.empty()) {

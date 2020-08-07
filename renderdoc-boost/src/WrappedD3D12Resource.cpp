@@ -4,6 +4,21 @@
 
 RDCBOOST_NAMESPACE_BEGIN
 
+typedef ID3D12Resource*(*tRENDERDOC_Wrap_D3D12CommittedResource)(
+	ID3D12Device *pDevice, ID3D12Resource *pResource, const D3D12_HEAP_PROPERTIES *pHeapProperties,
+	D3D12_HEAP_FLAGS HeapFlags, const D3D12_RESOURCE_DESC *pDesc,
+	D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue);
+
+tRENDERDOC_Wrap_D3D12CommittedResource pfnRENDERDOC_Wrap_D3D12CommittedResource;
+
+void initWrapD3D12CommittedResourceImpl() {
+	if (pfnRENDERDOC_Wrap_D3D12CommittedResource)
+		return;
+	auto sRdcModule = LoadLibrary("renderdoc.dll");
+	pfnRENDERDOC_Wrap_D3D12CommittedResource = (tRENDERDOC_Wrap_D3D12CommittedResource)GetProcAddress(sRdcModule, "RENDERDOC_Wrap_D3D12CommittedResource");
+	Assert(pfnRENDERDOC_Wrap_D3D12CommittedResource);
+}
+
 WrappedD3D12Resource::~WrappedD3D12Resource() {
 	if (m_ClearValue) {
 		delete m_ClearValue;
@@ -13,36 +28,46 @@ WrappedD3D12Resource::~WrappedD3D12Resource() {
 }
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12Resource::CopyToDevice(ID3D12Device* pNewDevice) {
+	initWrapD3D12CommittedResourceImpl();
 	COMPtr<ID3D12Resource> pvResource;
 	switch (m_Type)
 	{
 	//创建D3D12_RESOURCE_STATE_COPY_DEST状态的资源，方便在device的switch中拷贝
-	case CommittedWrappedD3D12Resource:
-		D3D12_HEAP_PROPERTIES pHeapProperties;
-		D3D12_HEAP_FLAGS pHeapFlags;
-		GetReal()->GetHeapProperties(&pHeapProperties, &pHeapFlags);
+	case CommittedWrappedD3D12Resource: {
+#ifdef ENABLE_RDC_RESOURCE_RECREATE
 		if (pHeapProperties.Type == D3D12_HEAP_TYPE_UPLOAD ||
 			pHeapProperties.Type == D3D12_HEAP_TYPE_READBACK) m_bNeedCopy = false;
 		pNewDevice->CreateCommittedResource(
-			&m_HeapProperties, m_HeapFlags, &m_Desc, 
-			m_bNeedCopy?D3D12_RESOURCE_STATE_COPY_DEST:m_State, m_ClearValue, IID_PPV_ARGS(&pvResource));
+			&m_HeapProperties, m_HeapFlags, &m_Desc,
+			m_bNeedCopy ? D3D12_RESOURCE_STATE_COPY_DEST : m_State, m_ClearValue, IID_PPV_ARGS(&pvResource));
+#endif
+		auto lifes =m_pReal->AddRef();
+		pvResource = pfnRENDERDOC_Wrap_D3D12CommittedResource(
+			pNewDevice, GetReal().Get(), &m_HeapProperties,
+			m_HeapFlags, &m_Desc, m_State, m_ClearValue
+		);
 		break;
+	}
 	case PlacedWrappedD3D12Resource:
+	{
 		LogError("Placed D3D12Resource copy unsupportted now");
-		Assert(m_pWrappedHeap.Get()&&m_pWrappedHeap->GetReal().Get());
+		Assert(m_pWrappedHeap.Get() && m_pWrappedHeap->GetReal().Get());
 		if (m_pWrappedHeap.Get()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_UPLOAD ||
 			m_pWrappedHeap.Get()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_READBACK) m_bNeedCopy = false;
 		pNewDevice->CreatePlacedResource(
-			m_pWrappedHeap->GetReal().Get(), m_heapOffset, &m_Desc, 
+			m_pWrappedHeap->GetReal().Get(), m_heapOffset, &m_Desc,
 			m_bNeedCopy ? D3D12_RESOURCE_STATE_COPY_DEST : m_State, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
+	}
 	case ReservedWrappedD3D12Resource:
+	{
 		LogError("Reserved D3D12Resource copy unsupportted now");
 		m_bNeedCopy = false;
 		pNewDevice->CreateReservedResource(
 			&m_Desc, 
 			m_State, m_ClearValue, IID_PPV_ARGS(&pvResource));
 		break;
+	}
 	case BackBufferWrappedD3D12Resource:
 		//do nothing
 		break;
@@ -59,7 +84,6 @@ void WrappedD3D12Resource::SwitchToSwapChain(IDXGISwapChain1* pNewSwapChain, ID3
 	if (pNewSwapChain == m_pRealSwapChain)
 		return;
 	Assert(pNewResource != NULL);
-	//TODO: copy content in the swapchain buffers
 	m_Desc = pNewResource->GetDesc();
 	m_PrivateData.CopyPrivateData(pNewResource);
 	m_pReal = pNewResource;

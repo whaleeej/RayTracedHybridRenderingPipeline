@@ -52,10 +52,13 @@ protected:
 
 public:
 	static WrappedD3D12GPUVAddrMgr& Get();
+
 	WrappedD3D12Resource* GetWrappedResourceByAddr(OffsetType Addr);
 
 	OffsetType Allocate(SizeType size, WrappedD3D12Resource* pResource);
+
 	void Free(OffsetType offset);
+
 	void Cleanup();
 
 	FreeListByOffset m_FreeListByOffset;

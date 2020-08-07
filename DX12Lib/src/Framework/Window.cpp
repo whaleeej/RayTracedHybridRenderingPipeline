@@ -417,8 +417,11 @@ UINT Window::Present( const Texture& texture )
     Application::Get().ReleaseStaleDescriptors( m_FrameValues[m_CurrentBackBufferIndex] );
 
 	if (Application::Get().IsRenderDocEnabled()) {
-		if(rdcboost::D3D12CallAtEndOfFrame(Application::Get().GetDevice().Get()))
+		if(rdcboost::D3D12CallAtEndOfFrame(Application::Get().GetDevice().Get())){
+#ifdef ENABLE_RDC_RESOURCE_RECREATE
 			Application::Get().ReMapAllCommandLists();
+#endif
+		}
 	}
 
     return m_CurrentBackBufferIndex;

@@ -36,6 +36,6 @@ void D3D12EnableRenderDoc(ID3D12Device* pDevice, bool bSwitchToRenderdoc);
 bool D3D12CallAtEndOfFrame(ID3D12Device* pDevice);
 
 // common wrap for renderdoc
-RENDERDOC_API_1_0_1* GetRenderdocAPI();
+RENDERDOC_API_1_4_1* GetRenderdocAPI();
 RDCBOOST_NAMESPACE_END
 
