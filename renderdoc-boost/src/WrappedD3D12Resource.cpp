@@ -9,7 +9,7 @@ typedef ID3D12Resource*(*tRENDERDOC_Wrap_D3D12CommittedResource)(
 	D3D12_HEAP_FLAGS HeapFlags, const D3D12_RESOURCE_DESC *pDesc,
 	D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue);
 
-tRENDERDOC_Wrap_D3D12CommittedResource pfnRENDERDOC_Wrap_D3D12CommittedResource;
+tRENDERDOC_Wrap_D3D12CommittedResource pfnRENDERDOC_Wrap_D3D12CommittedResource = 0;
 
 void initWrapD3D12CommittedResourceImpl() {
 	if (pfnRENDERDOC_Wrap_D3D12CommittedResource)
