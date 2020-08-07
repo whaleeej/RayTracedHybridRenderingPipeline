@@ -6,8 +6,8 @@ RDCBOOST_NAMESPACE_BEGIN
 template<typename NestedTypeBase, typename NestedTypeHighest>
 class WrappedD3D12DeviceChild : public WrappedD3D12Object<NestedTypeBase, NestedTypeHighest> {
 public:
-	WrappedD3D12DeviceChild(NestedTypeBase* pReal, WrappedD3D12Device* pDevice)
-		:WrappedD3D12Object(pReal), m_pWrappedDevice(pDevice)
+	WrappedD3D12DeviceChild(NestedTypeBase* pReal, WrappedD3D12Device* pDevice, int highest = 0)
+		:WrappedD3D12Object(pReal, highest), m_pWrappedDevice(pDevice)
 	{
 		m_pRealDevice = m_pWrappedDevice->GetReal().Get();
 	};

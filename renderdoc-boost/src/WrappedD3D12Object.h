@@ -22,7 +22,9 @@ protected:
 template<typename NestedTypeBase, typename NestedTypeHighest>
 class WrappedD3D12Object : public WrappedD3D12ObjectBase, public NestedTypeHighest {
 public:
-	WrappedD3D12Object(NestedTypeBase* pReal) : WrappedD3D12ObjectBase(pReal), m_Ref(1) {};
+	WrappedD3D12Object(NestedTypeBase* pReal, int highest = 0) : 
+		WrappedD3D12ObjectBase(pReal), 
+		m_Ref(1), m_HighestVersion(0) {};
 
 public: // override for IUnknown
 	virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject)
@@ -113,8 +115,11 @@ public: // func
 		return m_ObjectName; 
 	}
 
+	bool checkVersionSupport(int _ver) { return _ver <= m_HighestVersion; };
+
 protected:
 	ULONG m_Ref;
+	int m_HighestVersion;
 	std::wstring m_ObjectName;
 	PrivateDataMap m_PrivateData;
 };

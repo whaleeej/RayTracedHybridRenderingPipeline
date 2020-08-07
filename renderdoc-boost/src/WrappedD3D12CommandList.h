@@ -23,35 +23,24 @@ protected:
 	D3D12_COMMAND_LIST_TYPE m_type;
 };
 
-class WrappedD3D12CommandList : public WrappedD3D12DeviceChild<ID3D12CommandList, ID3D12CommandList> {
+class WrappedD3D12CommandList : public WrappedD3D12DeviceChild<ID3D12CommandList, ID3D12GraphicsCommandList> {
 public:
 	WrappedD3D12CommandList(
 		ID3D12CommandList* pReal, WrappedD3D12Device* pDevice, 
 		WrappedD3D12CommandAllocator* pWrappedAllocator,
 		UINT nodeMask);
-	~WrappedD3D12CommandList();
-
-public://override
-	virtual D3D12_COMMAND_LIST_TYPE STDMETHODCALLTYPE GetType(void);
-
-public://framework
-	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
-	
-protected:
-	COMPtr<WrappedD3D12CommandAllocator> m_pWrappedCommandAllocator;
-	UINT m_NodeMask;
-};
-
-class WrappedD3D12GraphicsCommansList : public WrappedD3D12DeviceChild <ID3D12GraphicsCommandList, ID3D12GraphicsCommandList>{
-public:
-	WrappedD3D12GraphicsCommansList(
+	WrappedD3D12CommandList(
 		ID3D12GraphicsCommandList* pReal, WrappedD3D12Device* pDevice,
 		WrappedD3D12CommandAllocator* pWrappedAllocator,
 		UINT nodeMask);
-	~WrappedD3D12GraphicsCommansList();
+	~WrappedD3D12CommandList();
 
 public://override
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
+
 	virtual D3D12_COMMAND_LIST_TYPE STDMETHODCALLTYPE GetType(void);
+
+public://override for graphics commandlist
 	virtual HRESULT STDMETHODCALLTYPE Close(void);
 
 	virtual HRESULT STDMETHODCALLTYPE Reset(
@@ -304,12 +293,17 @@ public://func
 	void FlushPendingResourceStates();
 
 public://framework
-	virtual COMPtr <ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
+	virtual COMPtr<ID3D12DeviceChild> CopyToDevice(ID3D12Device* pNewDevice);
 
+	COMPtr<ID3D12GraphicsCommandList> GetReal0() {
+		COMPtr<ID3D12GraphicsCommandList> ret;
+		m_pReal.As(&ret);
+		return ret;
+	}
+	
 protected:
 	COMPtr<WrappedD3D12CommandAllocator> m_pWrappedCommandAllocator;
-	UINT m_NodeMask;
 	std::map<WrappedD3D12Resource*, D3D12_RESOURCE_STATES> m_PendingResourceStates;
+	UINT m_NodeMask;
 };
-
 RDCBOOST_NAMESPACE_END

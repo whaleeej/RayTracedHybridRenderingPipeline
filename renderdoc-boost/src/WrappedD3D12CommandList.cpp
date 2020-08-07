@@ -17,7 +17,6 @@ WrappedD3D12CommandAllocator::~WrappedD3D12CommandAllocator() {
 }
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12CommandAllocator::CopyToDevice(ID3D12Device* pNewDevice) {
-	//丢弃不拷贝
 	COMPtr<ID3D12CommandAllocator> pvNewCommandAllocator;
 	HRESULT ret = pNewDevice->CreateCommandAllocator(m_type, IID_PPV_ARGS(&pvNewCommandAllocator));
 	if (FAILED(ret)) {
@@ -31,9 +30,19 @@ WrappedD3D12CommandList::WrappedD3D12CommandList(
 	ID3D12CommandList* pReal, WrappedD3D12Device* pDevice, 
 	WrappedD3D12CommandAllocator* pWrappedAllocator,
 	UINT nodeMask)
-	:WrappedD3D12DeviceChild(pReal, pDevice),
+	:WrappedD3D12DeviceChild(pReal, pDevice, -1),
 	m_pWrappedCommandAllocator(pWrappedAllocator),
 	m_NodeMask(nodeMask)
+{
+}
+
+WrappedD3D12CommandList::WrappedD3D12CommandList(
+	ID3D12GraphicsCommandList* pReal, WrappedD3D12Device* pDevice,
+	WrappedD3D12CommandAllocator* pWrappedAllocator,
+	UINT nodeMask)
+	: WrappedD3D12DeviceChild(pReal, pDevice, 0),
+	m_pWrappedCommandAllocator(pWrappedAllocator),
+	m_NodeMask(nodeMask) 
 {
 }
 
@@ -42,45 +51,33 @@ WrappedD3D12CommandList::~WrappedD3D12CommandList() {
 
 COMPtr<ID3D12DeviceChild> WrappedD3D12CommandList::CopyToDevice(ID3D12Device* pNewDevice) {
 	//丢弃不拷贝 Initial pipelinestate直接设置为null
-	COMPtr<ID3D12CommandList> pvNewCommandList;
-	HRESULT ret = pNewDevice->CreateCommandList(
-		m_NodeMask, GetReal()->GetType(), 
-		m_pWrappedCommandAllocator->GetReal().Get(), 
-		NULL, IID_PPV_ARGS(&pvNewCommandList));
-	if (FAILED(ret)) {
-		LogError("create new CommandList failed");
-		return NULL;
+	if (checkVersionSupport(0)) {
+		COMPtr<ID3D12GraphicsCommandList> pvNewCommandList;
+		HRESULT ret = pNewDevice->CreateCommandList(
+			m_NodeMask, GetReal()->GetType(),
+			m_pWrappedCommandAllocator->GetReal().Get(),
+			NULL, IID_PPV_ARGS(&pvNewCommandList));
+		if (FAILED(ret)) {
+			LogError("create new CommandList failed");
+			return NULL;
+		}
+		return pvNewCommandList;
 	}
-	return pvNewCommandList;
-}
-
-WrappedD3D12GraphicsCommansList::WrappedD3D12GraphicsCommansList(
-	ID3D12GraphicsCommandList* pReal, WrappedD3D12Device* pDevice,
-	WrappedD3D12CommandAllocator* pWrappedAllocator,
-	UINT nodeMask)
-	: WrappedD3D12DeviceChild(pReal, pDevice),
-	m_pWrappedCommandAllocator(pWrappedAllocator),
-	m_NodeMask(nodeMask) 
-{
-}
-
-WrappedD3D12GraphicsCommansList::~WrappedD3D12GraphicsCommansList() {
-}
-
-COMPtr<ID3D12DeviceChild> WrappedD3D12GraphicsCommansList::CopyToDevice(ID3D12Device* pNewDevice) {
-	COMPtr<ID3D12GraphicsCommandList> pvNewCommandList;
-	HRESULT ret = pNewDevice->CreateCommandList(
-		m_NodeMask, GetReal()->GetType(), 
-		m_pWrappedCommandAllocator->GetReal().Get(),
-		NULL, IID_PPV_ARGS(&pvNewCommandList));
-	if (FAILED(ret)) {
-		LogError("create new CommandList failed");
-		return NULL;
+	else {
+		COMPtr<ID3D12CommandList> pvNewCommandList;
+		HRESULT ret = pNewDevice->CreateCommandList(
+			m_NodeMask, GetReal()->GetType(),
+			m_pWrappedCommandAllocator->GetReal().Get(),
+			NULL, IID_PPV_ARGS(&pvNewCommandList));
+		if (FAILED(ret)) {
+			LogError("create new CommandList failed");
+			return NULL;
+		}
+		return pvNewCommandList;
 	}
-	return pvNewCommandList;
 }
 
-void WrappedD3D12GraphicsCommansList::FlushPendingResourceStates() {
+void WrappedD3D12CommandList::FlushPendingResourceStates() {
 	for (auto it = m_PendingResourceStates.begin(); it != m_PendingResourceStates.end(); it++) {
 		it->first->changeToState(it->second);//这里认为持有的资源都有生命周期 // 否则d3d也会出错的
 	}
@@ -89,6 +86,19 @@ void WrappedD3D12GraphicsCommansList::FlushPendingResourceStates() {
 /************************************************************************/
 /*                         override                                                                     */
 /************************************************************************/
+HRESULT STDMETHODCALLTYPE WrappedD3D12CommandList::QueryInterface(REFIID riid, void** ppvObject) {
+	if (riid == __uuidof(ID3D12GraphicsCommandList)) {
+		if (checkVersionSupport(0)) {
+			*ppvObject = static_cast<ID3D12GraphicsCommandList*>(this);
+			AddRef();
+			return S_OK;
+		}
+		else
+			return E_FAIL;
+	}
+	return WrappedD3D12DeviceChild::QueryInterface(riid, ppvObject);
+}
+
 HRESULT STDMETHODCALLTYPE WrappedD3D12CommandAllocator::Reset(void) {
 	return GetReal()->Reset();
 }
@@ -97,46 +107,42 @@ D3D12_COMMAND_LIST_TYPE STDMETHODCALLTYPE WrappedD3D12CommandList::GetType(void)
 	return GetReal()->GetType();
 }
 
-D3D12_COMMAND_LIST_TYPE STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::GetType(void) {
-	return GetReal()->GetType();
+HRESULT STDMETHODCALLTYPE WrappedD3D12CommandList::Close(void) {
+	return GetReal0()->Close();
 }
 
-HRESULT STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Close(void) {
-	return GetReal()->Close();
-}
-
-HRESULT STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Reset(
+HRESULT STDMETHODCALLTYPE WrappedD3D12CommandList::Reset(
 	_In_  ID3D12CommandAllocator *pAllocator,
 	_In_opt_  ID3D12PipelineState *pInitialState) {
 	m_PendingResourceStates.clear();
-	return GetReal()->Reset(static_cast<WrappedD3D12CommandAllocator *>(pAllocator)->GetReal().Get(), 
+	return GetReal0()->Reset(static_cast<WrappedD3D12CommandAllocator *>(pAllocator)->GetReal().Get(), 
 		pInitialState?static_cast<WrappedD3D12PipelineState *>(pInitialState)->GetReal().Get():NULL);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearState(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ClearState(
 	_In_opt_  ID3D12PipelineState *pPipelineState) {
-	return GetReal()->ClearState(static_cast<WrappedD3D12PipelineState *>(pPipelineState)->GetReal().Get());
+	return GetReal0()->ClearState(static_cast<WrappedD3D12PipelineState *>(pPipelineState)->GetReal().Get());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::DrawInstanced(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::DrawInstanced(
 	_In_  UINT VertexCountPerInstance,
 	_In_  UINT InstanceCount,
 	_In_  UINT StartVertexLocation,
 	_In_  UINT StartInstanceLocation) {
-	return GetReal()->DrawInstanced(
+	return GetReal0()->DrawInstanced(
 		VertexCountPerInstance, 
 		InstanceCount, 
 		StartVertexLocation, 
 		StartInstanceLocation);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::DrawIndexedInstanced(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::DrawIndexedInstanced(
 	_In_  UINT IndexCountPerInstance,
 	_In_  UINT InstanceCount,
 	_In_  UINT StartIndexLocation,
 	_In_  INT BaseVertexLocation,
 	_In_  UINT StartInstanceLocation) {
-	return GetReal()->DrawIndexedInstanced(
+	return GetReal0()->DrawIndexedInstanced(
 		IndexCountPerInstance,
 		InstanceCount,
 		StartIndexLocation,
@@ -144,23 +150,23 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::DrawIndexedInstanced(
 		StartInstanceLocation);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::Dispatch(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::Dispatch(
 	_In_  UINT ThreadGroupCountX,
 	_In_  UINT ThreadGroupCountY,
 	_In_  UINT ThreadGroupCountZ) {
-	return GetReal()->Dispatch(
+	return GetReal0()->Dispatch(
 		ThreadGroupCountX,
 		ThreadGroupCountY,
 		ThreadGroupCountZ);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyBufferRegion(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::CopyBufferRegion(
 	_In_  ID3D12Resource *pDstBuffer,
 	UINT64 DstOffset,
 	_In_  ID3D12Resource *pSrcBuffer,
 	UINT64 SrcOffset,
 	UINT64 NumBytes) {
-	return GetReal()->CopyBufferRegion(
+	return GetReal0()->CopyBufferRegion(
 		static_cast<WrappedD3D12Resource *>(pDstBuffer)->GetReal().Get(),
 		DstOffset,
 		static_cast<WrappedD3D12Resource *>(pSrcBuffer)->GetReal().Get(),
@@ -168,7 +174,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyBufferRegion(
 		NumBytes);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyTextureRegion(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::CopyTextureRegion(
 	_In_  const D3D12_TEXTURE_COPY_LOCATION *pDst,
 	UINT DstX,
 	UINT DstY,
@@ -180,7 +186,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyTextureRegion(
 	_Dst.pResource = static_cast<WrappedD3D12Resource *>(_Dst.pResource)->GetReal().Get();
 	_Src.pResource = static_cast<WrappedD3D12Resource *>(_Src.pResource)->GetReal().Get();
 
-	return GetReal()->CopyTextureRegion(
+	return GetReal0()->CopyTextureRegion(
 		&_Dst,
 		DstX,
 		DstY,
@@ -189,22 +195,22 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyTextureRegion(
 		pSrcBox);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyResource(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::CopyResource(
 	_In_  ID3D12Resource *pDstResource,
 	_In_  ID3D12Resource *pSrcResource) {
-	return GetReal()->CopyResource(
+	return GetReal0()->CopyResource(
 		static_cast<WrappedD3D12Resource *>(pDstResource)->GetReal().Get(),
 		static_cast<WrappedD3D12Resource *>(pSrcResource)->GetReal().Get());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyTiles(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::CopyTiles(
 	_In_  ID3D12Resource *pTiledResource,
 	_In_  const D3D12_TILED_RESOURCE_COORDINATE *pTileRegionStartCoordinate,
 	_In_  const D3D12_TILE_REGION_SIZE *pTileRegionSize,
 	_In_  ID3D12Resource *pBuffer,
 	UINT64 BufferStartOffsetInBytes,
 	D3D12_TILE_COPY_FLAGS Flags) {
-	return GetReal()->CopyTiles(
+	return GetReal0()->CopyTiles(
 		static_cast<WrappedD3D12Resource *>(pTiledResource)->GetReal().Get(),
 		pTileRegionStartCoordinate,
 		pTileRegionSize,
@@ -213,13 +219,13 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::CopyTiles(
 		Flags);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResolveSubresource(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ResolveSubresource(
 	_In_  ID3D12Resource *pDstResource,
 	_In_  UINT DstSubresource,
 	_In_  ID3D12Resource *pSrcResource,
 	_In_  UINT SrcSubresource,
 	_In_  DXGI_FORMAT Format) {
-	return GetReal()->ResolveSubresource(
+	return GetReal0()->ResolveSubresource(
 		static_cast<WrappedD3D12Resource *>(pDstResource)->GetReal().Get(),
 		DstSubresource,
 		static_cast<WrappedD3D12Resource *>(pSrcResource)->GetReal().Get(),
@@ -227,47 +233,47 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResolveSubresource(
 		Format);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetPrimitiveTopology(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::IASetPrimitiveTopology(
 	_In_  D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopology) {
-	return GetReal()->IASetPrimitiveTopology(
+	return GetReal0()->IASetPrimitiveTopology(
 		PrimitiveTopology);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::RSSetViewports(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::RSSetViewports(
 	_In_range_(0, D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE)  UINT NumViewports,
 	_In_reads_(NumViewports)  const D3D12_VIEWPORT *pViewports) {
-	return GetReal()->RSSetViewports(
+	return GetReal0()->RSSetViewports(
 		NumViewports,
 		pViewports);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::RSSetScissorRects(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::RSSetScissorRects(
 	_In_range_(0, D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE)  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
-	return GetReal()->RSSetScissorRects(
+	return GetReal0()->RSSetScissorRects(
 		NumRects,
 		pRects);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetBlendFactor(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::OMSetBlendFactor(
 	_In_reads_opt_(4)  const FLOAT BlendFactor[4]) {
-	return GetReal()->OMSetBlendFactor(
+	return GetReal0()->OMSetBlendFactor(
 		BlendFactor);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetStencilRef(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::OMSetStencilRef(
 	_In_  UINT StencilRef) {
-	return GetReal()->OMSetStencilRef(
+	return GetReal0()->OMSetStencilRef(
 		StencilRef);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetPipelineState(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetPipelineState(
 	_In_  ID3D12PipelineState *pPipelineState) {
-	return GetReal()->SetPipelineState(
+	return GetReal0()->SetPipelineState(
 		static_cast<WrappedD3D12PipelineState *>(pPipelineState)->GetReal().Get());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ResourceBarrier(
 	_In_  UINT NumBarriers,
 	_In_reads_(NumBarriers)  const D3D12_RESOURCE_BARRIER *pBarriers) {
 	std::vector<D3D12_RESOURCE_BARRIER > barriers(NumBarriers);
@@ -276,7 +282,6 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 		D3D12_RESOURCE_BARRIER& _Barriers = barriers[i];
 		switch (_Barriers.Type) {
 		case D3D12_RESOURCE_BARRIER_TYPE_TRANSITION:
-			//static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->changeToState(_Barriers.Transition.StateAfter);
 			m_PendingResourceStates[static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)] = _Barriers.Transition.StateAfter;
 			_Barriers.Transition.pResource =
 				_Barriers.Transition.pResource ? static_cast<WrappedD3D12Resource *>(_Barriers.Transition.pResource)->GetReal().Get() : NULL;
@@ -294,168 +299,168 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResourceBarrier(
 			LogError("Unknown barrier type");
 		}
 	}
-	return GetReal()->ResourceBarrier(
+	return GetReal0()->ResourceBarrier(
 		NumBarriers,
 		barriers.data());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ExecuteBundle(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ExecuteBundle(
 	_In_  ID3D12GraphicsCommandList *pCommandList) {
-	return GetReal()->ExecuteBundle(
-		static_cast<WrappedD3D12GraphicsCommansList *>(pCommandList)->GetReal().Get());
+	return GetReal0()->ExecuteBundle(
+		static_cast<WrappedD3D12CommandList *>(pCommandList)->GetReal0().Get());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetDescriptorHeaps(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetDescriptorHeaps(
 	_In_  UINT NumDescriptorHeaps,
 	_In_reads_(NumDescriptorHeaps)  ID3D12DescriptorHeap *const *ppDescriptorHeaps) {
 	std::vector<ID3D12DescriptorHeap*> descHeaps(NumDescriptorHeaps);
 	for (UINT i = 0; i < NumDescriptorHeaps; i++) {
 		descHeaps[i] = static_cast<WrappedD3D12DescriptorHeap *>(ppDescriptorHeaps[i])->GetReal().Get();
 	}
-	return GetReal()->SetDescriptorHeaps(
+	return GetReal0()->SetDescriptorHeaps(
 		NumDescriptorHeaps,
 		descHeaps.data());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootSignature(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRootSignature(
 	_In_opt_  ID3D12RootSignature *pRootSignature) {
-	return GetReal()->SetComputeRootSignature(
+	return GetReal0()->SetComputeRootSignature(
 		static_cast<WrappedD3D12RootSignature*>(pRootSignature)->GetReal().Get()
 		);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootSignature(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRootSignature(
 	_In_opt_  ID3D12RootSignature *pRootSignature) {
-	return GetReal()->SetGraphicsRootSignature(
+	return GetReal0()->SetGraphicsRootSignature(
 		static_cast<WrappedD3D12RootSignature *>(pRootSignature)->GetReal().Get()
 		);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootDescriptorTable(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRootDescriptorTable(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) {
-	return GetReal()->SetComputeRootDescriptorTable(
+	return GetReal0()->SetComputeRootDescriptorTable(
 		RootParameterIndex,
 		ANALYZE_WRAPPED_GPU_HANDLE(BaseDescriptor));
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootDescriptorTable(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRootDescriptorTable(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) {
-	return GetReal()->SetGraphicsRootDescriptorTable(
+	return GetReal0()->SetGraphicsRootDescriptorTable(
 		RootParameterIndex,
 		ANALYZE_WRAPPED_GPU_HANDLE(BaseDescriptor));
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRoot32BitConstant(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRoot32BitConstant(
 	_In_  UINT RootParameterIndex,
 	_In_  UINT SrcData,
 	_In_  UINT DestOffsetIn32BitValues) {
-	return GetReal()->SetComputeRoot32BitConstant(
+	return GetReal0()->SetComputeRoot32BitConstant(
 		RootParameterIndex,
 		SrcData,
 		DestOffsetIn32BitValues);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRoot32BitConstant(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRoot32BitConstant(
 	_In_  UINT RootParameterIndex,
 	_In_  UINT SrcData,
 	_In_  UINT DestOffsetIn32BitValues) {
-	return GetReal()->SetGraphicsRoot32BitConstant(
+	return GetReal0()->SetGraphicsRoot32BitConstant(
 		RootParameterIndex,
 		SrcData,
 		DestOffsetIn32BitValues);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRoot32BitConstants(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRoot32BitConstants(
 	_In_  UINT RootParameterIndex,
 	_In_  UINT Num32BitValuesToSet,
 	_In_reads_(Num32BitValuesToSet * sizeof(UINT))  const void *pSrcData,
 	_In_  UINT DestOffsetIn32BitValues) {
-	return GetReal()->SetComputeRoot32BitConstants(
+	return GetReal0()->SetComputeRoot32BitConstants(
 		RootParameterIndex,
 		Num32BitValuesToSet,
 		pSrcData,
 		DestOffsetIn32BitValues);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRoot32BitConstants(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRoot32BitConstants(
 	_In_  UINT RootParameterIndex,
 	_In_  UINT Num32BitValuesToSet,
 	_In_reads_(Num32BitValuesToSet * sizeof(UINT))  const void *pSrcData,
 	_In_  UINT DestOffsetIn32BitValues) {
-	return GetReal()->SetGraphicsRoot32BitConstants(
+	return GetReal0()->SetGraphicsRoot32BitConstants(
 		RootParameterIndex,
 		Num32BitValuesToSet,
 		pSrcData,
 		DestOffsetIn32BitValues);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootConstantBufferView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRootConstantBufferView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetComputeRootConstantBufferView(
+	return GetReal0()->SetComputeRootConstantBufferView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootConstantBufferView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRootConstantBufferView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetGraphicsRootConstantBufferView(
+	return GetReal0()->SetGraphicsRootConstantBufferView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootShaderResourceView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRootShaderResourceView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetComputeRootShaderResourceView(
+	return GetReal0()->SetComputeRootShaderResourceView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootShaderResourceView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRootShaderResourceView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetGraphicsRootShaderResourceView(
+	return GetReal0()->SetGraphicsRootShaderResourceView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetComputeRootUnorderedAccessView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetComputeRootUnorderedAccessView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetComputeRootUnorderedAccessView(
+	return GetReal0()->SetComputeRootUnorderedAccessView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetGraphicsRootUnorderedAccessView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetGraphicsRootUnorderedAccessView(
 	_In_  UINT RootParameterIndex,
 	_In_  D3D12_GPU_VIRTUAL_ADDRESS BufferLocation) {
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(BufferLocation);
-	return GetReal()->SetGraphicsRootUnorderedAccessView(
+	return GetReal0()->SetGraphicsRootUnorderedAccessView(
 		RootParameterIndex,
 		realVAddr);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetIndexBuffer(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::IASetIndexBuffer(
 	_In_opt_  const D3D12_INDEX_BUFFER_VIEW *pView) {
 	Assert(pView);
 	auto view = *pView;
 	DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(view.BufferLocation);
 	view.BufferLocation = realVAddr;
-	return GetReal()->IASetIndexBuffer(
+	return GetReal0()->IASetIndexBuffer(
 		&view);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetVertexBuffers(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::IASetVertexBuffers(
 	_In_  UINT StartSlot,
 	_In_  UINT NumViews,
 	_In_reads_opt_(NumViews)  const D3D12_VERTEX_BUFFER_VIEW *pViews) {
@@ -467,13 +472,13 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::IASetVertexBuffers(
 		DEFINE_AND_ASSERT_WRAPPED_GPU_VADDR(views[i].BufferLocation);
 		views[i].BufferLocation = realVAddr;
 	}
-	return GetReal()->IASetVertexBuffers(
+	return GetReal0()->IASetVertexBuffers(
 		StartSlot,
 		NumViews,
 		views.data());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SOSetTargets(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SOSetTargets(
 	_In_  UINT StartSlot,
 	_In_  UINT NumViews,
 	_In_reads_opt_(NumViews)  const D3D12_STREAM_OUTPUT_BUFFER_VIEW *pViews) {
@@ -491,13 +496,13 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SOSetTargets(
 			views[i].BufferFilledSizeLocation = realVAddr;
 		}
 	}
-	return GetReal()->SOSetTargets(
+	return GetReal0()->SOSetTargets(
 		StartSlot,
 		NumViews,
 		views.data());
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetRenderTargets(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::OMSetRenderTargets(
 	_In_  UINT NumRenderTargetDescriptors,
 	_In_opt_  const D3D12_CPU_DESCRIPTOR_HANDLE *pRenderTargetDescriptors,
 	_In_  BOOL RTsSingleHandleToDescriptorRange,
@@ -516,21 +521,21 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::OMSetRenderTargets(
 		rtHandles[i].ptr = ANALYZE_WRAPPED_CPU_HANDLE(pRenderTargetDescriptors[i]).ptr;
 	}
 
-	return GetReal()->OMSetRenderTargets(
+	return GetReal0()->OMSetRenderTargets(
 		NumRenderTargetDescriptors,
 		rtHandles.data(),
 		RTsSingleHandleToDescriptorRange,
 		dspHandle);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearDepthStencilView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ClearDepthStencilView(
 	_In_  D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView,
 	_In_  D3D12_CLEAR_FLAGS ClearFlags,
 	_In_  FLOAT Depth,
 	_In_  UINT8 Stencil,
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
-	return GetReal()->ClearDepthStencilView(
+	return GetReal0()->ClearDepthStencilView(
 		ANALYZE_WRAPPED_CPU_HANDLE(DepthStencilView),
 		ClearFlags,
 		Depth,
@@ -539,26 +544,26 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearDepthStencilView(
 		pRects);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearRenderTargetView(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ClearRenderTargetView(
 	_In_  D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetView,
 	_In_  const FLOAT ColorRGBA[4],
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
-	return GetReal()->ClearRenderTargetView(
+	return GetReal0()->ClearRenderTargetView(
 		ANALYZE_WRAPPED_CPU_HANDLE(RenderTargetView),
 		ColorRGBA,
 		NumRects,
 		pRects);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessViewUint(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ClearUnorderedAccessViewUint(
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE ViewGPUHandleInCurrentHeap,
 	_In_  D3D12_CPU_DESCRIPTOR_HANDLE ViewCPUHandle,
 	_In_  ID3D12Resource *pResource,
 	_In_  const UINT Values[4],
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
-	return GetReal()->ClearUnorderedAccessViewUint(
+	return GetReal0()->ClearUnorderedAccessViewUint(
 		ANALYZE_WRAPPED_GPU_HANDLE(ViewGPUHandleInCurrentHeap),
 		ANALYZE_WRAPPED_CPU_HANDLE(ViewCPUHandle),
 		static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(),
@@ -567,14 +572,14 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessView
 		pRects);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessViewFloat(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ClearUnorderedAccessViewFloat(
 	_In_  D3D12_GPU_DESCRIPTOR_HANDLE ViewGPUHandleInCurrentHeap,
 	_In_  D3D12_CPU_DESCRIPTOR_HANDLE ViewCPUHandle,
 	_In_  ID3D12Resource *pResource,
 	_In_  const FLOAT Values[4],
 	_In_  UINT NumRects,
 	_In_reads_(NumRects)  const D3D12_RECT *pRects) {
-	return GetReal()->ClearUnorderedAccessViewFloat(
+	return GetReal0()->ClearUnorderedAccessViewFloat(
 		ANALYZE_WRAPPED_GPU_HANDLE(ViewGPUHandleInCurrentHeap),
 		ANALYZE_WRAPPED_CPU_HANDLE(ViewCPUHandle),
 		static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(),
@@ -583,39 +588,39 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ClearUnorderedAccessView
 		pRects);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::DiscardResource(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::DiscardResource(
 	_In_  ID3D12Resource *pResource,
 	_In_opt_  const D3D12_DISCARD_REGION *pRegion) {
-	return GetReal()->DiscardResource(
+	return GetReal0()->DiscardResource(
 		static_cast<WrappedD3D12Resource *>(pResource)->GetReal().Get(),
 		pRegion);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::BeginQuery(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::BeginQuery(
 	_In_  ID3D12QueryHeap *pQueryHeap,
 	_In_  D3D12_QUERY_TYPE Type,
 	_In_  UINT Index) {
 	//TODO: suppotr query heap
 	LogError("QUERY HEAP not supported");
-	return GetReal()->BeginQuery(
+	return GetReal0()->BeginQuery(
 		pQueryHeap,
 		Type,
 		Index);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::EndQuery(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::EndQuery(
 	_In_  ID3D12QueryHeap *pQueryHeap,
 	_In_  D3D12_QUERY_TYPE Type,
 	_In_  UINT Index) {
 	//TODO: suppotr query heap
 	LogError("QUERY HEAP not supported");
-	return GetReal()->EndQuery(
+	return GetReal0()->EndQuery(
 		pQueryHeap,
 		Type,
 		Index);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResolveQueryData(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ResolveQueryData(
 	_In_  ID3D12QueryHeap *pQueryHeap,
 	_In_  D3D12_QUERY_TYPE Type,
 	_In_  UINT StartIndex,
@@ -624,7 +629,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResolveQueryData(
 	_In_  UINT64 AlignedDestinationBufferOffset) {
 	//TODO: suppotr query heap
 	LogError("QUERY HEAP not supported");
-	return GetReal()->ResolveQueryData(
+	return GetReal0()->ResolveQueryData(
 		pQueryHeap,
 		Type,
 		StartIndex,
@@ -633,41 +638,41 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ResolveQueryData(
 		AlignedDestinationBufferOffset);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetPredication(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetPredication(
 	_In_opt_  ID3D12Resource *pBuffer,
 	_In_  UINT64 AlignedBufferOffset,
 	_In_  D3D12_PREDICATION_OP Operation) {
-	return GetReal()->SetPredication(
+	return GetReal0()->SetPredication(
 		static_cast<WrappedD3D12Resource *>(pBuffer)->GetReal().Get(),
 		AlignedBufferOffset,
 		Operation);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::SetMarker(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::SetMarker(
 	UINT Metadata,
 	_In_reads_bytes_opt_(Size)  const void *pData,
 	UINT Size) {
-	return GetReal()->SetMarker(
+	return GetReal0()->SetMarker(
 		Metadata,
 		pData,
 		Size);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::BeginEvent(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::BeginEvent(
 	UINT Metadata,
 	_In_reads_bytes_opt_(Size)  const void *pData,
 	UINT Size) {
-	return GetReal()->BeginEvent(
+	return GetReal0()->BeginEvent(
 		Metadata,
 		pData,
 		Size);
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::EndEvent(void) {
-	return GetReal()->EndEvent();
+void STDMETHODCALLTYPE WrappedD3D12CommandList::EndEvent(void) {
+	return GetReal0()->EndEvent();
 }
 
-void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ExecuteIndirect(
+void STDMETHODCALLTYPE WrappedD3D12CommandList::ExecuteIndirect(
 	_In_  ID3D12CommandSignature *pCommandSignature,
 	_In_  UINT MaxCommandCount,
 	_In_  ID3D12Resource *pArgumentBuffer,
@@ -676,7 +681,7 @@ void STDMETHODCALLTYPE WrappedD3D12GraphicsCommansList::ExecuteIndirect(
 	_In_  UINT64 CountBufferOffset) {
 	//TODO COMMANDSignature
 	LogError("CommandSignature unsupported");
-	return GetReal()->ExecuteIndirect(
+	return GetReal0()->ExecuteIndirect(
 		pCommandSignature,
 		MaxCommandCount,
 		static_cast<WrappedD3D12Resource *>(pArgumentBuffer)->GetReal().Get(),
