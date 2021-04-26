@@ -13,12 +13,3 @@ CTestTestfile.cmake
 /DX12Lib/inc/GenerateMips_CS.inc
 /Data/Shaders/*.cso
 *.cso
-Assets/Cerberus
-Assets/HDR
-Assets/Unreal-actor
-Assets/SM_Chair
-Assets/SM_Couch
-Assets/SM_Lamp_Ceiling
-Assets/SM_MatPreviewMesh
-Assets/SM_TableRound
-Assets/Sci-fi-Biolab
